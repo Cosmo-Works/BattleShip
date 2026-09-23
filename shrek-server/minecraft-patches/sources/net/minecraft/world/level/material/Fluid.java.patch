@@ -1,0 +1,13 @@
+--- a/net/minecraft/world/level/material/Fluid.java
++++ b/net/minecraft/world/level/material/Fluid.java
+@@ -74,6 +_,10 @@ public abstract class Fluid {
+ 
+     protected abstract Vec3 getFlow(BlockGetter level, BlockPos pos, FluidState fluidState);
+ 
++    public int sakura$getTickDelay(final Level world, final BlockPos pos) {
++        return this.getTickDelay(world);
++    }
++
+     public abstract int getTickDelay(LevelReader level);
+ 
+     protected boolean isRandomlyTicking() {

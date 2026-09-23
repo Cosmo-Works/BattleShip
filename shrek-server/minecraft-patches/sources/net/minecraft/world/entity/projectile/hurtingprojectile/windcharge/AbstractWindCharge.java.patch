@@ -1,0 +1,66 @@
+--- a/net/minecraft/world/entity/projectile/hurtingprojectile/windcharge/AbstractWindCharge.java
++++ b/net/minecraft/world/entity/projectile/hurtingprojectile/windcharge/AbstractWindCharge.java
+@@ -26,15 +_,42 @@ import net.minecraft.world.phys.HitResult;
+ import net.minecraft.world.phys.Vec3;
+ import org.jspecify.annotations.Nullable;
+ 
+-public abstract class AbstractWindCharge extends AbstractHurtingProjectile implements ItemSupplier {
++public abstract class AbstractWindCharge extends AbstractHurtingProjectile implements ItemSupplier, me.samsuik.sakura.entity.SakuraEntity { // Shrek - cannon entity merge
+     public static final ExplosionDamageCalculator EXPLOSION_DAMAGE_CALCULATOR = new SimpleExplosionDamageCalculator(
+         true, false, Optional.empty(), BuiltInRegistries.BLOCK.get(BlockTags.BLOCKS_WIND_CHARGE_EXPLOSIONS).map(Function.identity())
+     );
+     public static final double JUMP_SCALE = 0.25;
++    // Shrek start - cannon entity merge
++    public boolean canExplode = true;
++    private final me.samsuik.sakura.entity.SakuraEntityController sakuraEntityController;
++
++    @Override
++    public final me.samsuik.sakura.entity.SakuraEntityController getSakuraEntityController() {
++        return this.sakuraEntityController;
++    }
++
++    @Override
++    public final boolean canLink(final Entity entity, final int tickDifference) {
++        return true;
++    }
++
++    @Override
++    public final Vec3 sakura$position() {
++        return this.sakuraEntityController.getLinks().getHead().entity.position();
++    }
++
++    @Override
++    public final Vec3 sakura$deltaMovement() {
++        return this.sakuraEntityController.getLinks().getHead().entity.getDeltaMovement();
++    }
++    // Shrek end - cannon entity merge
+ 
+     public AbstractWindCharge(final EntityType<? extends AbstractWindCharge> type, final Level level) {
+         super(type, level);
+         this.accelerationPower = 0.0;
++        this.cannonEntity = true; // Shrek - cannon entity identity
++        this.sakuraEntityController = new me.samsuik.sakura.entity.SakuraEntityController(this); // Shrek - cannon entity merge
++        this.loadChunks = level.shrekConfig().cannons.loadChunks; // Shrek - load chunks on movement
+     }
+ 
+     public AbstractWindCharge(
+@@ -43,6 +_,9 @@ public abstract class AbstractWindCharge extends AbstractHurtingProjectile imple
+         super(type, x, y, z, level);
+         this.setOwner(owner);
+         this.accelerationPower = 0.0;
++        this.cannonEntity = true; // Shrek - cannon entity identity
++        this.sakuraEntityController = new me.samsuik.sakura.entity.SakuraEntityController(this); // Shrek - cannon entity merge
++        this.loadChunks = level.shrekConfig().cannons.loadChunks; // Shrek - load chunks on movement
+     }
+ 
+     protected AbstractWindCharge(
+@@ -50,6 +_,9 @@ public abstract class AbstractWindCharge extends AbstractHurtingProjectile imple
+     ) {
+         super(type, x, y, z, direction, level);
+         this.accelerationPower = 0.0;
++        this.cannonEntity = true; // Shrek - cannon entity identity
++        this.sakuraEntityController = new me.samsuik.sakura.entity.SakuraEntityController(this); // Shrek - cannon entity merge
++        this.loadChunks = level.shrekConfig().cannons.loadChunks; // Shrek - load chunks on movement
+     }
+ 
+     @Override

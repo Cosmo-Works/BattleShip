@@ -1,0 +1,14 @@
+--- a/net/minecraft/world/level/block/BubbleColumnBlock.java
++++ b/net/minecraft/world/level/block/BubbleColumnBlock.java
+@@ -59,6 +_,11 @@ public class BubbleColumnBlock extends Block implements BucketPickup {
+         final boolean isPrecise
+     ) {
+         if (!new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
++        // Shrek start - configure bubble columns affecting cannon entities
++        if (!level.shrekConfig().cannons.tntAndSandAffectedByBubbleColumns && (entity instanceof net.minecraft.world.entity.item.PrimedTnt || entity instanceof net.minecraft.world.entity.item.FallingBlockEntity)) {
++            return;
++        }
++        // Shrek end - configure bubble columns affecting cannon entities
+         if (isPrecise) {
+             BlockState stateAbove = level.getBlockState(pos.above());
+             boolean nothingAbove = stateAbove.getCollisionShape(level, pos).isEmpty() && stateAbove.getFluidState().isEmpty();

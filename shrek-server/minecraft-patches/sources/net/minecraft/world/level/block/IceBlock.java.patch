@@ -1,0 +1,20 @@
+--- a/net/minecraft/world/level/block/IceBlock.java
++++ b/net/minecraft/world/level/block/IceBlock.java
+@@ -49,7 +_,7 @@ public class IceBlock extends HalfTransparentBlock {
+     public void afterDestroy(Level level, BlockPos pos, ItemStack destroyedWith) {
+         // Paper end - Improve Block#breakNaturally API
+         if (!EnchantmentHelper.hasTag(destroyedWith, EnchantmentTags.PREVENTS_ICE_MELTING)) {
+-            if (level.environmentAttributes().getValue(EnvironmentAttributes.WATER_EVAPORATES, pos)) {
++            if (!level.shrekConfig().environment.allowWaterInTheNether && level.environmentAttributes().getValue(EnvironmentAttributes.WATER_EVAPORATES, pos)) {
+                 level.removeBlock(pos, false);
+                 return;
+             }
+@@ -74,7 +_,7 @@ public class IceBlock extends HalfTransparentBlock {
+         if (org.bukkit.craftbukkit.event.CraftEventFactory.callBlockFadeEvent(level, pos, waterEvaporates ? Blocks.AIR.defaultBlockState() : Blocks.WATER.defaultBlockState()).isCancelled()) {
+             return;
+         }
+-        if (waterEvaporates) {
++        if (!level.shrekConfig().environment.allowWaterInTheNether && waterEvaporates) {
+             // Paper end - call BlockFadeEvent
+             level.removeBlock(pos, false);
+         } else {

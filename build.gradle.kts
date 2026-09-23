@@ -20,17 +20,17 @@ paperweight {
 
         patchFile {
             path = "canvas-server/build.gradle.kts"
-            outputFile = file("baguette-server/build.gradle.kts")
-            patchFile = file("baguette-server/build.gradle.kts.patch")
+            outputFile = file("shrek-server/build.gradle.kts")
+            patchFile = file("shrek-server/build.gradle.kts.patch")
         }
         patchFile {
             path = "canvas-api/build.gradle.kts"
-            outputFile = file("baguette-api/build.gradle.kts")
-            patchFile = file("baguette-api/build.gradle.kts.patch")
+            outputFile = file("shrek-api/build.gradle.kts")
+            patchFile = file("shrek-api/build.gradle.kts.patch")
         }
         patchRepo("paperApi") {
             upstreamPath = "paper-api"
-            patchesDir = file("baguette-api/paper-patches")
+            patchesDir = file("shrek-api/paper-patches")
             // Thanks to weaver, you can also use ATs for all sources, not just the minecraft one.
             // By default, when weaver is looking for an AT file for a patch source set, it looks under the `build-data` dir for an AT file under the name of the patch set.
             // For this patchRepo, it would look for paperApi.at because 'paperApi` is the name of the source set, as declared in the `patchRepo("paperApi")` field.
@@ -41,7 +41,7 @@ paperweight {
         patchDir("canvasApi") {
             upstreamPath = "canvas-api"
             excludes = listOf("build.gradle.kts", "build.gradle.kts.patch", "paper-patches")
-            patchesDir = file("baguette-api/canvas-patches")
+            patchesDir = file("shrek-api/canvas-patches")
             outputDir = file("canvas-api")
         }
     }

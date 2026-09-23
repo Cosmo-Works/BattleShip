@@ -1,0 +1,36 @@
+--- a/net/minecraft/world/entity/Mob.java
++++ b/net/minecraft/world/entity/Mob.java
+@@ -153,6 +_,23 @@ public abstract class Mob extends LivingEntity implements Targeting, EquipmentUs
+     private int homeRadius = -1;
+     public boolean aware = true; // CraftBukkit
+ 
++    private boolean isAwareOnGroundOrSwimming() {
++        return this.aware
++            || this.verticalCollision
++            || this.isInWater()
++            || this.getDeltaMovement().y > 0.0;
++    }
++
++    @Override
++    protected boolean updateFluidInteraction() {
++        return this.isAwareOnGroundOrSwimming() && super.updateFluidInteraction();
++    }
++
++    @Override
++    public boolean isInWall() {
++        return this.isAwareOnGroundOrSwimming() && super.isInWall();
++    }
++
+     protected Mob(final EntityType<? extends Mob> type, final Level level) {
+         super(type, level);
+         this.goalSelector = new GoalSelector();
+@@ -166,6 +_,9 @@ public abstract class Mob extends LivingEntity implements Targeting, EquipmentUs
+         if (level instanceof ServerLevel) {
+             this.registerGoals();
+         }
++        if (this.level().shrekConfig().entities.disableMobAi) {
++            this.aware = false;
++        }
+     }
+ 
+     protected void registerGoals() {

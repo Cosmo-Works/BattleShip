@@ -1,0 +1,14 @@
+--- a/net/minecraft/core/component/PatchedDataComponentMap.java
++++ b/net/minecraft/core/component/PatchedDataComponentMap.java
+@@ -19,6 +_,11 @@ public final class PatchedDataComponentMap implements DataComponentMap {
+     private Reference2ObjectMap<DataComponentType<?>, Optional<?>> patch;
+     private boolean copyOnWrite;
+ 
++    public <T> void sakura$patchComponent(final DataComponentType<T> prototype, final @org.jspecify.annotations.Nullable T newValue) {
++        this.ensureMapOwnership();
++        this.patch.put(prototype, java.util.Optional.ofNullable(newValue));
++    }
++
+     public PatchedDataComponentMap(final DataComponentMap prototype) {
+         this(prototype, Reference2ObjectMaps.emptyMap(), true);
+     }

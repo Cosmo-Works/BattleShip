@@ -1,0 +1,23 @@
+--- a/net/minecraft/world/level/block/LadderBlock.java
++++ b/net/minecraft/world/level/block/LadderBlock.java
+@@ -33,6 +_,11 @@ public class LadderBlock extends Block implements SimpleWaterloggedBlock {
+         return CODEC;
+     }
+ 
++    @Override
++    public boolean hasDynamicShape() {
++        return true;
++    }
++
+     protected LadderBlock(final BlockBehaviour.Properties properties) {
+         super(properties);
+         this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(WATERLOGGED, false));
+@@ -40,7 +_,7 @@ public class LadderBlock extends Block implements SimpleWaterloggedBlock {
+ 
+     @Override
+     protected VoxelShape getShape(final BlockState state, final BlockGetter level, final BlockPos pos, final CollisionContext context) {
+-        return SHAPES.get(state.getValue(FACING));
++        return me.samsuik.sakura.mechanics.LadderBehaviour.collisionShape(level, state);
+     }
+ 
+     private boolean canAttachTo(final BlockGetter level, final BlockPos pos, final Direction direction) {

@@ -1,0 +1,11 @@
+--- a/net/minecraft/world/level/material/WaterFluid.java
++++ b/net/minecraft/world/level/material/WaterFluid.java
+@@ -123,7 +_,7 @@ public abstract class WaterFluid extends FlowingFluid {
+ 
+     @Override
+     public boolean canBeReplacedWith(final FluidState state, final BlockGetter level, final BlockPos pos, final Fluid other, final Direction direction) {
+-        return direction == Direction.DOWN && !other.is(FluidTags.WATER);
++        return me.samsuik.sakura.mechanics.BlockFormation.waterAllowsReplacement(level, other, direction);
+     }
+ 
+     @Override

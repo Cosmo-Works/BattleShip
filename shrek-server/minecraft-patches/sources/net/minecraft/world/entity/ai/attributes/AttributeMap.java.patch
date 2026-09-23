@@ -1,0 +1,14 @@
+--- a/net/minecraft/world/entity/ai/attributes/AttributeMap.java
++++ b/net/minecraft/world/entity/ai/attributes/AttributeMap.java
+@@ -18,6 +_,11 @@ public class AttributeMap {
+     private final Set<AttributeInstance> attributesToSync = new ObjectOpenHashSet<>();
+     private final Set<AttributeInstance> attributesToUpdate = new ObjectOpenHashSet<>();
+     private final AttributeSupplier supplier;
++    // Shrek start - state watchers
++    public double supplyDefaultValue(final Holder<Attribute> attribute) {
++        return this.supplier.getValue(attribute);
++    }
++    // Shrek end - state watchers
+ 
+     public AttributeMap(final AttributeSupplier supplier) {
+         this.supplier = supplier;

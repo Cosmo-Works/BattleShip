@@ -1,0 +1,16 @@
+--- a/net/minecraft/world/item/Item.java
++++ b/net/minecraft/world/item/Item.java
+@@ -132,6 +_,13 @@ public class Item implements ItemLike, FeatureElement {
+         return BY_BLOCK.getOrDefault(block, Items.AIR);
+     }
+ 
++    public DataComponentMap modifyBaseComponents(final DataComponentMap components) {
++        return components;
++    }
++
++    public void modifyComponentsSentToClient(final net.minecraft.core.component.PatchedDataComponentMap components) {
++    }
++
+     public Item(final Item.Properties properties) {
+         this.descriptionId = properties.effectiveDescriptionId();
+         DataComponentInitializers.Initializer<Item> componentInitializer = properties.finalizeInitializer(

@@ -1,0 +1,12 @@
+--- a/src/main/java/io/papermc/paper/ServerBuildInfo.java
++++ b/src/main/java/io/papermc/paper/ServerBuildInfo.java
+@@ -26,6 +_,9 @@
+      */
+     Key BRAND_CANVAS_ID = Key.key("canvasmc", "canvas");
+     // Canvas end - Rebrand
++    // Shrek start - Rebrand
++    Key BRAND_SHREK_ID = Key.key("shrekmc", "shrek");
++    // Shrek end - Rebrand
+ 
+     /**
+      * Gets the {@code ServerBuildInfo}.

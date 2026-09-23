@@ -1,0 +1,13 @@
+--- a/net/minecraft/network/protocol/game/ClientboundLevelChunkPacketData.java
++++ b/net/minecraft/network/protocol/game/ClientboundLevelChunkPacketData.java
+@@ -39,6 +_,10 @@ public class ClientboundLevelChunkPacketData {
+     public List<net.minecraft.network.protocol.Packet<?>> getExtraPackets() {
+         return this.extraPackets;
+     }
++
++    public void removeBlockEntitiesOfType(final BlockEntityType<?> type) {
++        this.blockEntitiesData.removeIf(info -> info.type == type);
++    }
+     // Paper end - Handle oversized block entities in chunks
+ 
+     @Deprecated @io.papermc.paper.annotation.DoNotUse // Paper - Anti-Xray - Add chunk packet info

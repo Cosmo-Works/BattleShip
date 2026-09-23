@@ -1,0 +1,92 @@
+--- a/io/papermc/paper/threadedregions/RegionizedWorldData.java
++++ b/io/papermc/paper/threadedregions/RegionizedWorldData.java
+@@ -163,6 +_,13 @@ public final class RegionizedWorldData {
+             into.phantomSpawnerNextTick = Math.max(from.phantomSpawnerNextTick, into.phantomSpawnerNextTick);
+             // chunkHoldersToBroadcast
+             into.chunkHoldersToBroadcast.addAll(from.chunkHoldersToBroadcast);
++            // Shrek start - per-region tick scheduler and block state watchers
++            into.shrekTickScheduler.mergeFrom(from.shrekTickScheduler);
++            into.shrekBlockStateChangeTracker.mergeFrom(from.shrekBlockStateChangeTracker);
++            into.shrekBlockStateRevision = Math.max(into.shrekBlockStateRevision, from.shrekBlockStateRevision);
++            into.shrekEntityManager.mergeFrom(from.shrekEntityManager);
++            into.shrekDurableBlockManager.mergeFrom(from.shrekDurableBlockManager);
++            // Shrek end - per-region tick scheduler and block state watchers
+         }
+ 
+         @Override
+@@ -342,6 +_,15 @@ public final class RegionizedWorldData {
+                     into.chunkHoldersToBroadcast.add(chunkHolder);
+                 }
+             }
++            // Shrek start - per-region tick scheduler and block state watchers
++            from.shrekTickScheduler.splitInto(chunkToRegionShift, regionToData, dataSet);
++            from.shrekBlockStateChangeTracker.splitInto(chunkToRegionShift, regionToData);
++            from.shrekEntityManager.splitInto(from.allEntities, chunkToRegionShift, regionToData);
++            from.shrekDurableBlockManager.splitInto(chunkToRegionShift, regionToData);
++            for (final RegionizedWorldData regionizedWorldData : dataSet) {
++                regionizedWorldData.shrekBlockStateRevision = from.shrekBlockStateRevision;
++            }
++            // Shrek end - per-region tick scheduler and block state watchers
+         }
+     };
+ 
+@@ -461,6 +_,18 @@ public final class RegionizedWorldData {
+     public int wakeupInactiveRemainingVillagers;
+     // Paper end
+     public int currentPrimedTnt = 0; // Spigot
++    // Shrek start - per-region tick scheduler and block state watchers
++    public final me.samsuik.sakura.scheduler.LevelTickScheduler shrekTickScheduler = new me.samsuik.sakura.scheduler.LevelTickScheduler();
++    public final me.samsuik.sakura.tracking.block_change.BlockStateChangeTracker shrekBlockStateChangeTracker;
++    public long shrekBlockStateRevision;
++    public final me.samsuik.sakura.entity.SakuraEntityManager shrekEntityManager = new me.samsuik.sakura.entity.SakuraEntityManager();
++    public final me.samsuik.sakura.explosion.density.ExplosionObstructionCache shrekObstructionCache = new me.samsuik.sakura.explosion.density.ExplosionObstructionCache();
++    public final me.samsuik.sakura.explosion.DurableBlockManager shrekDurableBlockManager;
++    public final me.samsuik.sakura.mechanics.sake.DispenseRelocationHandler shrekDispenseRelocationHandler;
++    public final me.samsuik.sakura.entity.FallingBlockColumnLimits shrekFallingBlockColumnLimits = new me.samsuik.sakura.entity.FallingBlockColumnLimits();
++    public final me.samsuik.sakura.redstone.RedstoneWireCache shrekRedstoneWireCache = new me.samsuik.sakura.redstone.RedstoneWireCache();
++    public final me.samsuik.sakura.tps.TickInformationCollector shrekTickInformation = new me.samsuik.sakura.tps.TickInformationCollector();
++    // Shrek end - per-region tick scheduler and block state watchers
+     @VisibleForDebug
+     public NaturalSpawner.@Nullable SpawnState lastSpawnState;
+     public boolean shouldSignal = true;
+@@ -506,6 +_,10 @@ public final class RegionizedWorldData {
+         this.wireHandler = new alternate.current.wire.WireHandler(world);
+         this.turbo = new io.papermc.paper.redstone.RedstoneWireTurbo((RedStoneWireBlock)Blocks.REDSTONE_WIRE);
+         this.regionData = regionData;
++        this.shrekBlockStateChangeTracker = new me.samsuik.sakura.tracking.block_change.BlockStateChangeTracker(world); // Shrek - per-region block state watchers
++        this.shrekDurableBlockManager = new me.samsuik.sakura.explosion.DurableBlockManager(world); // Shrek - explosion durable blocks
++        this.shrekDispenseRelocationHandler = new me.samsuik.sakura.mechanics.sake.DispenseRelocationHandler(world); // Shrek - dispenser relocation
++        me.samsuik.sakura.scheduler.ScheduleSakuraTasks.schedule(this.shrekTickScheduler); // Shrek - per-region tick scheduler
+ 
+         // tasks may be drained before the region ticks, so we must set up the tick data early just in case
+         this.updateTickData();
+@@ -726,6 +_,29 @@ public final class RegionizedWorldData {
+         }
+     }
+ 
++    public IteratorSafeOrderedReferenceSet<Entity> tickingEntities() {
++        return this.entityTickList;
++    }
++
++    public me.samsuik.sakura.tps.ServerTickInformation latestTickInformation() {
++        return this.shrekTickInformation.latestTickInformation();
++    }
++
++    public it.unimi.dsi.fastutil.objects.ObjectImmutableList<me.samsuik.sakura.tps.ServerTickInformation> tickHistory(final long from, final long to) {
++        return this.shrekTickInformation.collect(from, to);
++    }
++
++    public void recordShrekTick(final long durationNanos) {
++        this.shrekTickInformation.tickDuration(java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(Math.max(0L, durationNanos)));
++        if (this.shrekTickInformation.hasFullSecond()) {
++            this.shrekTickInformation.regionData(
++                this.chunks.size(),
++                this.entityTickList.size(),
++                io.papermc.paper.threadedregions.TickRegionScheduler.getTickRate()
++            );
++        }
++    }
++
+     public void addEntity(final @NonNull Entity entity) {
+         if (!TickThread.isTickThreadFor(this.world, entity.chunkPosition())) {
+             throw new IllegalArgumentException("Entity " + entity + " is not under this region's control");

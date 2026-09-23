@@ -1,0 +1,15 @@
+--- a/net/minecraft/world/level/block/WeightedPressurePlateBlock.java
++++ b/net/minecraft/world/level/block/WeightedPressurePlateBlock.java
+@@ -54,6 +_,12 @@ public class WeightedPressurePlateBlock extends BasePressurePlateBlock {
+ 
+             // We only want to block turning the plate on if all events are cancelled
+             if (!cancellable.isCancelled()) {
++                // Shrek start - cannon entity merge
++                if (entity instanceof final me.samsuik.sakura.entity.SakuraEntity sakuraEntity) {
++                    count += sakuraEntity.getSakuraEntityController().getLinks().count();
++                    continue;
++                }
++                // Shrek end - cannon entity merge
+                 count++;
+             }
+         }

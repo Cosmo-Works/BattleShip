@@ -1,0 +1,19 @@
+--- a/net/minecraft/server/network/ServerCommonPacketListenerImpl.java
++++ b/net/minecraft/server/network/ServerCommonPacketListenerImpl.java
+@@ -383,6 +_,16 @@ public abstract class ServerCommonPacketListenerImpl implements ServerCommonPack
+         } else if (packet instanceof net.minecraft.network.protocol.game.ClientboundSetDefaultSpawnPositionPacket defaultSpawnPositionPacket && this instanceof ServerGamePacketListenerImpl serverGamePacketListener) {
+             serverGamePacketListener.player.compassTarget = org.bukkit.craftbukkit.util.CraftLocation.toBukkit(defaultSpawnPositionPacket.respawnData().pos(), serverGamePacketListener.getPlayer().level());
+         }
++        // Shrek start - client visibility settings
++        final net.minecraft.server.level.ServerPlayer player = this instanceof final ServerGamePacketListenerImpl gamePacketListener
++            ? gamePacketListener.getPlayer()
++            : this.connection.getPlayer();
++        if (player != null
++            && player.visibilitySettings.playerModified()
++            && me.samsuik.sakura.player.visibility.FilterOrModifyPackets.filterOrModifyPacket(packet, player)) {
++            return;
++        }
++        // Shrek end - client visibility settings
+         // CraftBukkit end
+         if (packet.isTerminal()) {
+             this.close();

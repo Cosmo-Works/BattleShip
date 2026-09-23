@@ -1,0 +1,17 @@
+--- a/net/minecraft/world/item/SolidBucketItem.java
++++ b/net/minecraft/world/item/SolidBucketItem.java
+@@ -27,7 +_,13 @@ public class SolidBucketItem extends BlockItem implements DispensibleContainerIt
+         InteractionResult placeResult = super.useOn(context);
+         Player player = context.getPlayer();
+         if (placeResult.consumesAction() && player != null) {
+-            player.setItemInHand(context.getHand(), BucketItem.getEmptySuccessItem(context.getItemInHand(), player));
++            final ItemStack itemInHand = context.getItemInHand();
++            final ItemStack emptyBucket = BucketItem.getEmptySuccessItem(itemInHand, player);
++            if (itemInHand.isEmpty()) {
++                player.setItemInHand(context.getHand(), emptyBucket);
++            } else {
++                player.addItem(emptyBucket);
++            }
+         }
+ 
+         return placeResult;

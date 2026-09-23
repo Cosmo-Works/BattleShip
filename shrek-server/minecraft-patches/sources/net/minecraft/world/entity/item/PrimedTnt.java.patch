@@ -1,0 +1,265 @@
+--- a/net/minecraft/world/entity/item/PrimedTnt.java
++++ b/net/minecraft/world/entity/item/PrimedTnt.java
+@@ -36,7 +_,7 @@ import org.bukkit.event.entity.EntityRemoveEvent;
+ import org.bukkit.event.entity.ExplosionPrimeEvent;
+ // CraftBukkit end
+ 
+-public class PrimedTnt extends Entity implements TraceableEntity {
++public class PrimedTnt extends Entity implements TraceableEntity, me.samsuik.sakura.entity.SakuraEntity { // Shrek - cannon entity merge
+     private static final EntityDataAccessor<Integer> DATA_FUSE_ID = SynchedEntityData.defineId(PrimedTnt.class, EntityDataSerializers.INT);
+     private static final EntityDataAccessor<BlockState> DATA_BLOCK_STATE_ID = SynchedEntityData.defineId(PrimedTnt.class, EntityDataSerializers.BLOCK_STATE);
+     public static final short DEFAULT_FUSE_TIME = 80;
+@@ -63,10 +_,15 @@ public class PrimedTnt extends Entity implements TraceableEntity {
+     private boolean usedPortal;
+     public float explosionPower = 4.0F;
+     public boolean isIncendiary = false; // CraftBukkit
++    public int heightLimit = Integer.MIN_VALUE; // Shrek - cannon mechanics
+ 
+     public PrimedTnt(final EntityType<? extends PrimedTnt> type, final Level level) {
+         super(type, level);
+         this.blocksBuilding = true;
++        this.cannonEntity = true; // Shrek - cannon entity identity
++        this.sakuraEntityController = new me.samsuik.sakura.entity.SakuraEntityController(this); // Shrek - cannon entity merge
++        this.loadChunks = level.shrekConfig().cannons.loadChunks; // Shrek - load chunks on movement
++        this.shrek$applyHeightLimit(); // Shrek - cannon mechanics
+     }
+ 
+     public PrimedTnt(final Level level, final double x, final double y, final double z, final @Nullable LivingEntity owner) {
+@@ -74,6 +_,7 @@ public class PrimedTnt extends Entity implements TraceableEntity {
+         this.setPos(x, y, z);
+         double rot = this.getRandom().nextDouble() * (float) (Math.PI * 2); // Paper - Don't use level random in entity constructors
+         this.setDeltaMovement(-Math.sin(rot) * 0.02, 0.2F, -Math.cos(rot) * 0.02);
++        this.shrek$applyCannonMechanics(); // Shrek - cannon mechanics
+         this.setFuse(80);
+         this.xo = x;
+         this.yo = y;
+@@ -81,6 +_,107 @@ public class PrimedTnt extends Entity implements TraceableEntity {
+         this.owner = EntityReference.of(owner);
+     }
+ 
++    // Shrek start - cannon mechanics
++    private me.samsuik.sakura.mechanics.MinecraftMechanicsTarget shrek$target() {
++        final me.samsuik.sakura.mechanics.MinecraftMechanicsTarget target = this.level().shrekConfig().mechanics.parsedTarget.valueSafe();
++        return target != null ? target : me.samsuik.sakura.mechanics.MinecraftMechanicsTarget.latest();
++    }
++
++    private void shrek$applyCannonMechanics() {
++        final me.samsuik.sakura.configuration.local.CachedLocalConfiguration config = this.level().localConfig().at(this.blockPosition());
++        final me.samsuik.sakura.entity.TntSpread spread = config.tntSpread;
++        if (spread != null) {
++            switch (spread) {
++                case NONE -> this.setDeltaMovement(0.0, 0.0, 0.0);
++                case Y -> this.setDeltaMovement(this.getDeltaMovement().multiply(0.0, 1.0, 0.0));
++                default -> {
++                }
++            }
++        }
++
++        if (this.shrek$target().isLegacy()) {
++            this.setDeltaMovement(this.getDeltaMovement().multiply(0.0, 1.0, 0.0));
++        }
++        this.shrek$applyHeightLimit();
++    }
++
++    @Override
++    public final void sakura$addedToWorld() {
++        this.shrek$applyHeightLimit();
++    }
++
++    private void shrek$applyHeightLimit() {
++        final me.samsuik.sakura.configuration.local.CachedLocalConfiguration config = this.level().localConfig().at(this.blockPosition());
++        this.heightLimit = config.heightLimit != Integer.MIN_VALUE
++            ? config.heightLimit
++            : this.level().shrekConfig().mechanics.heightLimitOr(
++                this.level().paperConfig().fixes.tntEntityHeightNerf.or(Integer.MIN_VALUE)
++            );
++    }
++
++    @Override
++    public final double getEyeY() {
++        // Shrek - cannon mechanics: legacy tnt uses an eye height of 0.49
++        return this.shrek$target().isLegacy() ? this.getY() + (double) 0.49f : this.getY();
++    }
++
++    @Override
++    public final double distanceToSqr(final net.minecraft.world.phys.Vec3 pos) {
++        if (!this.shrek$target().isLegacy()) {
++            return super.distanceToSqr(pos);
++        }
++        // Shrek - cannon mechanics: legacy tnt measures distance from its eye position
++        final double x = this.getX() - pos.x;
++        final double y = this.getEyeY() - pos.y;
++        final double z = this.getZ() - pos.z;
++        return x * x + y * y + z * z;
++    }
++    // Shrek end - cannon mechanics
++    // Shrek start - cannon entity merge
++    private final me.samsuik.sakura.entity.SakuraEntityController sakuraEntityController;
++    public boolean canExplode = true; // Shrek - optimise explosions
++
++    @Override
++    public final me.samsuik.sakura.entity.SakuraEntityController getSakuraEntityController() {
++        return this.sakuraEntityController;
++    }
++
++    @Override
++    public final boolean canLink(final Entity otherEntity, final int tickDifference) {
++        return otherEntity instanceof final PrimedTnt otherTnt
++            && Math.abs(this.getFuse() - otherTnt.getFuse()) <= tickDifference
++            && this.explosionPower == otherTnt.explosionPower
++            && this.isIncendiary == otherTnt.isIncendiary;
++    }
++
++    @Override
++    public final boolean sameProperties(final Entity otherEntity, final int tickDifference) {
++        return otherEntity instanceof final PrimedTnt otherTnt
++            && this.getFuse() - tickDifference == otherTnt.getFuse();
++    }
++
++    @Override
++    public final void catchupOnTicks(final int ticks) {
++        this.setFuse(this.getFuse() - ticks);
++    }
++
++    @Override
++    public final net.minecraft.world.phys.Vec3 sakura$position() {
++        return this.sakuraEntityController.getLinks().getHead().entity.position();
++    }
++
++    @Override
++    public final net.minecraft.world.phys.Vec3 sakura$deltaMovement() {
++        return this.sakuraEntityController.getLinks().getHead().entity.getDeltaMovement();
++    }
++    // Shrek end - cannon entity merge
++    // Shrek start - optimise cannon entity movement
++    @Override
++    protected final net.minecraft.world.phys.Vec3 collide(final net.minecraft.world.phys.Vec3 movement) {
++        return this.sakura$collide(movement);
++    }
++    // Shrek end - optimise cannon entity movement
++
+     @Override
+     protected void defineSynchedData(final SynchedEntityData.Builder entityData) {
+         entityData.define(DATA_FUSE_ID, 80);
+@@ -99,30 +_,53 @@ public class PrimedTnt extends Entity implements TraceableEntity {
+ 
+     @Override
+     protected double getDefaultGravity() {
+-        return 0.04;
++        return this.shrek$target().before(me.samsuik.sakura.mechanics.MechanicVersion.v1_14) ? 0.04f : 0.04; // Shrek - cannon mechanics: pre-1.14 used float gravity
+     }
+ 
+     @Override
+     public void tick() {
+-        if (this.level().spigotConfig.maxTntTicksPerTick > 0 && ++this.level().getCurrentWorldData().currentPrimedTnt > this.level().spigotConfig.maxTntTicksPerTick) { return; } // Spigot // Folia - region threading
++        if (!this.level().shrekConfig().cannons.tnt.removeMaxTntPerTick && this.level().spigotConfig.maxTntTicksPerTick > 0 && ++this.level().getCurrentWorldData().currentPrimedTnt > this.level().spigotConfig.maxTntTicksPerTick) { return; } // Spigot // Folia - region threading // Shrek - cannon mechanics: optionally remove the tnt tick limit
+         // this.handlePortal(); // Folia - region threading
+         this.applyGravity();
++        // Shrek start - cannon mechanics
++        final me.samsuik.sakura.mechanics.MinecraftMechanicsTarget shrek$mechanicsTarget = this.shrek$target();
++        final boolean shrek$effectsBeforeMovement = shrek$mechanicsTarget.isLegacy();
++        if (shrek$effectsBeforeMovement) {
++            this.applyEffectsFromBlocks();
++        }
++        // Shrek end - cannon mechanics
+         this.move(MoverType.SELF, this.getDeltaMovement());
+-        this.applyEffectsFromBlocks();
++        // Shrek start - cannon mechanics
++        if (!shrek$effectsBeforeMovement) {
++            this.applyEffectsFromBlocks();
++        }
++        // Shrek end - cannon mechanics
+         // Paper start - Configurable TNT height nerf
+-        if (this.level().paperConfig().fixes.tntEntityHeightNerf.test(v -> this.getY() > v)) {
++        if (this.heightLimit != Integer.MIN_VALUE && this.getY() > this.heightLimit) { // Shrek - cannon mechanics
+             this.discard(EntityRemoveEvent.Cause.OUT_OF_WORLD);
+             return;
+         }
+         // Paper end - Configurable TNT height nerf
+-        this.setDeltaMovement(this.getDeltaMovement().scale(this.getAirDrag()));
++        // Shrek start - cannon mechanics
++        if (shrek$mechanicsTarget.atLeast(me.samsuik.sakura.mechanics.MechanicVersion.v1_12)) {
++            final double drag = shrek$mechanicsTarget.between(me.samsuik.sakura.mechanics.MechanicVersion.v1_14, me.samsuik.sakura.mechanics.MechanicVersion.v26_2)
++                ? 0.98
++                : this.getAirDrag();
++            this.setDeltaMovement(this.getDeltaMovement().scale(drag));
++        }
++        // Shrek end - cannon mechanics
+         if (this.onGround()) {
+-            this.setDeltaMovement(this.getDeltaMovement().multiply(0.7, -0.5, 0.7));
++            // Shrek start - cannon mechanics
++            final double friction = shrek$mechanicsTarget.before(me.samsuik.sakura.mechanics.MechanicVersion.v1_14)
++                ? 0.7f
++                : 0.7;
++            this.setDeltaMovement(this.getDeltaMovement().multiply(friction, -0.5, friction));
++            // Shrek end - cannon mechanics
+         }
+ 
+         int fuse = this.getFuse() - 1;
+         this.setFuse(fuse);
+-        if (fuse <= 0) {
++        if (shrek$mechanicsTarget.before(me.samsuik.sakura.mechanics.MechanicVersion.v1_9) ? (fuse < 0) : (fuse <= 0)) { // Shrek - cannon mechanics: pre-1.9 tnt explodes a tick later
+             // CraftBukkit start - Need to reverse the order of the explosion and the entity death so we have a location for the event
+             //this.discard();
+             if (!this.level().isClientSide()) {
+@@ -136,16 +_,22 @@ public class PrimedTnt extends Entity implements TraceableEntity {
+                 this.level().addParticle(ParticleTypes.SMOKE, this.getX(), this.getY() + 0.5, this.getZ(), 0.0, 0.0, 0.0);
+             }
+         }
+-        // Paper start - Option to prevent TNT from moving in water
+-        if (!this.isRemoved() && this.wasTouchingWater && this.level().paperConfig().fixes.preventTntFromMovingInWater) {
++        // Shrek start - configure force position updates
++        if (this.level().shrekConfig().cannons.tnt.forcePositionUpdates) {
++            this.forcePositionUpdateInWater();
++        }
++    }
++
++    private void forcePositionUpdateInWater() {
++        if (!this.isRemoved() && this.wasTouchingWater && !this.isPushedByFluid()) {
+             this.hurtMarked = true;
+             this.needsSync = true;
+         }
+-        // Paper end - Option to prevent TNT from moving in water
++        // Shrek end - configure force position updates
+     }
+ 
+     private void explode() {
+-        if (this.level() instanceof ServerLevel level && level.getGameRules().get(GameRules.TNT_EXPLODES)) {
++        if (this.level() instanceof ServerLevel level && level.getGameRules().get(GameRules.TNT_EXPLODES) && this.canExplode) { // Shrek - optimise explosions
+             // CraftBukkit start
+             ExplosionPrimeEvent event = CraftEventFactory.callExplosionPrimeEvent((org.bukkit.entity.Explosive) this.getBukkitEntity());
+             if (event.isCancelled()) {
+@@ -158,7 +_,7 @@ public class PrimedTnt extends Entity implements TraceableEntity {
+                     Explosion.getDefaultDamageSource(this.level(), this),
+                     this.usedPortal ? USED_PORTAL_DAMAGE_CALCULATOR : null,
+                     this.getX(),
+-                    this.getY(0.0625),
++                    me.samsuik.sakura.mechanics.ExplosionBehaviour.getY(this), // Shrek - cannon mechanics: explosion height
+                     this.getZ(),
+                     event.getRadius(), // CraftBukkit
+                     event.getFire(), // CraftBukkit
+@@ -200,7 +_,11 @@ public class PrimedTnt extends Entity implements TraceableEntity {
+     }
+ 
+     public void setFuse(final int time) {
+-        this.entityData.set(DATA_FUSE_ID, time);
++        // Shrek start - packet obfuscation and reduction
++        final int phase = (((time - 1) / 10) & 1) == 0 ? 0 : 10;
++        final int obfuscatedFuse = 80 - phase - 1;
++        this.entityData.set(DATA_FUSE_ID, time, obfuscatedFuse);
++        // Shrek end - packet obfuscation and reduction
+     }
+ 
+     public int getFuse() {
+@@ -249,6 +_,11 @@ public class PrimedTnt extends Entity implements TraceableEntity {
+     // Paper start - Option to prevent TNT from moving in water
+     @Override
+     public boolean isPushedByFluid() {
++        // Shrek start - cannon mechanics
++        if (!this.level().localConfig().at(this.blockPosition()).tntFlowsInWater || this.shrek$target().isLegacy()) {
++            return false;
++        }
++        // Shrek end - cannon mechanics
+         return !this.level().paperConfig().fixes.preventTntFromMovingInWater && super.isPushedByFluid();
+     }
+     // Paper end - Option to prevent TNT from moving in water

@@ -1,0 +1,23 @@
+--- a/ca/spottedleaf/moonrise/patches/chunk_system/level/entity/EntityLookup.java
++++ b/ca/spottedleaf/moonrise/patches/chunk_system/level/entity/EntityLookup.java
+@@ -743,6 +_,11 @@ public abstract class EntityLookup implements LevelEntityGetter<Entity> {
+ 
+     public void getEntities(final Entity except, final AABB box, final List<Entity> into, final Predicate<? super Entity> predicate,
+                             final int maxCount) {
++        this.getEntities(except, box, into, predicate, maxCount, Integer.MAX_VALUE);
++    }
++
++    public void getEntities(final Entity except, final AABB box, final List<Entity> into, final Predicate<? super Entity> predicate,
++                            final int maxCount, final int maxSearch) {
+         final int minChunkX = (Mth.floor(box.minX) - 2) >> 4;
+         final int minChunkZ = (Mth.floor(box.minZ) - 2) >> 4;
+         final int maxChunkX = (Mth.floor(box.maxX) + 2) >> 4;
+@@ -774,7 +_,7 @@ public abstract class EntityLookup implements LevelEntityGetter<Entity> {
+                             continue;
+                         }
+ 
+-                        if (chunk.getEntities(except, box, into, predicate, maxCount)) {
++                        if (chunk.getEntities(except, box, into, predicate, maxCount, maxSearch)) {
+                             return;
+                         }
+                     }

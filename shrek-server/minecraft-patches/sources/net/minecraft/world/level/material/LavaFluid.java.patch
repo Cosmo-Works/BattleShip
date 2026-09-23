@@ -1,0 +1,36 @@
+--- a/net/minecraft/world/level/material/LavaFluid.java
++++ b/net/minecraft/world/level/material/LavaFluid.java
+@@ -186,7 +_,13 @@ public abstract class LavaFluid extends FlowingFluid {
+ 
+     @Override
+     public boolean canBeReplacedWith(final FluidState state, final BlockGetter level, final BlockPos pos, final Fluid other, final Direction direction) {
+-        return state.getHeight(level, pos) >= 0.44444445F && other.is(FluidTags.WATER);
++        return me.samsuik.sakura.mechanics.BlockFormation.lavaAllowsWaterReplacement(state, level, pos, other);
++    }
++
++    @Override
++    public final int sakura$getTickDelay(final Level level, final BlockPos pos) {
++        final int flowSpeed = level.localConfig().at(pos).lavaFlowSpeed;
++        return flowSpeed >= 0 ? flowSpeed : this.getTickDelay(level);
+     }
+ 
+     @Override
+@@ -196,7 +_,7 @@ public abstract class LavaFluid extends FlowingFluid {
+ 
+     @Override
+     public int getSpreadDelay(final Level level, final BlockPos pos, final FluidState oldFluidState, final FluidState newFluidState) {
+-        int result = this.getTickDelay(level);
++        int result = this.sakura$getTickDelay(level, pos);
+         if (!oldFluidState.isEmpty()
+             && !newFluidState.isEmpty()
+             && !oldFluidState.getValue(FALLING)
+@@ -255,6 +_,9 @@ public abstract class LavaFluid extends FlowingFluid {
+     }
+ 
+     private static boolean isFastLava(final LevelReader level) {
++        if (level instanceof final Level gameLevel && gameLevel.shrekConfig().environment.disableFastNetherLava) {
++            return false;
++        }
+         return level.environmentAttributes().getDimensionValue(EnvironmentAttributes.FAST_LAVA);
+     }
+ 

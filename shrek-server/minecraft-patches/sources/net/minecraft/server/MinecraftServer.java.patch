@@ -1,0 +1,10 @@
+--- a/net/minecraft/server/MinecraftServer.java
++++ b/net/minecraft/server/MinecraftServer.java
+@@ -1871,6 +_,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
+             }
+ 
+             regionizedWorldData.explosionDensityCache.clear(); // Paper - Optimize explosions // Folia - region threading
++            regionizedWorldData.shrekTickScheduler.tick(level); // Shrek - per-region tick scheduler
+         }
+         // this.isIteratingOverLevels = false; // Paper - Throw exception on world create while being ticked // Folia - region threading
+ 

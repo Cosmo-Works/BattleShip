@@ -18,14 +18,14 @@ jobs:
 
       - name: Authenticate
         run: |
-          git config --global user.name "baguette-maintainer-bot"
-          git config --global user.email "baguette.maintainer.bot@gmail.com"
+          git config --global user.name "shrek-maintainer-bot"
+          git config --global user.email "shrek.maintainer.bot@gmail.com"
           gh auth login --with-token <<< "${{ secrets.BOT_TOKEN }}"
 
       - name: Check if workflow should run
         id: check_should_run
         run: |
-          ISSUE=$(gh issue list --author baguette-maintainer-bot --state open --json number --jq '.[0].number // empty')
+          ISSUE=$(gh issue list --author shrek-maintainer-bot --state open --json number --jq '.[0].number // empty')
           CURRENT_CANVAS_COMMIT=$(grep '^canvasCommit' gradle.properties | awk -F '=' '{print $2}' | tr -d '[:space:]' | tr -d '\r')
           LATEST_CANVAS_COMMIT=$(curl -s https://api.github.com/repos/CraftCanvasMC/Canvas/commits/$UPSTREAM_BRANCH | jq -r '.sha' | tr -d '[:space:]' | tr -d '\r')
 
@@ -128,14 +128,14 @@ jobs:
         if: env.APPLY_FAILED == 'true' && env.SKIP_WORKFLOW == 'false'
         run: |
           gh issue create \
-            --title "[BOT] Failed to apply Baguette patches" \
+            --title "[BOT] Failed to apply Shrek patches" \
             --body "Failed to apply patches after updating Canvas to $LATEST_CANVAS_COMMIT" \
 
       - name: Create an issue if build failed
         if: env.BUILD_FAILED == 'true' && env.SKIP_WORKFLOW == 'false'
         run: |
           gh issue create \
-            --title "[BOT] Failed to build Baguette" \
+            --title "[BOT] Failed to build Shrek" \
             --body "Failed to build after updating Canvas to $LATEST_CANVAS_COMMIT" \
 
       - name: Generate commit description

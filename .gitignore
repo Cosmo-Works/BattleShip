@@ -6,9 +6,9 @@ build
 
 /run
 
-/baguette-server/build.gradle.kts
-/baguette-server/src/minecraft
-/baguette-api/build.gradle.kts
+/shrek-server/build.gradle.kts
+/shrek-server/src/minecraft
+/shrek-api/build.gradle.kts
 /canvas-api
 /canvas-server
 /folia-api

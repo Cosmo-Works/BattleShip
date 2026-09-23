@@ -1,0 +1,116 @@
+--- a/net/minecraft/world/level/BaseSpawner.java
++++ b/net/minecraft/world/level/BaseSpawner.java
+@@ -69,57 +_,27 @@ public abstract class BaseSpawner {
+     // able to fetch the current region and pull the Canvas config from there
+ 
+     private int getMinSpawnDelayDefault() {
+-        final io.papermc.paper.threadedregions.RegionizedWorldData worldData = io.papermc.paper.threadedregions.TickRegionScheduler.getCurrentRegionizedWorldData();
+-        if (worldData == null) {
+-            // return vanilla default
+-            return 200;
+-        }
+-        return worldData.world.canvasConfig().blocks.spawner.minSpawnDelay;
++        return gg.shrekmc.ShrekServerConfig.mobSpawnerDefaults().minSpawnDelay;
+     }
+ 
+     private int getMaxSpawnDelayDefault() {
+-        final io.papermc.paper.threadedregions.RegionizedWorldData worldData = io.papermc.paper.threadedregions.TickRegionScheduler.getCurrentRegionizedWorldData();
+-        if (worldData == null) {
+-            // return vanilla default
+-            return 800;
+-        }
+-        return worldData.world.canvasConfig().blocks.spawner.maxSpawnDelay;
++        return gg.shrekmc.ShrekServerConfig.mobSpawnerDefaults().maxSpawnDelay;
+     }
+ 
+     private int getSpawnCountDefault() {
+-        final io.papermc.paper.threadedregions.RegionizedWorldData worldData = io.papermc.paper.threadedregions.TickRegionScheduler.getCurrentRegionizedWorldData();
+-        if (worldData == null) {
+-            // return vanilla default
+-            return 4;
+-        }
+-        return worldData.world.canvasConfig().blocks.spawner.spawnCount;
++        return gg.shrekmc.ShrekServerConfig.mobSpawnerDefaults().spawnCount;
+     }
+ 
+     private int getMaxNearbyEntitiesDefault() {
+-        final io.papermc.paper.threadedregions.RegionizedWorldData worldData = io.papermc.paper.threadedregions.TickRegionScheduler.getCurrentRegionizedWorldData();
+-        if (worldData == null) {
+-            // return vanilla default
+-            return 6;
+-        }
+-        return worldData.world.canvasConfig().blocks.spawner.maxNearbyEntities;
++        return gg.shrekmc.ShrekServerConfig.mobSpawnerDefaults().maxNearbyEntities;
+     }
+ 
+     private int getRequiredPlayerRangeDefault() {
+-        final io.papermc.paper.threadedregions.RegionizedWorldData worldData = io.papermc.paper.threadedregions.TickRegionScheduler.getCurrentRegionizedWorldData();
+-        if (worldData == null) {
+-            // return vanilla default
+-            return 16;
+-        }
+-        return worldData.world.canvasConfig().blocks.spawner.requiredPlayerRange;
++        return gg.shrekmc.ShrekServerConfig.mobSpawnerDefaults().requiredPlayerRange;
+     }
+ 
+     private int getSpawnRangeDefault() {
+-        final io.papermc.paper.threadedregions.RegionizedWorldData worldData = io.papermc.paper.threadedregions.TickRegionScheduler.getCurrentRegionizedWorldData();
+-        if (worldData == null) {
+-            // return vanilla default
+-            return 4;
+-        }
+-        return worldData.world.canvasConfig().blocks.spawner.spawnRange;
++        return gg.shrekmc.ShrekServerConfig.mobSpawnerDefaults().spawnRange;
+     }
+     // Canvas end - spawner configs
+ 
+@@ -158,7 +_,7 @@ public abstract class BaseSpawner {
+         tickDelay = level.paperConfig().tickRates.mobSpawner;
+         if (tickDelay == -1) { return; } // If disabled
+         // Paper end - Configurable mob spawner tick rate
+-        if (this.isNearPlayer(level, pos) && level.isSpawnerBlockEnabled()) {
++        if ((!level.shrekConfig().environment.mobSpawner.requireNearbyPlayer || this.isNearPlayer(level, pos)) && level.isSpawnerBlockEnabled()) {
+             if (this.spawnDelay < -tickDelay) { // Paper - Configurable mob spawner tick rate
+                 this.delay(level, pos);
+             }
+@@ -166,6 +_,11 @@ public abstract class BaseSpawner {
+             if (this.spawnDelay > 0) {
+                 this.spawnDelay -= tickDelay; // Paper - Configurable mob spawner tick rate
+             } else {
++                if (!me.samsuik.sakura.event.SakuraEvents.preSpawnerTick(pos, level)) {
++                    this.delay(level, pos);
++                    return;
++                }
++
+                 boolean delay = false;
+                 RandomSource random = level.getRandom();
+                 SpawnData nextSpawnData = this.getOrCreateNextSpawnData(level, random, pos);
+@@ -198,7 +_,7 @@ public abstract class BaseSpawner {
+                                 if (!customSpawnRules.isValidPosition(spawnBlockPos, level)) {
+                                     continue;
+                                 }
+-                            } else if (!SpawnPlacements.checkSpawnRules(entityType.get(), level, EntitySpawnReason.SPAWNER, spawnBlockPos, level.getRandom())) {
++                            } else if (level.shrekConfig().environment.mobSpawner.checkSpawnConditions && !SpawnPlacements.checkSpawnRules(entityType.get(), level, EntitySpawnReason.SPAWNER, spawnBlockPos, level.getRandom())) {
+                                 continue;
+                             }
+ 
+@@ -226,7 +_,7 @@ public abstract class BaseSpawner {
+                                 return;
+                             }
+ 
+-                            int nearBy = level.canvasConfig().blocks.spawner.disableMaxNearbyEntitiesCheck ? Integer.MIN_VALUE : level.getEntities( // Canvas - spawner configs
++                            int nearBy = level.canvasConfig().blocks.spawner.disableMaxNearbyEntitiesCheck || level.shrekConfig().environment.mobSpawner.ignoreEntityLimit ? Integer.MIN_VALUE : level.getEntities( // Canvas - spawner configs
+                                     EntityTypeTest.forExactClass(entity.getClass()),
+                                     new AABB(pos.getX(), pos.getY(), pos.getZ(), pos.getX() + 1, pos.getY() + 1, pos.getZ() + 1).inflate(this.spawnRange),
+                                     EntitySelector.NO_SPECTATORS
+@@ -239,8 +_,8 @@ public abstract class BaseSpawner {
+ 
+                             entity.snapTo(entity.getX(), entity.getY(), entity.getZ(), random.nextFloat() * 360.0F, 0.0F);
+                             if (entity instanceof Mob mob) {
+-                                if (nextSpawnData.getCustomSpawnRules().isEmpty() && !mob.checkSpawnRules(level, EntitySpawnReason.SPAWNER)
+-                                    || !mob.checkSpawnObstruction(level)) {
++                                if (level.shrekConfig().environment.mobSpawner.checkSpawnConditions && (nextSpawnData.getCustomSpawnRules().isEmpty() && !mob.checkSpawnRules(level, EntitySpawnReason.SPAWNER)
++                                    || !mob.checkSpawnObstruction(level))) {
+                                     continue;
+                                 }
+ 

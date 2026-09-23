@@ -1,0 +1,336 @@
+--- a/net/minecraft/world/entity/item/FallingBlockEntity.java
++++ b/net/minecraft/world/entity/item/FallingBlockEntity.java
+@@ -54,7 +_,7 @@ import net.minecraft.world.phys.Vec3;
+ import org.jspecify.annotations.Nullable;
+ import org.slf4j.Logger;
+ 
+-public class FallingBlockEntity extends Entity {
++public class FallingBlockEntity extends Entity implements me.samsuik.sakura.entity.SakuraEntity { // Shrek - cannon entity merge
+     private static final Logger LOGGER = LogUtils.getLogger();
+     private static final BlockState DEFAULT_BLOCK_STATE = Blocks.SAND.defaultBlockState();
+     private static final int DEFAULT_TIME = 0;
+@@ -74,9 +_,17 @@ public class FallingBlockEntity extends Entity {
+     private boolean canvas$finishTickOnly; // Canvas - safely continue falling block ticks after End portal transfers
+     protected static final EntityDataAccessor<BlockPos> DATA_START_POS = SynchedEntityData.defineId(FallingBlockEntity.class, EntityDataSerializers.BLOCK_POS);
+     public boolean autoExpire = true; // Paper - Expand FallingBlock API
++    public boolean heightParity; // Shrek - cannon entity identity
++    public int heightLimit = Integer.MIN_VALUE; // Shrek - cannon mechanics
+ 
+     public FallingBlockEntity(final EntityType<? extends FallingBlockEntity> type, final Level level) {
+         super(type, level);
++        this.dropItem = level.shrekConfig().cannons.sand.dropItems; // Shrek - cannon mechanics
++        this.cannonEntity = true; // Shrek - cannon entity identity
++        this.heightParity = level.localConfig().at(this.blockPosition()).heightParity; // Shrek - cannon entity identity
++        this.sakuraEntityController = new me.samsuik.sakura.entity.SakuraEntityController(this); // Shrek - cannon entity merge
++        this.loadChunks = level.shrekConfig().cannons.loadChunks; // Shrek - load chunks on movement
++        this.shrek$applyHeightLimit(); // Shrek - cannon mechanics
+     }
+ 
+     public FallingBlockEntity(final Level level, final double x, final double y, final double z, final BlockState blockState) {
+@@ -91,16 +_,155 @@ public class FallingBlockEntity extends Entity {
+         this.setStartPos(this.blockPosition());
+     }
+ 
++    // Shrek start - cannon mechanics
++    private static me.samsuik.sakura.mechanics.MinecraftMechanicsTarget shrek$target(final Level level) {
++        final me.samsuik.sakura.mechanics.MinecraftMechanicsTarget target = level.shrekConfig().mechanics.parsedTarget.valueSafe();
++        return target != null ? target : me.samsuik.sakura.mechanics.MinecraftMechanicsTarget.latest();
++    }
++
++    private me.samsuik.sakura.mechanics.MinecraftMechanicsTarget shrek$target() {
++        return shrek$target(this.level());
++    }
++
++    private boolean shrek$heightParity() {
++        return this.heightParity && !this.shrek$target().isLegacy();
++    }
++
++    @Override
++    public final void sakura$addedToWorld() {
++        this.shrek$applyHeightLimit();
++    }
++
++    private void shrek$applyHeightLimit() {
++        this.heightLimit = this.level().shrekConfig().mechanics.heightLimitOr(
++            this.level().paperConfig().fixes.fallingBlockHeightNerf.or(Integer.MIN_VALUE)
++        );
++    }
++
++    @Override
++    public double getEyeY() {
++        // Shrek - cannon mechanics: height parity option; legacy falling blocks use an eye height of 0.49
++        if (this.shrek$heightParity()) {
++            return this.getY();
++        }
++        return this.shrek$target().isLegacy() ? this.getY() + (double) 0.49f : super.getEyeY();
++    }
++
++    @Override
++    public double distanceToSqr(final Vec3 pos) {
++        if (!this.shrek$target().isLegacy()) {
++            return super.distanceToSqr(pos);
++        }
++        // Shrek - cannon mechanics: legacy falling blocks measure distance from their eye position
++        final double x = this.getX() - pos.x;
++        final double y = this.getEyeY() - pos.y;
++        final double z = this.getZ() - pos.z;
++        return x * x + y * y + z * z;
++    }
++
++    private BlockPos shrek$patchedBlockPosition() {
++        // This fix allows some tech that uses "indirect clipping" to still function.
++        return BlockPos.containing(this.getX(), this.getY() + 1.0e-12, this.getZ());
++    }
++
++    private boolean shrek$canReplaceBlock(final BlockState state) {
++        return this.level().shrekConfig().cannons.sand.replaceBlocksWithoutCollision
++            && state.moonrise$emptyCollisionShape()
++            && this.getBlockStateOn().is(this.blockState.getBlock());
++    }
++
++    private boolean shrek$isFallingBlockInBounds(final ServerLevel level, final BlockPos pos) {
++        final gg.shrekmc.ShrekWorldConfig.Cannons.Sand sand = level.shrekConfig().cannons.sand;
++        // Prevent stacking one block below build limit
++        if (!sand.canStackAtWorldHeight && pos.getY() >= level.getMaxY() - 1) {
++            return false;
++        }
++
++        final Vec3 center = Vec3.atBottomCenterOf(pos);
++        // Prevent stacking directly against the world border
++        return sand.canStackAgainstBorder
++            || level.getWorldBorder().isWithinBounds(center.x(), center.z(), -1.0);
++    }
++    // Shrek end - cannon mechanics
++    // Shrek start - cannon entity merge
++    private final me.samsuik.sakura.entity.SakuraEntityController sakuraEntityController;
++
++    @Override
++    public final me.samsuik.sakura.entity.SakuraEntityController getSakuraEntityController() {
++        return this.sakuraEntityController;
++    }
++
++    private boolean canSolidifyInWater() {
++        return this.level().shrekConfig().cannons.sand.concreteSolidifyInWater
++            && this.blockState.getBlock() instanceof ConcretePowderBlock;
++    }
++
++    @Override
++    public final boolean canLink(final Entity entity, final int tickDifference) {
++        if (!(entity instanceof final FallingBlockEntity otherFallingBlock)) {
++            return false;
++        }
++
++        if (this.heightParity != otherFallingBlock.heightParity) {
++            return false;
++        }
++
++        final boolean otherEntityCanSolidify = otherFallingBlock.canSolidifyInWater();
++        return this.canSolidifyInWater() == otherEntityCanSolidify
++            || this.getId() > otherFallingBlock.getId() && otherEntityCanSolidify;
++    }
++
++    @Override
++    public final boolean sameProperties(final Entity otherEntity, final int tickDifference) {
++        return otherEntity instanceof final FallingBlockEntity otherFallingBlockEntity
++            && this.time + tickDifference == otherFallingBlockEntity.time
++            && this.blockState == otherFallingBlockEntity.blockState;
++    }
++
++    @Override
++    public final void catchupOnTicks(final int ticks) {
++        this.time += ticks;
++    }
++
++    @Override
++    public final Vec3 sakura$position() {
++        return this.sakuraEntityController.getLinks().getHead().entity.position();
++    }
++
++    @Override
++    public final Vec3 sakura$deltaMovement() {
++        return this.sakuraEntityController.getLinks().getHead().entity.getDeltaMovement();
++    }
++    // Shrek end - cannon entity merge
++    // Shrek start - optimise cannon entity movement
++    @Override
++    protected final Vec3 collide(final Vec3 movement) {
++        return this.sakura$collide(movement);
++    }
++    // Shrek end - optimise cannon entity movement
++
+     public static FallingBlockEntity fall(final Level level, final BlockPos pos, final BlockState state) {
++        // Shrek start - cannon mechanics
++        final me.samsuik.sakura.mechanics.MinecraftMechanicsTarget shrek$mechanicsTarget = shrek$target(level);
++        final double spawnY = shrek$mechanicsTarget.between(me.samsuik.sakura.mechanics.MechanicVersion.v1_9, me.samsuik.sakura.mechanics.MechanicVersion.v1_18_2)
++            ? pos.getY() + (double) ((1.0f - 0.98f) / 2.0f)
++            : pos.getY();
++        // Shrek end - cannon mechanics
++
+         FallingBlockEntity entity = new FallingBlockEntity(
+             level,
+             pos.getX() + 0.5,
+-            pos.getY(),
++            spawnY, // Shrek - cannon mechanics
+             pos.getZ() + 0.5,
+             state.hasProperty(BlockStateProperties.WATERLOGGED) ? state.setValue(BlockStateProperties.WATERLOGGED, false) : state
+         );
+         if (!org.bukkit.craftbukkit.event.CraftEventFactory.callEntityChangeBlockEvent(entity, pos, state.getFluidState().createLegacyBlock())) return entity; // CraftBukkit
+-        level.setBlock(pos, state.getFluidState().createLegacyBlock(), Block.UPDATE_ALL);
++        level.fallingBlockColumnLimits().limitInstantFalling(level, pos); // Shrek - limit instant block falling
++        // Shrek start - cannon mechanics
++        if (shrek$mechanicsTarget.atLeast(me.samsuik.sakura.mechanics.MechanicVersion.v1_18_2)) {
++            level.setBlock(pos, state.getFluidState().createLegacyBlock(), Block.UPDATE_ALL);
++        }
++        // Shrek end - cannon mechanics
+         level.addFreshEntity(entity);
+         return entity;
+     }
+@@ -120,7 +_,7 @@ public class FallingBlockEntity extends Entity {
+     }
+ 
+     public void setStartPos(final BlockPos pos) {
+-        this.entityData.set(DATA_START_POS, pos);
++        this.entityData.set(DATA_START_POS, pos, BlockPos.ZERO); // Shrek - packet obfuscation and reduction
+     }
+ 
+     public BlockPos getStartPos() {
+@@ -144,7 +_,7 @@ public class FallingBlockEntity extends Entity {
+ 
+     @Override
+     protected double getDefaultGravity() {
+-        return 0.04;
++        return this.shrek$target().before(me.samsuik.sakura.mechanics.MechanicVersion.v1_14) ? 0.04f : 0.04; // Shrek - cannon mechanics: pre-1.14 used float gravity
+     }
+ 
+     @Override
+@@ -159,8 +_,12 @@ public class FallingBlockEntity extends Entity {
+             // Paper end - Configurable falling blocks height nerf
+             // this.handlePortal(); // Folia - region threading
+             if (this.level() instanceof ServerLevel serverLevel && (this.isAlive() || this.forceTickAfterTeleportToDuplicate)) {
+-                BlockPos pos = this.blockPosition();
+-                boolean isConcrete = this.blockState.getBlock() instanceof ConcretePowderBlock;
++                // Shrek start - cannon mechanics
++                final me.samsuik.sakura.mechanics.MinecraftMechanicsTarget shrek$mechanicsTarget = this.shrek$target();
++                final boolean shrek$floatingPointFix = serverLevel.shrekConfig().cannons.sand.floatingPointFix || shrek$mechanicsTarget.before(me.samsuik.sakura.mechanics.MechanicVersion.v1_17);
++                BlockPos pos = shrek$floatingPointFix ? this.shrek$patchedBlockPosition() : this.blockPosition();
++                // Shrek end - cannon mechanics
++                boolean isConcrete = serverLevel.shrekConfig().cannons.sand.concreteSolidifyInWater && this.blockState.getBlock() instanceof ConcretePowderBlock; // Shrek - cannon mechanics: configure concrete solidifying in water
+                 boolean isStuckInWater = isConcrete && this.level().getFluidState(pos).is(FluidTags.WATER);
+                 double moveVec = this.getDeltaMovement().lengthSqr();
+                 if (isConcrete && moveVec > 1.0) {
+@@ -176,7 +_,7 @@ public class FallingBlockEntity extends Entity {
+                     }
+                 }
+ 
+-                if (!this.onGround() && !isStuckInWater) {
++                if (!this.onGround() && !isStuckInWater || serverLevel.shrekConfig().cannons.sand.despawnInsideMovingPistons && this.autoExpire && this.time > 600) { // Shrek - allow falling blocks to despawn inside moving pistons
+                     if ((this.time > 100 && this.autoExpire) && (pos.getY() <= this.level().getMinY() || pos.getY() > this.level().getMaxY()) || (this.time > 600 && this.autoExpire)) { // Paper - Expand FallingBlock API
+                         if (this.dropItem && serverLevel.getGameRules().get(GameRules.ENTITY_DROPS)) {
+                             this.spawnAtLocation(serverLevel, block);
+@@ -186,15 +_,21 @@ public class FallingBlockEntity extends Entity {
+                     }
+                 } else {
+                     BlockState currentState = this.level().getBlockState(pos);
+-                    this.setDeltaMovement(this.getDeltaMovement().multiply(0.7, -0.5, 0.7));
+-                    if (!currentState.is(Blocks.MOVING_PISTON)) {
++                    // Shrek start - cannon mechanics
++                    final double shrek$friction = shrek$mechanicsTarget.before(me.samsuik.sakura.mechanics.MechanicVersion.v1_14)
++                        ? 0.7f
++                        : 0.7;
++                    this.setDeltaMovement(this.getDeltaMovement().multiply(shrek$friction, -0.5, shrek$friction));
++                    if (!currentState.is(Blocks.MOVING_PISTON) && (isStuckInWater || me.samsuik.sakura.mechanics.FallingBlockBehaviour.isAbleToStackOnBlock(this, shrek$mechanicsTarget))) {
++                    // Shrek end - cannon mechanics
+                         if (!this.cancelDrop) {
+                             boolean mayReplace = currentState.canBeReplaced(
+                                 new DirectionalPlaceContext(this.level(), pos, Direction.DOWN, ItemStack.EMPTY, Direction.UP)
+                             );
++                            mayReplace = mayReplace || this.shrek$canReplaceBlock(currentState); // Shrek - replace blocks without collision
+                             boolean wouldContinueFalling = FallingBlock.isFree(this.level().getBlockState(pos.below())) && (!isConcrete || !isStuckInWater);
+                             boolean wouldSurvive = this.blockState.canSurvive(this.level(), pos) && !wouldContinueFalling;
+-                            if (mayReplace && wouldSurvive) {
++                            if (mayReplace && wouldSurvive && this.shrek$isFallingBlockInBounds(serverLevel, pos)) { // Shrek - falling block stacking restrictions
+                                 if (this.blockState.hasProperty(BlockStateProperties.WATERLOGGED) && this.level().getFluidState(pos).is(Fluids.WATER)) {
+                                     this.blockState = this.blockState.setValue(BlockStateProperties.WATERLOGGED, true);
+                                 }
+@@ -237,6 +_,10 @@ public class FallingBlockEntity extends Entity {
+                                     this.discard(org.bukkit.event.entity.EntityRemoveEvent.Cause.DROP); // CraftBukkit - add Bukkit remove cause
+                                     this.callOnBrokenAfterFall(block, pos);
+                                     this.spawnAtLocation(serverLevel, block);
++                                // Shrek start - fix falling blocks staying alive when entity drops are disabled
++                                } else {
++                                    this.discard(org.bukkit.event.entity.EntityRemoveEvent.Cause.DROP); // CraftBukkit - add Bukkit remove cause
++                                // Shrek end - fix falling blocks staying alive when entity drops are disabled
+                                 }
+                             } else {
+                                 this.discard(org.bukkit.event.entity.EntityRemoveEvent.Cause.DROP); // CraftBukkit - add Bukkit remove cause
+@@ -253,7 +_,25 @@ public class FallingBlockEntity extends Entity {
+                 }
+             }
+ 
+-            this.setDeltaMovement(this.getDeltaMovement().scale(this.getAirDrag()));
++            // Shrek start - cannon mechanics
++            final me.samsuik.sakura.mechanics.MinecraftMechanicsTarget shrek$mechanicsTarget = this.shrek$target();
++            if (shrek$mechanicsTarget.atLeast(me.samsuik.sakura.mechanics.MechanicVersion.v1_12)) {
++                final double shrek$drag = shrek$mechanicsTarget.between(me.samsuik.sakura.mechanics.MechanicVersion.v1_14, me.samsuik.sakura.mechanics.MechanicVersion.v26_2)
++                    ? 0.98
++                    : this.getAirDrag();
++                this.setDeltaMovement(this.getDeltaMovement().scale(shrek$drag));
++            }
++            // Shrek end - cannon mechanics
++        }
++        if (this.level().shrekConfig().cannons.sand.forcePositionUpdates) {
++            this.forcePositionUpdateInWater();
++        }
++    }
++
++    private void forcePositionUpdateInWater() {
++        if (!this.isRemoved() && this.wasTouchingWater && !this.isPushedByFluid()) {
++            this.hurtMarked = true;
++            this.needsSync = true;
+         }
+     }
+ 
+@@ -264,12 +_,29 @@ public class FallingBlockEntity extends Entity {
+             return false;
+         }
+ 
++        // Shrek start - cannon mechanics
++        final me.samsuik.sakura.mechanics.MinecraftMechanicsTarget shrek$mechanicsTarget = this.shrek$target();
++        if (this.time == 0 && shrek$mechanicsTarget.before(me.samsuik.sakura.mechanics.MechanicVersion.v1_18_2)) {
++            me.samsuik.sakura.mechanics.FallingBlockBehaviour.removeBlockOnFall(this, block);
++        }
++        // Shrek end - cannon mechanics
+         this.time++;
+         this.applyGravity();
++        // Shrek start - cannon mechanics
++        final boolean shrek$effectsBeforeMovement = shrek$mechanicsTarget.isLegacy();
++        if (shrek$effectsBeforeMovement) {
++            this.applyEffectsFromBlocks();
++        }
++        // Shrek end - cannon mechanics
++        me.samsuik.sakura.entity.CannonMovementLimits.limitLeftShooting(this);
+         this.move(net.minecraft.world.entity.MoverType.SELF, this.getDeltaMovement());
+-        this.applyEffectsFromBlocks();
++        // Shrek start - cannon mechanics
++        if (!shrek$effectsBeforeMovement) {
++            this.applyEffectsFromBlocks();
++        }
++        // Shrek end - cannon mechanics
+         // Paper start - Configurable falling blocks height nerf
+-        if (this.level().paperConfig().fixes.fallingBlockHeightNerf.test(value -> this.getY() > value)) {
++        if (this.heightLimit != Integer.MIN_VALUE && this.getY() > this.heightLimit) { // Shrek - cannon mechanics
+             if (
+                 this.dropItem
+                     && this.level() instanceof final net.minecraft.server.level.ServerLevel serverLevel
+@@ -289,6 +_,11 @@ public class FallingBlockEntity extends Entity {
+         ) {
+             return true;
+         }
++        // Shrek start - cannon mechanics
++        if (shrek$mechanicsTarget.before(me.samsuik.sakura.mechanics.MechanicVersion.v1_12)) {
++            this.setDeltaMovement(this.getDeltaMovement().scale(0.98F));
++        }
++        // Shrek end - cannon mechanics
+ 
+         return false;
+     }

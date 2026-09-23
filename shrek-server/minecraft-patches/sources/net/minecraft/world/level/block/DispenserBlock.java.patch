@@ -1,0 +1,12 @@
+--- a/net/minecraft/world/level/block/DispenserBlock.java
++++ b/net/minecraft/world/level/block/DispenserBlock.java
+@@ -139,7 +_,8 @@ public class DispenserBlock extends BaseEntityBlock {
+         boolean shouldTrigger = level.hasNeighborSignal(pos) || level.hasNeighborSignal(pos.above());
+         boolean isTriggered = state.getValue(TRIGGERED);
+         if (shouldTrigger && !isTriggered) {
+-            level.scheduleTick(pos, this, 4);
++            final int delay = me.samsuik.sakura.event.SakuraEvents.preDispense(level, pos, 4);
++            level.scheduleTick(pos, this, delay);
+             level.setBlock(pos, state.setValue(TRIGGERED, true), Block.UPDATE_CLIENTS);
+         } else if (!shouldTrigger && isTriggered) {
+             level.setBlock(pos, state.setValue(TRIGGERED, false), Block.UPDATE_CLIENTS);

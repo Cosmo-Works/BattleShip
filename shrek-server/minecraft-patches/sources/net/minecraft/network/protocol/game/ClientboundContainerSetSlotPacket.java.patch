@@ -1,0 +1,11 @@
+--- a/net/minecraft/network/protocol/game/ClientboundContainerSetSlotPacket.java
++++ b/net/minecraft/network/protocol/game/ClientboundContainerSetSlotPacket.java
+@@ -19,7 +_,7 @@ public class ClientboundContainerSetSlotPacket implements Packet<ClientGamePacke
+         this.containerId = containerId;
+         this.stateId = stateId;
+         this.slot = slot;
+-        this.itemStack = itemStack.copy();
++        this.itemStack = itemStack.copyForPacket();
+     }
+ 
+     private ClientboundContainerSetSlotPacket(final RegistryFriendlyByteBuf input) {

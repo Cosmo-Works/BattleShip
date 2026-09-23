@@ -1,0 +1,102 @@
+--- a/net/minecraft/world/item/ItemStack.java
++++ b/net/minecraft/world/item/ItemStack.java
+@@ -99,7 +_,7 @@ import org.apache.commons.lang3.mutable.MutableBoolean;
+ import org.jspecify.annotations.Nullable;
+ import org.slf4j.Logger;
+ 
+-public final class ItemStack implements DataComponentHolder, ItemInstance {
++public final class ItemStack implements DataComponentHolder, ItemInstance, me.samsuik.sakura.tracking.Watchable<ItemStack> { // Shrek - state watchers
+     private static final List<Component> OP_NBT_WARNING = List.of(
+         Component.translatable("item.op_warning.line1").withStyle(ChatFormatting.RED, ChatFormatting.BOLD),
+         Component.translatable("item.op_warning.line2").withStyle(ChatFormatting.RED),
+@@ -156,6 +_,19 @@ public final class ItemStack implements DataComponentHolder, ItemInstance {
+     @Deprecated
+     private @Nullable Holder<Item> item;
+     private PatchedDataComponentMap components;
++    // Shrek start - state watchers
++    private final me.samsuik.sakura.tracking.ChangeWatchers<ItemStack> watchers = new me.samsuik.sakura.tracking.ChangeWatchers<>();
++
++    @Override
++    public void watch(final me.samsuik.sakura.tracking.ChangeListener<ItemStack> listener) {
++        this.watchers.add(listener);
++    }
++
++    @Override
++    public void unwatch(final me.samsuik.sakura.tracking.ChangeListener<ItemStack> listener) {
++        this.watchers.remove(listener);
++    }
++    // Shrek end - state watchers
+ 
+     public static DataResult<ItemStack> validateStrict(final ItemStack itemStack) {
+         DataResult<?> result = validateComponents(itemStack.getComponents());
+@@ -250,6 +_,17 @@ public final class ItemStack implements DataComponentHolder, ItemInstance {
+         return !this.isEmpty() && this.components.hasNonDefault(type);
+     }
+ 
++    public ItemStack copyForPacket() {
++        final ItemStack stackCopy = this.copy();
++        final Item item = stackCopy.getItem();
++        item.modifyComponentsSentToClient(stackCopy.components);
++        return stackCopy;
++    }
++
++    private static DataComponentMap modifiedItemComponents(final Holder<Item> itemHolder) {
++        return itemHolder.value().modifyBaseComponents(itemHolder.components());
++    }
++
+     public ItemStack(final ItemLike item, final int count) {
+         this(item.asItem().builtInRegistryHolder(), count);
+     }
+@@ -259,7 +_,7 @@ public final class ItemStack implements DataComponentHolder, ItemInstance {
+     }
+ 
+     public ItemStack(final Holder<Item> item, final int count) {
+-        this(item, count, new PatchedDataComponentMap(item.components()));
++        this(item, count, new PatchedDataComponentMap(modifiedItemComponents(item)));
+     }
+ 
+     public ItemStack(final Holder<Item> item) {
+@@ -267,7 +_,7 @@ public final class ItemStack implements DataComponentHolder, ItemInstance {
+     }
+ 
+     public ItemStack(final Holder<Item> item, final int count, final DataComponentPatch components) {
+-        this(item, count, PatchedDataComponentMap.fromPatch(item.components(), components));
++        this(item, count, PatchedDataComponentMap.fromPatch(modifiedItemComponents(item), components));
+     }
+ 
+     private ItemStack(final Holder<Item> item, final int count, final PatchedDataComponentMap components) {
+@@ -961,11 +_,14 @@ public final class ItemStack implements DataComponentHolder, ItemInstance {
+     // CraftBukkit start
+     public void restorePatch(DataComponentPatch datacomponentpatch) {
+         this.components.restorePatch(datacomponentpatch);
++        this.watchers.changed(this); // Shrek - state watchers
+     }
+     // CraftBukkit end
+ 
+     public <T> @Nullable T set(final DataComponentType<T> type, final @Nullable T value) {
+-        return this.components.set(type, value);
++        final T replacedValue = this.components.set(type, value);
++        this.watchers.changed(this); // Shrek - state watchers
++        return replacedValue;
+     }
+ 
+     public <T> @Nullable T set(final TypedDataComponent<T> value) {
+@@ -986,7 +_,9 @@ public final class ItemStack implements DataComponentHolder, ItemInstance {
+     }
+ 
+     public <T> @Nullable T remove(final DataComponentType<? extends T> type) {
+-        return this.components.remove(type);
++        final T removedValue = this.components.remove(type);
++        this.watchers.changed(this); // Shrek - state watchers
++        return removedValue;
+     }
+ 
+     public void applyComponentsAndValidate(final DataComponentPatch patch) {
+@@ -1305,6 +_,7 @@ public final class ItemStack implements DataComponentHolder, ItemInstance {
+ 
+     public void setCount(final int count) {
+         this.count = count;
++        this.watchers.changed(this); // Shrek - state watchers
+     }
+ 
+     public void limitSize(final int maxStackSize) {

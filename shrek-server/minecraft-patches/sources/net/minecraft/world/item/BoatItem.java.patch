@@ -1,0 +1,11 @@
+--- a/net/minecraft/world/item/BoatItem.java
++++ b/net/minecraft/world/item/BoatItem.java
+@@ -65,7 +_,7 @@ public class BoatItem extends Item {
+             }
+ 
+             boat.setYRot(player.getYRot());
+-            if (!level.noCollision(boat, boat.getBoundingBox())) {
++            if (!level.noCollision(boat, boat.getBoundingBox()) || !level.getWorldBorder().isWithinBounds(boat.getBoundingBox())) {
+                 return InteractionResult.FAIL;
+             }
+ 

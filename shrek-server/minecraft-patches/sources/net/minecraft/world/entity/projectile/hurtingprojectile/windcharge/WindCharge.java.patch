@@ -1,0 +1,24 @@
+--- a/net/minecraft/world/entity/projectile/hurtingprojectile/windcharge/WindCharge.java
++++ b/net/minecraft/world/entity/projectile/hurtingprojectile/windcharge/WindCharge.java
+@@ -28,6 +_,13 @@ public class WindCharge extends AbstractWindCharge {
+     private static final float MIN_CAMERA_DISTANCE_SQUARED = Mth.square(3.5F);
+     private int noDeflectTicks = 5;
+ 
++    // Shrek start - cannon entity merge
++    @Override
++    public final void catchupOnTicks(final int ticks) {
++        this.noDeflectTicks = Math.max(this.noDeflectTicks - ticks, 0);
++    }
++    // Shrek end - cannon entity merge
++
+     public WindCharge(final EntityType<? extends AbstractWindCharge> type, final Level level) {
+         super(type, level);
+     }
+@@ -60,6 +_,7 @@ public class WindCharge extends AbstractWindCharge {
+ 
+     @Override
+     public void explode(final Vec3 position) {
++        if (!this.canExplode) { return; } // Shrek - optimise explosions
+         // Paper start - Fire event for WindCharge explosions
+         org.bukkit.event.entity.ExplosionPrimeEvent event = org.bukkit.craftbukkit.event.CraftEventFactory.callExplosionPrimeEvent(this, RADIUS, false);
+         if (event.isCancelled()) {

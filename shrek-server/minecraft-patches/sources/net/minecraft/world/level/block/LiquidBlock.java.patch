@@ -1,0 +1,19 @@
+--- a/net/minecraft/world/level/block/LiquidBlock.java
++++ b/net/minecraft/world/level/block/LiquidBlock.java
+@@ -240,8 +_,15 @@ public class LiquidBlock extends Block implements BucketPickup {
+ 
+             for (Direction direction : POSSIBLE_FLOW_DIRECTIONS) {
+                 BlockPos neighbourPos = pos.relative(direction.getOpposite());
++                if (level.shrekConfig().environment.disableFluidsFlowingThroughTheWorldBorder && !level.getWorldBorder().isWithinBounds(neighbourPos)) {
++                    continue;
++                }
+                 if (level.getFluidState(neighbourPos).is(FluidTags.WATER)) {
+-                    Block convertToBlock = level.getFluidState(pos).isSource() ? Blocks.OBSIDIAN : Blocks.COBBLESTONE;
++                    final FluidState fluidState = state.getFluidState();
++                    final Block convertToBlock = fluidState.isSource() ? Blocks.OBSIDIAN : Blocks.COBBLESTONE;
++                    if (convertToBlock == Blocks.COBBLESTONE && !me.samsuik.sakura.mechanics.BlockFormation.canLiquidFormBlock(level, pos, fluidState)) {
++                        return true;
++                    }
+                     // CraftBukkit start
+                     if (org.bukkit.craftbukkit.event.CraftEventFactory.handleBlockFormEvent(level, pos, convertToBlock.defaultBlockState(), Block.UPDATE_ALL)) {
+                         this.fizz(level, pos);

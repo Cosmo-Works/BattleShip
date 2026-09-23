@@ -1,0 +1,21 @@
+--- a/net/minecraft/world/level/block/SugarCaneBlock.java
++++ b/net/minecraft/world/level/block/SugarCaneBlock.java
+@@ -48,6 +_,18 @@ public class SugarCaneBlock extends Block implements BonemealableBlock { // Canv
+ 
+     @Override
+     protected void randomTick(final BlockState state, final ServerLevel level, final BlockPos pos, final RandomSource random) {
++        BlockState agedState = state;
++        if (level.shrekConfig().environment.crops.useRandomChanceToGrow) {
++            final int modifier = level.spigotConfig.caneModifier;
++            if (random.nextFloat() >= modifier / (100.0f * 16)) {
++                return;
++            }
++            agedState = state.setValue(SugarCaneBlock.AGE, AGE.max);
++        }
++        this.ageAndGrow(agedState, level, pos, random);
++    }
++
++    private void ageAndGrow(final BlockState state, final ServerLevel level, final BlockPos pos, final RandomSource random) {
+         if (level.isEmptyBlock(pos.above())) {
+             int height = 1;
+ 

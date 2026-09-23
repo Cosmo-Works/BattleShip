@@ -1,0 +1,56 @@
+--- a/net/minecraft/world/item/BlockItem.java
++++ b/net/minecraft/world/item/BlockItem.java
+@@ -1,6 +_,8 @@
+ package net.minecraft.world.item;
+ 
+ import java.util.Map;
++import gg.shrekmc.ShrekServerConfig;
++import me.samsuik.sakura.explosion.durable.DurableMaterial;
+ import net.minecraft.advancements.triggers.CriteriaTriggers;
+ import net.minecraft.core.BlockPos;
+ import net.minecraft.core.component.DataComponents;
+@@ -18,6 +_,7 @@ import net.minecraft.world.item.context.BlockPlaceContext;
+ import net.minecraft.world.item.context.UseOnContext;
+ import net.minecraft.world.level.Level;
+ import net.minecraft.world.level.block.Block;
++import net.minecraft.world.level.block.Blocks;
+ import net.minecraft.world.level.block.ShulkerBoxBlock;
+ import net.minecraft.world.level.block.SoundType;
+ import net.minecraft.world.level.block.entity.BlockEntity;
+@@ -39,12 +_,36 @@ public class BlockItem extends Item {
+ 
+     @Override
+     public InteractionResult useOn(final UseOnContext context) {
++        if (this.getBlock() == Blocks.POTATOES && context.getPlayer() != null) {
++            this.sendBlockDurabilityToPlayer(context);
++        }
+         InteractionResult placeResult = this.place(new BlockPlaceContext(context));
+         return !placeResult.consumesAction() && context.getItemInHand().has(DataComponents.CONSUMABLE)
+             ? super.use(context.getLevel(), context.getPlayer(), context.getHand())
+             : placeResult;
+     }
+ 
++    private void sendBlockDurabilityToPlayer(final UseOnContext context) {
++        final Player player = context.getPlayer();
++        if (player == null) {
++            return;
++        }
++
++        final Level level = context.getLevel();
++        final BlockPos clickedPos = context.getClickedPos();
++        final DurableMaterial material = durableMaterialAt(level, clickedPos);
++        if (material == null) {
++            return;
++        }
++
++        final int remaining = level.durabilityManager().durability(clickedPos, material);
++        player.getBukkitEntity().sendMessage(ShrekServerConfig.durableBlockInteraction(remaining, material.durability()));
++    }
++
++    private static @Nullable DurableMaterial durableMaterialAt(final Level level, final BlockPos pos) {
++        return level.localConfig().at(pos).durableMaterials.get(level.getBlockState(pos).getBlock());
++    }
++
+     public InteractionResult place(final BlockPlaceContext placeContext) {
+         if (!this.getBlock().isEnabled(placeContext.getLevel().enabledFeatures())) {
+             return InteractionResult.FAIL;

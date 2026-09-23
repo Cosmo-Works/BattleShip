@@ -1,0 +1,22 @@
+--- a/net/minecraft/world/entity/projectile/FishingHook.java
++++ b/net/minecraft/world/entity/projectile/FishingHook.java
+@@ -306,6 +_,10 @@ public class FishingHook extends Projectile {
+         if (!this.level().isClientSide()) {
+             this.setHookedEntity(hitResult.getEntity());
+         }
++        if (this.level().shrekConfig().players.fishingHooksApplyKnockback) {
++            final Entity entity = hitResult.getEntity();
++            entity.hurt(this.damageSources().thrown(this, this.getOwner()), 0.0f);
++        }
+     }
+ 
+     @Override
+@@ -603,7 +_,7 @@ public class FishingHook extends Projectile {
+ 
+     public void pullEntity(final Entity entity) {
+         Entity owner = this.getOwner();
+-        if (owner != null) {
++        if (owner != null && (this.level().shrekConfig().players.fishingHooksPullEntities || entity instanceof ItemEntity)) {
+             Vec3 delta = new Vec3(owner.getX() - this.getX(), owner.getY() - this.getY(), owner.getZ() - this.getZ()).scale(0.1);
+             entity.setDeltaMovement(entity.getDeltaMovement().add(delta));
+             // Canvas start - MC-100991

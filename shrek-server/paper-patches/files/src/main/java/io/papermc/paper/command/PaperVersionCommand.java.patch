@@ -1,0 +1,14 @@
+--- a/src/main/java/io/papermc/paper/command/PaperVersionCommand.java
++++ b/src/main/java/io/papermc/paper/command/PaperVersionCommand.java
+@@ -165,7 +_,10 @@
+     private CompletableFuture<ComputedVersion> fetchVersionMessage() {
+        return CompletableFuture.supplyAsync(() -> {
+            final Component message = Component.textOfChildren(
+-               Component.text(Bukkit.getVersionMessage(), NamedTextColor.WHITE),
++               Component.text(Bukkit.getVersionMessage(), NamedTextColor.WHITE)
++                   // Shrek start - git information on /version
++                   .hoverEvent(Component.text(Bukkit.getGitInformation())),
++                   // Shrek end - git information on /version
+                Component.newline(),
+                this.versionFetcher.getVersionMessage()
+            );

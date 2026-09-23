@@ -1,0 +1,19 @@
+--- a/net/minecraft/world/level/block/piston/MovingPistonBlock.java
++++ b/net/minecraft/world/level/block/piston/MovingPistonBlock.java
+@@ -106,6 +_,16 @@ public class MovingPistonBlock extends BaseEntityBlock {
+     @Override
+     protected VoxelShape getCollisionShape(final BlockState state, final BlockGetter level, final BlockPos pos, final CollisionContext context) {
+         PistonMovingBlockEntity blockEntity = this.getBlockEntity(level, pos);
++        // Shrek start - configure server mechanics
++        if (blockEntity != null && level instanceof Level gameLevel && gameLevel.mechanicsTarget().before(me.samsuik.sakura.mechanics.MechanicVersion.v1_9)) {
++            final VoxelShape shape = blockEntity.getCollisionShapeFromProgress(level, pos);
++            if (context.isAbove(shape, pos, false)) {
++                return shape;
++            } else {
++                return blockEntity.getMovedState().getCollisionShape(level, pos);
++            }
++        }
++        // Shrek end - configure server mechanics
+         return blockEntity != null ? blockEntity.getCollisionShape(level, pos) : Shapes.empty();
+     }
+ 

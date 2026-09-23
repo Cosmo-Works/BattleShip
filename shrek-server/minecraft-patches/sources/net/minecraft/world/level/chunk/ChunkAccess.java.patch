@@ -1,0 +1,20 @@
+--- a/net/minecraft/world/level/chunk/ChunkAccess.java
++++ b/net/minecraft/world/level/chunk/ChunkAccess.java
+@@ -396,6 +_,17 @@ public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeM
+     private final int minSection;
+     private final int maxSection;
+     // Paper end - get block chunk optimisation
++    // Shrek start - load chunks on movement
++    private long lastMovementLoadTicket = 0;
++
++    public final boolean refreshMovementTicket(final long gameTime) {
++        final boolean refresh = gameTime - this.lastMovementLoadTicket >= 100;
++        if (refresh) {
++            this.lastMovementLoadTicket = gameTime;
++        }
++        return refresh;
++    }
++    // Shrek end - load chunks on movement
+ 
+     public ChunkAccess(
+         final ChunkPos chunkPos,

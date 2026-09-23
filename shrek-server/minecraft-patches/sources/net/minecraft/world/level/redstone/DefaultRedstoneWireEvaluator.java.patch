@@ -1,0 +1,22 @@
+--- a/net/minecraft/world/level/redstone/DefaultRedstoneWireEvaluator.java
++++ b/net/minecraft/world/level/redstone/DefaultRedstoneWireEvaluator.java
+@@ -27,7 +_,11 @@ public class DefaultRedstoneWireEvaluator extends RedstoneWireEvaluator {
+         }
+         if (previousStrength != targetStrength) {
+             // Paper end - Call BlockRedstoneEvent
++            if (me.samsuik.sakura.redstone.RedstoneBehaviour.tryApplyCache(level, pos, orientation, previousStrength, targetStrength)) {
++                return;
++            }
+             if (level.getBlockState(pos) == state) {
++                level.redstoneWireCache().wirePower(pos, previousStrength, targetStrength); // Shrek - cache vanilla and eigencraft wires
+                 level.setBlock(pos, state.setValue(RedStoneWireBlock.POWER, targetStrength), Block.UPDATE_CLIENTS);
+             }
+ 
+@@ -39,6 +_,7 @@ public class DefaultRedstoneWireEvaluator extends RedstoneWireEvaluator {
+             }
+ 
+             for (BlockPos blockPos : toUpdate) {
++                level.redstoneWireCache().neighborUpdates(blockPos); // Shrek - cache vanilla and eigencraft wires
+                 level.updateNeighborsAt(blockPos, this.wireBlock);
+             }
+         }

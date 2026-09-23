@@ -1,0 +1,60 @@
+--- a/net/minecraft/world/level/chunk/LevelChunk.java
++++ b/net/minecraft/world/level/chunk/LevelChunk.java
+@@ -152,6 +_,13 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource, ca.spot
+         return this.getBlockStateFinal(x, y, z);
+     }
+     // Paper end - get block chunk optimisation
++    // Shrek start - per-region block state watchers
++    private final me.samsuik.sakura.tracking.block_change.ChunkBlockStateWatcher blockStateWatcher = new me.samsuik.sakura.tracking.block_change.ChunkBlockStateWatcher();
++
++    public final me.samsuik.sakura.tracking.block_change.ChunkBlockStateWatcher getBlockStateWatcher() {
++        return this.blockStateWatcher;
++    }
++    // Shrek end - per-region block state watchers
+ 
+     public LevelChunk(final Level level, final ChunkPos pos) {
+         this(level, pos, UpgradeData.EMPTY, new LevelChunkTicks<>(), new LevelChunkTicks<>(), 0L, null, null, null);
+@@ -190,6 +_,7 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource, ca.spot
+         this.defaultBlockState = empty ? VOID_AIR_BLOCKSTATE : AIR_BLOCKSTATE;
+         // Paper end - get block chunk optimisation
+         this.lightningTick = new java.util.Random().nextInt(100000) << 1; // Pufferfish - initialize lightning tick
++        this.blockStateWatcher.load(this); // Shrek - per-region block state watchers
+     }
+ 
+     public LevelChunk(final ServerLevel level, final ProtoChunk protoChunk, final LevelChunk.@Nullable PostLoadProcessor postLoad) {
+@@ -448,6 +_,7 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource, ca.spot
+             return null;
+         }
+ 
++        this.blockStateWatcher.blockChange(this.level, pos, state, oldState); // Shrek - per-region block state watchers
+         if (!this.level.isClientSide() && (flags & Block.UPDATE_SKIP_ON_PLACE) == 0 && (!this.level.getCurrentWorldData().captureBlockStates || newBlock instanceof net.minecraft.world.level.block.BaseEntityBlock)) { // CraftBukkit - Don't place while processing the BlockPlaceEvent, unless it's a BlockContainer. Prevents blocks such as TNT from activating when cancelled. // Folia - region threading
+             state.onPlace(this.level, pos, oldState, movedByPiston);
+         }
+@@ -1123,6 +_,13 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource, ca.spot
+             return this.blockEntity.typeHolder().getRegisteredName();
+         }
+ 
++        // Shrek start - optimise hopper ticking
++        @Override
++        public final boolean sakura$isActive() {
++            return this.blockEntity.sakura$isActive();
++        }
++        // Shrek end - optimise hopper ticking
++
+         @Override
+         public String toString() {
+             return "Level ticker for " + this.getType() + "@" + this.getPos();
+@@ -1178,6 +_,13 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource, ca.spot
+             return this.ticker.getType();
+         }
+ 
++        // Shrek start - optimise hopper ticking
++        @Override
++        public final boolean sakura$isActive() {
++            return this.ticker.sakura$isActive();
++        }
++        // Shrek end - optimise hopper ticking
++
+         @Override
+         public String toString() {
+             return this.ticker + " <wrapped>";

@@ -1,0 +1,10 @@
+--- a/net/minecraft/world/entity/player/Inventory.java
++++ b/net/minecraft/world/entity/player/Inventory.java
+@@ -146,6 +_,7 @@ public class Inventory implements Container, Nameable {
+             throw new IllegalArgumentException("Invalid selected slot");
+         }
+ 
++        this.equipment.changed(); // Shrek - state watchers
+         this.selected = selected;
+     }
+ 

@@ -1,0 +1,197 @@
+--- a/net/minecraft/world/entity/player/Player.java
++++ b/net/minecraft/world/entity/player/Player.java
+@@ -186,6 +_,36 @@ public abstract class Player extends Avatar implements ContainerUser {
+         return (org.bukkit.craftbukkit.entity.CraftHumanEntity) super.getBukkitEntity();
+     }
+     // CraftBukkit end
++    private long lastSprintKnockback = -1;
++    public long lastLungeMillis = 0;
++    // Shrek start - player poses shrink collision box
++    @Override
++    public net.minecraft.world.entity.EntityDimensions getDefaultDimensions(final Pose pose) {
++        final net.minecraft.world.entity.EntityDimensions dimensions = super.getDefaultDimensions(pose);
++        if (!this.level().shrekConfig().players.posesShrinkCollisionBox && dimensions.height() != Avatar.STANDING_DIMENSIONS.height()) {
++            return STANDING_DIMENSIONS;
++        }
++        return dimensions;
++    }
++
++    public final boolean isInsideAnyCollision() {
++        return this.insideAnyCollisionAt(this.level(), this.position(), Pose.STANDING);
++    }
++
++    public final boolean insideAnyCollisionAt(final Level level, final Vec3 position) {
++        final Pose pose = this.getVehicle() != null || !this.level().shrekConfig().players.posesShrinkCollisionBox
++            ? Pose.STANDING
++            : Pose.SWIMMING;
++        return this.insideAnyCollisionAt(level, position, pose);
++    }
++
++    public final boolean insideAnyCollisionAt(final Level level, final Vec3 position, final Pose pose) {
++        final net.minecraft.world.entity.EntityDimensions entityPoseDimensions = this.getDimensions(pose);
++        final AABB poseCollisionBox = entityPoseDimensions.makeBoundingBox(position);
++        return !level.noCollision(this, poseCollisionBox.deflate(1.0e-7))
++            || !level.getWorldBorder().isWithinBounds(poseCollisionBox);
++    }
++    // Shrek end - player poses shrink collision box
+ 
+     public Player(final Level level, final GameProfile gameProfile) {
+         super(EntityTypes.PLAYER, level);
+@@ -545,7 +_,7 @@ public abstract class Player extends Avatar implements ContainerUser {
+ 
+     public void increaseScore(final int amount) {
+         int score = this.getScore();
+-        this.entityData.set(DATA_SCORE_ID, score + amount);
++        this.entityData.set(DATA_SCORE_ID, score + amount, 0); // Shrek - packet obfuscation and reduction
+     }
+ 
+     public void startAutoSpinAttack(final int activationTicks, final float dmg, final ItemStack itemStackUsed) {
+@@ -705,6 +_,8 @@ public abstract class Player extends Avatar implements ContainerUser {
+     public boolean isInvulnerableTo(final ServerLevel level, final DamageSource source) {
+         if (super.isInvulnerableTo(level, source)) {
+             return true;
++        } else if (!this.level().shrekConfig().cannons.explosion.explosionsHurtPlayers && source.is(DamageTypeTags.IS_EXPLOSION)) { // Shrek - allow disabling explosions hurting players
++            return true;
+         } else if (source.is(DamageTypeTags.IS_DROWNING)) {
+             return !level.getGameRules().get(GameRules.DROWNING_DAMAGE);
+         } else if (source.is(DamageTypeTags.IS_FALL)) {
+@@ -746,6 +_,11 @@ public abstract class Player extends Avatar implements ContainerUser {
+             }
+         }
+ 
++        final double maxDamage = this.level().shrekConfig().players.combat.maxDamageOrDisabled();
++        if (damage > 0.0 && maxDamage >= 0.0) {
++            damage = Math.min(damage, (float) maxDamage);
++        }
++
+         // return damage != 0.0F && super.hurtServer(level, source, damage);
+         // CraftBukkit start - Don't filter out 0 damage
+         boolean damaged = super.hurtServer(level, source, damage);
+@@ -1031,19 +_,26 @@ public abstract class Player extends Avatar implements ContainerUser {
+ 
+         if (playerAttackEntityEvent.callEvent() && willAttack) { // Logic moved to willAttack local variable.
+         // Paper end - PlayerAttackEntityEvent
+-            float baseDamage = this.isAutoSpinAttack() ? this.autoSpinAttackDmg : (float)this.getAttributeValue(Attributes.ATTACK_DAMAGE);
++            float baseDamage = this.isAutoSpinAttack() ? this.autoSpinAttackDmg : this.getAttackDamageFromAttributes();
+             ItemStack attackingItemStack = this.getWeaponItem();
+             DamageSource damageSource = this.createAttackSource(attackingItemStack); final DamageSource dmgSourceFinal = damageSource; // Paper - damage events
+             float attackStrengthScale = this.getAttackStrengthScale(0.5F);
++            if (this.level().shrekConfig().players.combat.legacyCombatMechanics) {
++                attackStrengthScale = 1.0f;
++            }
+             float magicBoost = attackStrengthScale * (this.getEnchantedDamage(entity, baseDamage, damageSource) - baseDamage);
+-            baseDamage *= this.baseDamageScaleFactor();
++            if (!this.level().shrekConfig().players.combat.legacyCombatMechanics) {
++                baseDamage *= this.baseDamageScaleFactor();
++            } else if (magicBoost != 0.0) {
++                magicBoost += me.samsuik.sakura.player.combat.CombatUtil.calculateLegacySharpnessDamage(this, attackingItemStack, damageSource);
++            }
+             this.onAttack(entity); // Paper
+             final float dmgFinal = magicBoost; // Paper - damage events
+             if (!this.deflectProjectile(entity, () -> !org.bukkit.craftbukkit.event.CraftEventFactory.handleNonLivingEntityDamageEvent(entity, dmgSourceFinal, dmgFinal, false))) {
+                 if (baseDamage > 0.0F || magicBoost > 0.0F) {
+                     boolean fullStrengthAttack = attackStrengthScale > 0.9F;
+                     boolean knockbackAttack;
+-                    if (this.isSprinting() && fullStrengthAttack) {
++                    if (this.isSprinting() && (!this.level().shrekConfig().players.knockback.sprinting.requireFullAttack || fullStrengthAttack)) {
+                         this.playServerSideSound(SoundEvents.PLAYER_ATTACK_KNOCKBACK);
+                         knockbackAttack = true;
+                     } else {
+@@ -1069,10 +_,17 @@ public abstract class Player extends Avatar implements ContainerUser {
+                     Vec3 oldMovement = entity.getDeltaMovement();
+                     boolean wasHurt = entity.hurtOrSimulate(damageSource, totalDamage);
+                     if (wasHurt) {
+-                        this.causeExtraKnockback(
+-                            entity, this.getKnockback(entity, damageSource) + (knockbackAttack ? 0.5F : 0.0F), oldMovement, damageSource, totalDamage, true
++                        final float extraKnockbackToApply = this.level().shrekConfig().players.combat.legacyCombatMechanics ? 1.0f : 0.5f;
++                        this.sakura$causeExtraKnockback(
++                            entity,
++                            this.getKnockback(entity, damageSource) + (knockbackAttack ? extraKnockbackToApply : 0.0F),
++                            oldMovement,
++                            damageSource,
++                            totalDamage,
++                            true,
++                            !knockbackAttack
+                         );
+-                        if (sweepAttack && !this.level().canvasConfig().combat.disableSweepingEdge) { // Canvas - combat configs
++                        if (sweepAttack && !this.level().canvasConfig().combat.disableSweepingEdge && this.level().shrekConfig().players.combat.allowSweepAttacks) {
+                             this.doSweepAttack(entity, baseDamage, damageSource, attackStrengthScale);
+                         }
+ 
+@@ -1098,6 +_,9 @@ public abstract class Player extends Avatar implements ContainerUser {
+     }
+ 
+     private void playServerSideSound(final SoundEvent sound) {
++        if (this.level().shrekConfig().players.combat.oldSoundsAndParticleEffects) {
++            return;
++        }
+         sendSoundEffect(this, this.getX(), this.getY(), this.getZ(), sound, this.getSoundSource(), 1.0F, 1.0F); // Paper - send while respecting visibility
+     }
+ 
+@@ -1129,7 +_,7 @@ public abstract class Player extends Avatar implements ContainerUser {
+             && !this.isMobilityRestricted()
+             && !this.isPassenger()
+             && entity instanceof LivingEntity
+-            && !this.isSprinting();
++            && (this.level().shrekConfig().players.combat.legacyCombatMechanics || !this.isSprinting());
+     }
+ 
+     private boolean isSweepAttack(final boolean fullStrengthAttack, final boolean criticalAttack, final boolean knockbackAttack) {
+@@ -1170,7 +_,7 @@ public abstract class Player extends Avatar implements ContainerUser {
+         if (entity instanceof LivingEntity livingEntity) {
+             float actualDamage = oldLivingEntityHealth - livingEntity.getHealth();
+             this.awardStat(Stats.DAMAGE_DEALT, Math.round(actualDamage * 10.0F));
+-            if (!level().canvasConfig().visuals.particles.disableNewCombatParticles && this.level() instanceof ServerLevel && actualDamage > 2.0F) { // Canvas - particles config
++            if (!this.level().shrekConfig().players.combat.oldSoundsAndParticleEffects && !level().canvasConfig().visuals.particles.disableNewCombatParticles && this.level() instanceof ServerLevel && actualDamage > 2.0F) {
+                 int count = (int)(actualDamage * 0.5);
+                 ((ServerLevel)this.level())
+                     .sendParticles(ParticleTypes.DAMAGE_INDICATOR, entity.getX(), entity.getY(0.5), entity.getZ(), count, 0.1, 0.0, 0.1, 0.2);
+@@ -1218,9 +_,32 @@ public abstract class Player extends Avatar implements ContainerUser {
+         final DamageSource damageSource,
+         final float damage,
+         final boolean comesFromEffect
++    ) {
++        this.sakura$causeExtraKnockback(entity, knockbackAmount, oldMovement, damageSource, damage, comesFromEffect, true);
++    }
++
++    private void sakura$causeExtraKnockback(
++        final Entity entity,
++        float knockbackAmount,
++        final Vec3 oldMovement,
++        final DamageSource damageSource,
++        final float damage,
++        final boolean comesFromEffect,
++        final boolean bypassKnockbackDelay
+     ) {
+         if (knockbackAmount > 0.0F) {
+-            if (entity instanceof LivingEntity livingTarget) {
++            final long millis = System.currentTimeMillis();
++            final long sinceLastKnockback = millis - this.lastSprintKnockback;
++            if (!bypassKnockbackDelay) {
++                double knockbackToApply = 0.0;
++                if (sinceLastKnockback >= this.level().shrekConfig().players.knockback.knockbackDelayMillis()) {
++                    knockbackToApply = this.level().shrekConfig().players.knockback.sprinting.extraKnockback * 2.0;
++                    this.lastSprintKnockback = millis;
++                }
++                knockbackAmount = (knockbackAmount - 1.0f) + (float) knockbackToApply;
++            }
++            if (knockbackAmount == 0.0f) {
++            } else if (entity instanceof LivingEntity livingTarget) {
+                 livingTarget.knockback(
+                     knockbackAmount, Mth.sin(this.getYRot() * Mth.DEG_TO_RAD), -Mth.cos(this.getYRot() * Mth.DEG_TO_RAD), damageSource, damage, comesFromEffect, this, io.papermc.paper.event.entity.EntityKnockbackEvent.Cause.ENTITY_ATTACK // Paper - knockback events
+                 );
+@@ -1292,7 +_,13 @@ public abstract class Player extends Avatar implements ContainerUser {
+                     if (nearby.hurtServer(serverLevel, damageSource.knownCause(org.bukkit.event.entity.EntityDamageEvent.DamageCause.ENTITY_SWEEP_ATTACK), enchantedDamage) && !nearby.lastDamageCancelled) {
+                         // Paper end - Only apply knockback if the event is not canceled
+                         nearby.knockback(
+-                            0.4F, Mth.sin(this.getYRot() * Mth.DEG_TO_RAD), -Mth.cos(this.getYRot() * Mth.DEG_TO_RAD), damageSource, enchantedDamage, this, io.papermc.paper.event.entity.EntityKnockbackEvent.Cause.SWEEP_ATTACK // Paper - knockback events
++                            (float) this.level().shrekConfig().players.knockback.sweepingEdgeKnockback,
++                            Mth.sin(this.getYRot() * Mth.DEG_TO_RAD),
++                            -Mth.cos(this.getYRot() * Mth.DEG_TO_RAD),
++                            damageSource,
++                            enchantedDamage,
++                            this,
++                            io.papermc.paper.event.entity.EntityKnockbackEvent.Cause.SWEEP_ATTACK
+                         );
+                         EnchantmentHelper.doPostAttackEffects(serverLevel, nearby, damageSource);
+                     }
