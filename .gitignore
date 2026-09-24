@@ -18,3 +18,7 @@ build
 
 .idea/
 /local/
+
+# Local test servers and helper scripts
+/run-*/
+/tools/
