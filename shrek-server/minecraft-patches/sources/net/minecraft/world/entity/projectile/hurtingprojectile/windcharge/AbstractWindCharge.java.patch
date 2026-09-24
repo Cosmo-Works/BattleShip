@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/entity/projectile/hurtingprojectile/windcharge/AbstractWindCharge.java
 +++ b/net/minecraft/world/entity/projectile/hurtingprojectile/windcharge/AbstractWindCharge.java
-@@ -26,15 +_,42 @@ import net.minecraft.world.phys.HitResult;
+@@ -26,15 +_,42 @@
  import net.minecraft.world.phys.Vec3;
  import org.jspecify.annotations.Nullable;
  
@@ -44,7 +44,7 @@
      }
  
      public AbstractWindCharge(
-@@ -43,6 +_,9 @@ public abstract class AbstractWindCharge extends AbstractHurtingProjectile imple
+@@ -43,6 +_,9 @@
          super(type, x, y, z, level);
          this.setOwner(owner);
          this.accelerationPower = 0.0;
@@ -54,7 +54,7 @@
      }
  
      protected AbstractWindCharge(
-@@ -50,6 +_,9 @@ public abstract class AbstractWindCharge extends AbstractHurtingProjectile imple
+@@ -50,6 +_,9 @@
      ) {
          super(type, x, y, z, direction, level);
          this.accelerationPower = 0.0;

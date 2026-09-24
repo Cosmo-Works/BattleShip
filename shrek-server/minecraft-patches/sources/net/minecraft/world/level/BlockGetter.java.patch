@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/level/BlockGetter.java
 +++ b/net/minecraft/world/level/BlockGetter.java
-@@ -207,9 +_,24 @@ public interface BlockGetter extends LevelHeightAccessor {
+@@ -207,9 +_,24 @@
      }
  
      static boolean forEachBlockIntersectedBetween(final Vec3 from, final Vec3 to, final AABB aabbAtTarget, final BlockGetter.BlockStepVisitor visitor) {
@@ -27,7 +27,7 @@
                  if (!visitor.visit(blockPos, 0)) {
                      return false;
                  }
-@@ -217,22 +_,42 @@ public interface BlockGetter extends LevelHeightAccessor {
+@@ -217,22 +_,42 @@
  
              return true;
          } else {

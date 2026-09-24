@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/level/block/entity/DispenserBlockEntity.java
 +++ b/net/minecraft/world/level/block/entity/DispenserBlockEntity.java
-@@ -71,8 +_,11 @@ public class DispenserBlockEntity extends RandomizableContainerBlockEntity {
+@@ -71,8 +_,11 @@
          int replaceSlot = -1;
          int replaceOdds = 1;
  

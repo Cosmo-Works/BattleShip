@@ -11,7 +11,7 @@ jobs:
     env:
       PLUGIN_ID: "io.canvasmc.weaver.patcher"
       FILE_PATH: "build.gradle.kts"
-      UPSTREAM_BRANCH: "main"
+      UPSTREAM_BRANCH: "dev/26.3"
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6

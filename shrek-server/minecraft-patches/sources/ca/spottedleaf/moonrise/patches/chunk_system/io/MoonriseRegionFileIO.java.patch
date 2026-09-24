@@ -1,6 +1,6 @@
 --- a/ca/spottedleaf/moonrise/patches/chunk_system/io/MoonriseRegionFileIO.java
 +++ b/ca/spottedleaf/moonrise/patches/chunk_system/io/MoonriseRegionFileIO.java
-@@ -17,7 +_,7 @@ import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
+@@ -17,7 +_,7 @@
  import net.minecraft.nbt.CompoundTag;
  import net.minecraft.server.MinecraftServer;
  import net.minecraft.server.level.ServerLevel;
@@ -9,7 +9,7 @@
  import net.minecraft.world.level.chunk.storage.RegionFileStorage;
  import org.slf4j.Logger;
  import org.slf4j.LoggerFactory;
-@@ -1273,7 +_,7 @@ public final class MoonriseRegionFileIO {
+@@ -1311,7 +_,7 @@
                  this.regionDataController.finishWrite(this.chunkX, this.chunkZ, writeData);
                  // Paper start - flush regionfiles on save
                  if (this.world.paperConfig().chunks.flushRegionsOnSave) {
@@ -18,7 +18,7 @@
                      if (regionFile != null) {
                          regionFile.flush();
                      } // else: evicted from cache, which should have called flush
-@@ -1489,7 +_,7 @@ public final class MoonriseRegionFileIO {
+@@ -1562,7 +_,7 @@
  
          public static interface IORunnable {
  

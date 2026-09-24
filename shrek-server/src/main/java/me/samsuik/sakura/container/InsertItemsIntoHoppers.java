@@ -64,14 +64,7 @@ public final class InsertItemsIntoHoppers {
             if (HopperBlockEntity.addItem(hopper, itemEntity)) {
                 drops.remove(index--);
             } else {
-                drops.set(
-                    index,
-                    new Entity.DefaultDrop(
-                        itemEntity.getItem().getItem(),
-                        CraftItemStack.asCraftMirror(itemEntity.getItem()),
-                        drop.dropConsumer()
-                    )
-                );
+                drops.set(index, new Entity.DefaultDrop(itemEntity.getItem(), drop.dropConsumer()));
             }
         }
     }

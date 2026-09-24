@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/entity/Entity.java
 +++ b/net/minecraft/world/entity/Entity.java
-@@ -117,6 +_,7 @@ import net.minecraft.world.level.block.Rotation;
+@@ -118,6 +_,7 @@
  import net.minecraft.world.level.block.SoundType;
  import net.minecraft.world.level.block.state.BlockState;
  import net.minecraft.world.level.border.WorldBorder;
@@ -8,7 +8,17 @@
  import net.minecraft.world.level.entity.EntityAccess;
  import net.minecraft.world.level.entity.EntityInLevelCallback;
  import net.minecraft.world.level.gameevent.DynamicGameEventListener;
-@@ -619,6 +_,50 @@ public abstract class Entity
+@@ -445,6 +_,9 @@
+     public long activatedTick = Integer.MIN_VALUE;
+     public boolean isTemporarilyActive;
+     public long activatedImmunityTick = Integer.MIN_VALUE;
++    public boolean activatedPriorityReset = false;
++    public int activatedPriority = 1;
++    public int brainActivationTick;
+ 
+     public void inactiveTick() {
+     }
+@@ -624,6 +_,50 @@
      }
      // Folia end - region threading
  
@@ -59,7 +69,7 @@
      public Entity(final EntityType<?> type, final Level level) {
          this.type = type;
          this.level = level;
-@@ -630,6 +_,7 @@ public abstract class Entity
+@@ -635,6 +_,7 @@
          // Paper start - EAR 2
          if (level != null) {
              this.defaultActivationState = io.papermc.paper.entity.activation.ActivationRange.initializeEntityActivationState(this, level.spigotConfig);
@@ -67,7 +77,7 @@
          } else {
              this.defaultActivationState = false;
          }
-@@ -1175,7 +_,7 @@ public abstract class Entity
+@@ -1195,7 +_,7 @@
      }
  
      protected void checkSupportingBlock(final boolean onGround, final @Nullable Vec3 movement) {
@@ -76,7 +86,7 @@
              AABB boundingBox = this.getBoundingBox();
              AABB testArea = new AABB(boundingBox.minX, boundingBox.minY - 1.0E-6, boundingBox.minZ, boundingBox.maxX, boundingBox.minY, boundingBox.maxZ);
              Optional<BlockPos> supportingBlock = this.level.findSupportingBlock(this, testArea);
-@@ -1221,7 +_,10 @@ public abstract class Entity
+@@ -1248,7 +_,10 @@
              this.verticalCollisionBelow = false;
              this.minorHorizontalCollision = false;
          } else {
@@ -88,7 +98,7 @@
                  delta = this.limitPistonMovement(delta);
                  // Paper start - EAR 2
                  this.activatedTick = Math.max(this.activatedTick, io.papermc.paper.threadedregions.RegionizedServer.getCurrentTick() + 20); // Folia - region threading
-@@ -1233,7 +_,7 @@ public abstract class Entity
+@@ -1260,7 +_,7 @@
              }
  
              if (this.stuckSpeedMultiplier.lengthSqr() > 1.0E-7) {
@@ -97,7 +107,7 @@
                      delta = delta.multiply(this.stuckSpeedMultiplier);
                  }
  
-@@ -1250,6 +_,7 @@ public abstract class Entity
+@@ -1277,6 +_,7 @@
              delta = this.maybeBackOffFromEdge(delta, moverType);
              // Canvas start - region threading
              if (
@@ -105,7 +115,7 @@
                  io.canvasmc.canvas.GlobalConfiguration.getInstance().regionScheduler.preventExcessiveVelocityMoveOutOfRegion &&
                  delta.lengthSqr() >= (30.0D * 30.0D) &&
                  !ca.spottedleaf.moonrise.common.util.TickThread.isTickThreadFor(level(), position(), delta, 16)
-@@ -1261,10 +_,30 @@ public abstract class Entity
+@@ -1288,34 +_,46 @@
              // Canvas end - region threading
              Vec3 movement = this.collide(delta);
              double movementLength = movement.lengthSqr();
@@ -113,16 +123,33 @@
 -                if (this.fallDistance != 0.0 && movementLength >= 1.0) {
 -                    double checkDistance = Math.min(movement.length(), 8.0);
 -                    Vec3 checkTo = this.position().add(movement.normalize().scale(checkDistance));
+-                    BlockHitResult hitResult = this.level()
+-                        .clip(new ClipContext(this.position(), checkTo, ClipContext.Block.FALLDAMAGE_RESETTING, ClipContext.Fluid.WATER, this));
+-                    if (hitResult.getType() != HitResult.Type.MISS) {
+-                        this.resetFallDistance();
+-                    }
+-                }
+-
 +            // Shrek start - configure server mechanics
 +            if (me.samsuik.sakura.mechanics.EntityBehaviour.canMoveEntity(movementLength, movement, mechanicsTarget)) {
-+                Vec3 pos = this.position();
-+                Vec3 newPosition = pos.add(movement);
-+                // Canvas start - region threading
+                 Vec3 pos = this.position();
+                 Vec3 newPosition = pos.add(movement);
+                 // Canvas start - region threading
+-                // This is after collide(movement) so we evaluate resolved displacement, not raw input.
+-                // Moonrise collision lookups treat out-of-region/unloaded chunks as blocking, so this point avoids
+-                // applying a large cross-region setPos while preserving normal collision resolution first.
+-                if (movement.lengthSqr() >= (30.0D * 30.0D)
+-                    && !Double.isNaN(newPosition.x) && !Double.isNaN(newPosition.y) && !Double.isNaN(newPosition.z)
+-                    && !this.isVehicle()
+-                    && !this.isPassenger()
+-                    && !ca.spottedleaf.moonrise.common.util.TickThread.isTickThreadFor(this.level(), pos, movement, 0)) {
 +                if (this.leavesThisRegion(pos, movement, newPosition)) {
 +                    this.unmergeForRegionTransfer(); // Shrek - cannon region transfer
-+                    throw new io.canvasmc.canvas.threadedregions.entities.EntityMoveOutOfRegionException(this, moverType, movement);
-+                }
-+                // Canvas end - region threading
+                     throw new io.canvasmc.canvas.threadedregions.entities.EntityMoveOutOfRegionException(this, moverType, movement);
+                 }
+                 // Canvas end - region threading
+-                this.addMovementThisTick(new Entity.Movement(pos, newPosition, delta));
+-                this.setPos(newPosition);
 +                if (this.fallDistance != 0.0 && movementLength >= 1.0 && mechanicsTarget.atLeast(me.samsuik.sakura.mechanics.MechanicVersion.v1_18_2)) {
 +                    final Vec3 checkTo;
 +                    if (mechanicsTarget.atLeast(me.samsuik.sakura.mechanics.MechanicVersion.v1_21_9)) {
@@ -137,40 +164,26 @@
 +                        checkTo = this.position().add(movement);
 +                    }
 +                    // Shrek end - configure server mechanics
-                     BlockHitResult hitResult = this.level()
-                         .clip(new ClipContext(this.position(), checkTo, ClipContext.Block.FALLDAMAGE_RESETTING, ClipContext.Fluid.WATER, this));
-                     if (hitResult.getType() != HitResult.Type.MISS) {
-@@ -1272,22 +_,14 @@ public abstract class Entity
-                     }
-                 }
- 
--                Vec3 pos = this.position();
--                Vec3 newPosition = pos.add(movement);
--                // Canvas start - region threading
--                // This is after collide(movement) so we evaluate resolved displacement, not raw input.
--                // Moonrise collision lookups treat out-of-region/unloaded chunks as blocking, so this point avoids
--                // applying a large cross-region setPos while preserving normal collision resolution first.
--                if (movement.lengthSqr() >= (30.0D * 30.0D)
--                    && !Double.isNaN(newPosition.x) && !Double.isNaN(newPosition.y) && !Double.isNaN(newPosition.z)
--                    && !this.isVehicle()
--                    && !this.isPassenger()
--                    && !ca.spottedleaf.moonrise.common.util.TickThread.isTickThreadFor(this.level(), pos, movement, 0)) {
--                    throw new io.canvasmc.canvas.threadedregions.entities.EntityMoveOutOfRegionException(this, moverType, movement);
++                    BlockHitResult hitResult = this.level()
++                        .clip(new ClipContext(this.position(), checkTo, ClipContext.Block.FALLDAMAGE_RESETTING, ClipContext.Fluid.WATER, this));
++                    if (hitResult.getType() != HitResult.Type.MISS) {
++                        this.resetFallDistance();
++                    }
++                }
++
 +                // Shrek start - configure server mechanics
 +                if (mechanicsTarget.before(me.samsuik.sakura.mechanics.MechanicVersion.v1_21_6)) {
 +                    me.samsuik.sakura.mechanics.EntityBehaviour.changeEntityPosition(this, pos, movement, mechanicsTarget);
 +                } else {
 +                    this.addMovementThisTick(new Entity.Movement(pos, newPosition, delta));
 +                    this.setPos(newPosition);
-                 }
--                // Canvas end - region threading
--                this.addMovementThisTick(new Entity.Movement(pos, newPosition, delta));
--                this.setPos(newPosition);
++                }
+                 this.recordMovement(moverType, movement);
 +                // Shrek end - configure server mechanics
              }
  
              boolean xCollision = !Mth.equal(delta.x, movement.x);
-@@ -1314,9 +_,17 @@ public abstract class Entity
+@@ -1342,9 +_,17 @@
  
              if (this.isRemoved()) {
              } else {
@@ -190,7 +203,7 @@
                  // CraftBukkit start
                  if (this.horizontalCollision && this.getBukkitEntity() instanceof org.bukkit.entity.Vehicle) {
                      org.bukkit.entity.Vehicle vehicle = (org.bukkit.entity.Vehicle) this.getBukkitEntity();
-@@ -1352,6 +_,25 @@ public abstract class Entity
+@@ -1386,6 +_,25 @@
          }
      }
  
@@ -216,7 +229,7 @@
      private void restituteMovementAfterCollisions(final BlockState effectState, final boolean xCollision, final boolean zCollision, final Vec3 movement) {
          double restitution = this.isSuppressingBounce() ? 0.0 : this.getEntityBounciness();
          Vec3 currentMovement = this.getDeltaMovement();
-@@ -1457,7 +_,7 @@ public abstract class Entity
+@@ -1494,7 +_,7 @@
          this.finalMovementsThisTick.clear();
          this.finalMovementsThisTick.addAll(this.movementThisTick);
          this.movementThisTick.clear();
@@ -225,7 +238,7 @@
              this.finalMovementsThisTick.add(new Entity.Movement(this.oldPosition(), this.position()));
          } else if (this.finalMovementsThisTick.getLast().to.distanceToSqr(this.position()) > 9.9999994E-11F) {
              this.finalMovementsThisTick.add(new Entity.Movement(this.finalMovementsThisTick.getLast().to, this.position()));
-@@ -1470,7 +_,7 @@ public abstract class Entity
+@@ -1507,7 +_,7 @@
          this.applyEffectsFromBlocks(this.finalMovementsThisTick);
      }
  
@@ -234,7 +247,7 @@
          if (this.movementThisTick.size() >= 100) {
              Entity.Movement first = this.movementThisTick.removeFirst();
              Entity.Movement second = this.movementThisTick.removeFirst();
-@@ -1691,7 +_,153 @@ public abstract class Entity
+@@ -1728,7 +_,153 @@
          return colliders.isEmpty() ? maxDistance : -Shapes.collide(Direction.Axis.Y, aabb, colliders, -maxDistance);
      }
  
@@ -389,7 +402,7 @@
          // Paper start - optimise collisions
          final boolean xZero = movement.x == 0.0;
          final boolean yZero = movement.y == 0.0;
-@@ -1722,10 +_,10 @@ public abstract class Entity
+@@ -1764,10 +_,10 @@
  
          ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.getCollisionsForBlocksOrWorldBorder(
              this.level, (Entity)(Object)this, initialCollisionBox, potentialCollisionsVoxel, potentialCollisionsBB,
@@ -402,7 +415,7 @@
  
          final boolean collidedX = collided.x != movement.x;
          final boolean collidedY = collided.y != movement.y;
-@@ -1754,7 +_,7 @@ public abstract class Entity
+@@ -1796,7 +_,7 @@
          );
  
          for (final float step : calculateStepHeights(collidedYBox, stepVoxels, stepAABBs, (float)stepHeight, (float)collided.y)) {
@@ -411,7 +424,7 @@
              if (stepResult.horizontalDistanceSqr() > collided.horizontalDistanceSqr()) {
                  return stepResult.add(0.0, collidedYBox.minY - currentBox.minY, 0.0);
              }
-@@ -1873,26 +_,38 @@ public abstract class Entity
+@@ -1915,26 +_,38 @@
      private void checkInsideBlocks(final List<Entity.Movement> movements, final InsideBlockEffectApplier.StepBasedCollector effectCollector) {
          if (this.isAffectedByBlocks()) {
              LongSet visitedBlocks = this.visitedBlocks;
@@ -457,7 +470,7 @@
                  }
              }
  
-@@ -1905,22 +_,31 @@ public abstract class Entity
+@@ -1947,22 +_,31 @@
          final Vec3 to,
          final InsideBlockEffectApplier.StepBasedCollector effectCollector,
          final LongSet visitedBlocks,
@@ -497,7 +510,7 @@
              (blockIntersection, iteration) -> {
                  if (!this.isAlive()) {
                      return false;
-@@ -1930,25 +_,12 @@ public abstract class Entity
+@@ -1972,25 +_,12 @@
                      return false;
                  }
  
@@ -524,7 +537,7 @@
                  if (state.isAir()) {
                      if (debugEntityBlockIntersections) {
                          this.debugBlockIntersection((ServerLevel)this.level(), blockIntersection.immutable(), false, false);
-@@ -1960,7 +_,7 @@ public abstract class Entity
+@@ -2002,7 +_,7 @@
                      boolean insideBlock = intersectShape == Shapes.block()
                          || this.collidedWithShapeMovingFrom(from, to, intersectShape.move(new Vec3(blockIntersection)).toAabbs());
                      boolean insideFluid = (state.tagFlag & io.canvasmc.canvas.world.block.BlockTags.FLUID) != 0 && this.collidedWithFluid(state.getFluidState(), blockIntersection, from, to); // Canvas - optimize checkInsideBlocks
@@ -533,7 +546,7 @@
                          if (insideBlock) {
                              try {
                                  boolean isPrecise = movedFar || deflatedBoundingBoxAtTarget.intersects(blockIntersection);
-@@ -1996,6 +_,18 @@ public abstract class Entity
+@@ -2038,6 +_,18 @@
          return iterations.get() + 1;
      }
  
@@ -552,7 +565,7 @@
      private void debugBlockIntersection(final ServerLevel level, final BlockPos pos, final boolean insideBlock, final boolean insideFluid) {
          DebugEntityBlockIntersection type;
          if (insideFluid) {
-@@ -3900,7 +_,7 @@ public abstract class Entity
+@@ -3994,7 +_,7 @@
              }
              return;
          }
@@ -561,7 +574,7 @@
          // CraftBukkit end
      }
  
-@@ -5794,7 +_,7 @@ public abstract class Entity
+@@ -5985,7 +_,7 @@
      }
  
      public boolean isPushedByFluid() {
@@ -570,7 +583,7 @@
      }
  
      public static double getViewScale() {
-@@ -6631,6 +_,12 @@ public abstract class Entity
+@@ -6846,6 +_,12 @@
              this.stopRiding();
          }
  
@@ -583,7 +596,7 @@
          if (this.removalReason != Entity.RemovalReason.UNLOADED_TO_CHUNK) { this.getPassengers().forEach(Entity::stopRiding); } // Paper - rewrite chunk system
          this.levelCallback.onRemove(reason);
          this.onRemoval(reason);
-@@ -6677,13 +_,14 @@ public abstract class Entity
+@@ -6892,13 +_,14 @@
      @Override
      public boolean shouldBeSaved() {
          return (this.removalReason == null || this.removalReason.shouldSave())
@@ -599,7 +612,7 @@
      }
  
      public boolean mayInteract(final ServerLevel level, final BlockPos pos) {
-@@ -6830,7 +_,7 @@ public abstract class Entity
+@@ -7053,7 +_,7 @@
          void accept(Entity target, double x, double y, double z);
      }
  

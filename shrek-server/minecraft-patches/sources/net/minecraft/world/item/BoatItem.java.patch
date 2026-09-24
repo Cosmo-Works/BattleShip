@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/item/BoatItem.java
 +++ b/net/minecraft/world/item/BoatItem.java
-@@ -65,7 +_,7 @@ public class BoatItem extends Item {
+@@ -65,7 +_,7 @@
              }
  
              boat.setYRot(player.getYRot());

@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/entity/projectile/throwableitemprojectile/ThrownEnderpearl.java
 +++ b/net/minecraft/world/entity/projectile/throwableitemprojectile/ThrownEnderpearl.java
-@@ -20,6 +_,7 @@ import net.minecraft.world.entity.monster.Endermite;
+@@ -20,6 +_,7 @@
  import net.minecraft.world.item.Item;
  import net.minecraft.world.item.ItemStack;
  import net.minecraft.world.item.Items;
@@ -8,7 +8,7 @@
  import net.minecraft.world.level.Level;
  import net.minecraft.world.level.block.Blocks;
  import net.minecraft.world.level.block.state.BlockState;
-@@ -33,6 +_,32 @@ import org.jspecify.annotations.Nullable;
+@@ -33,6 +_,32 @@
  public class ThrownEnderpearl extends ThrowableItemProjectile {
      private long ticketTimer = 0L;
  
@@ -41,7 +41,7 @@
      public ThrownEnderpearl(final EntityType<? extends ThrownEnderpearl> type, final Level level) {
          super(type, level);
      }
-@@ -94,6 +_,17 @@ public class ThrownEnderpearl extends ThrowableItemProjectile {
+@@ -94,6 +_,17 @@
                  }
  
                  // source is now an invalid reference, do not use it, use the entity parameter
@@ -59,7 +59,7 @@
                  final Vec3 endermitePos = entity.position();
  
                  // dismount from any vehicles, so we can teleport and to prevent desync
-@@ -106,13 +_,14 @@ public class ThrownEnderpearl extends ThrowableItemProjectile {
+@@ -106,13 +_,14 @@
                  }
  
                  entity.teleportAsync(

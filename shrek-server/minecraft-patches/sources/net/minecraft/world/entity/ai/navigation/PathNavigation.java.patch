@@ -1,0 +1,13 @@
+--- a/net/minecraft/world/entity/ai/navigation/PathNavigation.java
++++ b/net/minecraft/world/entity/ai/navigation/PathNavigation.java
+@@ -475,7 +_,9 @@
+     }
+ 
+     public boolean shouldRecomputePath(final BlockPos pos) {
+-        if (this.hasDelayedRecomputation) {
++        if (!this.mob.aware) {
++            return false;
++        } else if (this.hasDelayedRecomputation) {
+             return false;
+         } else if (this.path != null && !this.path.isDone() && this.path.getNodeCount() != 0) {
+             Node target = this.path.getEndNode();

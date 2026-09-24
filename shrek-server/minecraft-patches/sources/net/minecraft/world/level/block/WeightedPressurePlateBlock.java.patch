@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/level/block/WeightedPressurePlateBlock.java
 +++ b/net/minecraft/world/level/block/WeightedPressurePlateBlock.java
-@@ -54,6 +_,12 @@ public class WeightedPressurePlateBlock extends BasePressurePlateBlock {
+@@ -38,6 +_,12 @@
  
              // We only want to block turning the plate on if all events are cancelled
              if (!cancellable.isCancelled()) {

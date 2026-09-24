@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/level/material/Fluid.java
 +++ b/net/minecraft/world/level/material/Fluid.java
-@@ -74,6 +_,10 @@ public abstract class Fluid {
+@@ -74,6 +_,10 @@
  
      protected abstract Vec3 getFlow(BlockGetter level, BlockPos pos, FluidState fluidState);
  

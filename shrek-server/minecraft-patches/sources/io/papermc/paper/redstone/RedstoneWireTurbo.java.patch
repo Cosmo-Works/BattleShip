@@ -1,6 +1,6 @@
 --- a/io/papermc/paper/redstone/RedstoneWireTurbo.java
 +++ b/io/papermc/paper/redstone/RedstoneWireTurbo.java
-@@ -660,6 +_,7 @@ public final class RedstoneWireTurbo {
+@@ -660,6 +_,7 @@
                      // The Orientation parameter is (for now) only used by redstone wire
                      // while these updates are dispatched to non-wires only, so we can
                      // pass null.
@@ -8,7 +8,7 @@
                      worldIn.getBlockState(upd.self).handleNeighborChanged(worldIn, upd.self, wire, null, false);
                  }
              }
-@@ -804,6 +_,7 @@ public final class RedstoneWireTurbo {
+@@ -804,6 +_,7 @@
          // Perform the walk over all directly reachable redstone wire blocks, propagating wire value
          // updates in a breadth first order out from the initial update received for the block at 'pos'.
          breadthFirstWalk(worldIn);
@@ -16,7 +16,7 @@
  
          // With the whole search completed, clear the list of all known blocks.
          // We do not want to keep around state information that may be changed by other code.
-@@ -909,6 +_,7 @@ public final class RedstoneWireTurbo {
+@@ -909,6 +_,7 @@
                  // bypass the new neighbor update stack.
                  if (worldIn.setBlock(upd.self, state, Block.UPDATE_KNOWN_SHAPE | Block.UPDATE_CLIENTS))
                      updateNeighborShapes(worldIn, upd.self, state);

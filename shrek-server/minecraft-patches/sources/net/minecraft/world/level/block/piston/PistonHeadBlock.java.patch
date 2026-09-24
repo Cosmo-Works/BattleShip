@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/level/block/piston/PistonHeadBlock.java
 +++ b/net/minecraft/world/level/block/piston/PistonHeadBlock.java
-@@ -105,6 +_,11 @@ public class PistonHeadBlock extends DirectionalBlock {
+@@ -98,6 +_,11 @@
      @Override
      protected boolean canSurvive(final BlockState state, final LevelReader level, final BlockPos pos) {
          BlockState base = level.getBlockState(pos.relative(state.getValue(FACING).getOpposite()));
@@ -12,7 +12,7 @@
          return this.isFittingBase(state, base) || base.is(Blocks.MOVING_PISTON) && base.getValue(FACING) == state.getValue(FACING);
      }
  
-@@ -118,6 +_,10 @@ public class PistonHeadBlock extends DirectionalBlock {
+@@ -111,6 +_,10 @@
                  block,
                  ExperimentalRedstoneUtils.withFront(orientation, state.getValue(FACING).getOpposite())
              );

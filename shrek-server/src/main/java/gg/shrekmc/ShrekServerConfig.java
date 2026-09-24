@@ -389,4 +389,42 @@ public class ShrekServerConfig extends Part {
             this.parsedBucketStackSize.setValue(-1);
         }
     }
+
+    {
+        option("knockbackSync").docs(
+            "Rewind a player's ping when applying melee knockback so high-latency hits feel like they did on the client.",
+            "Same-world only. Uses Paper keepalives, sending them more often while the player is in combat."
+        );
+    }
+
+    public KnockbackSync knockbackSync = new KnockbackSync();
+
+    public static class KnockbackSync extends Part {
+
+        {
+            option("enabled")
+                .docs("Apply ping-compensated knockback to player melee hits.");
+            option("pingOffset")
+                .docs("Milliseconds subtracted from measured ping before rewind. Knockback-sync's tested default is 25.")
+                .between(0, 1000);
+            option("spikeThreshold")
+                .docs("If ping jumps by this many milliseconds or more, use the previous ping instead.")
+                .greaterThanOrEqualTo(0);
+            option("combatPingInterval")
+                .docs("Keepalive interval in ticks while a player is in combat. Paper's idle interval is 20 ticks.")
+                .between(1, 20);
+            option("combatTimer")
+                .docs("Ticks after a melee hit before combat pinging stops.")
+                .greaterThanOrEqualTo(1);
+            option("offGround")
+                .docs("When the client would still be in the air, rewind falling velocity by ping instead of giving grounded knockback.");
+        }
+
+        public boolean enabled = true;
+        public int pingOffset = 25;
+        public int spikeThreshold = 20;
+        public int combatPingInterval = 5;
+        public int combatTimer = 30;
+        public boolean offGround = true;
+    }
 }

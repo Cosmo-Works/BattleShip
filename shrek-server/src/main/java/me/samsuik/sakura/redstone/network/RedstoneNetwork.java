@@ -14,7 +14,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.RedStoneWireBlock;
+import net.minecraft.world.level.block.RedstoneWireBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.redstone.ExperimentalRedstoneUtils;
 import net.minecraft.world.level.redstone.Orientation;
@@ -61,7 +61,7 @@ public final class RedstoneNetwork {
             return false;
         }
 
-        final RedStoneWireBlock wireBlock = (RedStoneWireBlock) Blocks.REDSTONE_WIRE;
+        final RedstoneWireBlock wireBlock = (RedstoneWireBlock) Blocks.REDSTONE_WIRE;
         final Orientation defaultOrientation = ExperimentalRedstoneUtils.initialOrientation(level, null, null);
         int updateFrom = 0;
         for (final RedstoneWireState redstoneUpdate : this.redstoneUpdates) {
@@ -76,7 +76,7 @@ public final class RedstoneNetwork {
 
             final BlockPos wirePos = redstoneUpdate.position();
             final BlockState state = level.getBlockState(wirePos);
-            final BlockState newState = state.setValue(RedStoneWireBlock.POWER, redstoneUpdate.newPower());
+            final BlockState newState = state.setValue(RedstoneWireBlock.POWER, redstoneUpdate.newPower());
             if (level.setBlock(wirePos, newState, Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE)
                 && redstoneUpdate.updateShapes()) {
                 TickRegionScheduler.getCurrentRegionizedWorldData().turbo.updateNeighborShapes(level, wirePos, newState);
@@ -113,7 +113,7 @@ public final class RedstoneNetwork {
 
     private void performUpdates(
         final Level level,
-        final RedStoneWireBlock wireBlock,
+        final RedstoneWireBlock wireBlock,
         final @Nullable Orientation orientation,
         final int updateFrom,
         final int updateTo
@@ -131,7 +131,7 @@ public final class RedstoneNetwork {
 
     private boolean wiresMatchCachedPower(final Level level) {
         for (final Map.Entry<BlockPos, RedstoneWireState> wireEntry : this.redstoneChanges.entrySet()) {
-            if (level.getBlockState(wireEntry.getKey()).getValue(RedStoneWireBlock.POWER) != wireEntry.getValue().oldPower()) {
+            if (level.getBlockState(wireEntry.getKey()).getValue(RedstoneWireBlock.POWER) != wireEntry.getValue().oldPower()) {
                 return false;
             }
         }

@@ -1,10 +1,10 @@
 --- a/net/minecraft/world/level/block/state/BlockBehaviour.java
 +++ b/net/minecraft/world/level/block/state/BlockBehaviour.java
-@@ -203,11 +_,17 @@ public abstract class BlockBehaviour implements FeatureElement {
+@@ -194,11 +_,17 @@
                  state.getDrops(params).forEach(stack -> onHit.accept(stack, pos));
              }
  
--            level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+-            level.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
 +            level.setBlock(pos, Blocks.AIR.defaultBlockState(), explosionBlockFlags(level, state));
              block.wasExploded(level, pos, explosion);
          }
@@ -19,7 +19,7 @@
      protected InteractionResult useWithoutItem(
          final BlockState state, final Level level, final BlockPos pos, final Player player, final BlockHitResult hitResult
      ) {
-@@ -490,6 +_,11 @@ public abstract class BlockBehaviour implements FeatureElement {
+@@ -489,6 +_,11 @@
          private boolean emptyCollisionShape;
          private boolean emptyConstantCollisionShape;
          private VoxelShape constantCollisionShape;
@@ -31,11 +31,11 @@
          // Canvas start - optimize path type cache
          // inspired by Cache-block-state-tags patch from Leaf
          public byte pathType; // 8bit, better this enum, as it only has 25 values
-@@ -582,6 +_,7 @@ public abstract class BlockBehaviour implements FeatureElement {
+@@ -581,6 +_,7 @@
              this.spawnTerrainParticles = properties.spawnTerrainParticles;
              this.instrument = properties.instrument;
              this.replaceable = properties.replaceable;
 +            this.specialBlock = !Block.class.equals(this.owner.getClass()); // Shrek - cache vanilla and eigencraft wires
          }
+ 
          // Paper start - Perf: impl cached craft block data, lazy load to fix issue with loading at the wrong time
-         private org.bukkit.craftbukkit.block.data.@Nullable CraftBlockData cachedBlockData;

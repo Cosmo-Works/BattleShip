@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/Container.java
 +++ b/net/minecraft/world/Container.java
-@@ -16,7 +_,19 @@ import net.minecraft.world.level.Level;
+@@ -16,7 +_,19 @@
  import net.minecraft.world.level.block.entity.BlockEntity;
  import org.jspecify.annotations.Nullable;
  

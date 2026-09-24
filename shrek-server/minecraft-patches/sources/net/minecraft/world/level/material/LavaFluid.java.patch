@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/level/material/LavaFluid.java
 +++ b/net/minecraft/world/level/material/LavaFluid.java
-@@ -186,7 +_,13 @@ public abstract class LavaFluid extends FlowingFluid {
+@@ -186,7 +_,13 @@
  
      @Override
      public boolean canBeReplacedWith(final FluidState state, final BlockGetter level, final BlockPos pos, final Fluid other, final Direction direction) {
@@ -15,7 +15,7 @@
      }
  
      @Override
-@@ -196,7 +_,7 @@ public abstract class LavaFluid extends FlowingFluid {
+@@ -196,7 +_,7 @@
  
      @Override
      public int getSpreadDelay(final Level level, final BlockPos pos, final FluidState oldFluidState, final FluidState newFluidState) {
@@ -24,7 +24,7 @@
          if (!oldFluidState.isEmpty()
              && !newFluidState.isEmpty()
              && !oldFluidState.getValue(FALLING)
-@@ -255,6 +_,9 @@ public abstract class LavaFluid extends FlowingFluid {
+@@ -255,6 +_,9 @@
      }
  
      private static boolean isFastLava(final LevelReader level) {

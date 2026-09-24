@@ -1,10 +1,9 @@
 --- a/net/minecraft/world/level/block/WebBlock.java
 +++ b/net/minecraft/world/level/block/WebBlock.java
-@@ -23,6 +_,27 @@ public class WebBlock extends Block {
-         super(properties);
+@@ -16,6 +_,27 @@
      }
  
-+    @Override
+     @Override
 +    protected final net.minecraft.world.phys.shapes.VoxelShape getCollisionShape(
 +        final BlockState state,
 +        final net.minecraft.world.level.BlockGetter blockGetter,
@@ -25,6 +24,7 @@
 +        return super.getCollisionShape(state, blockGetter, pos, context);
 +    }
 +
-     @Override
++    @Override
      protected void entityInside(
          final BlockState state,
+         final Level level,

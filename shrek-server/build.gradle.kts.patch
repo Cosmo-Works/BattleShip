@@ -1,9 +1,9 @@
 --- a/canvas-server/build.gradle.kts
 +++ b/canvas-server/build.gradle.kts
-@@ -20,8 +_,8 @@
+@@ -20,8 +_,8 @@ dependencies {
  }
  
- val mergeMinecraftATs by tasks.registering<MergeAccessTransforms> {
+ val mergeMinecraftATs = tasks.register<MergeAccessTransforms>("mergeMinecraftATs") {
 -    firstFile.set(paperweight.activeFork.flatMap { it.buildDataDir.file("${it.name}.at") })
 -    secondFile.set(paperweight.activeFork.flatMap { it.buildDataDir.file("folia.at") })
 +    firstFile.set(paperweight.forks.named("canvas").flatMap { it.buildDataDir.file("${it.name}.at") })
@@ -11,7 +11,7 @@
  }
  
  paperweight {
-@@ -39,10 +_,27 @@
+@@ -40,7 +_,22 @@ paperweight {
          }
      }
  
@@ -34,13 +34,10 @@
 +    activeFork = shrek
  
      updatingMinecraft {
-         // oldPaperCommit = "d4fe85375af18bfa88f44d7c1e6a61904ae550cc"
-+        // A commit hash from your repository
-+        // to fetch from in order to bring in objects for 3-way apply.
-         // oldForkCommit = "58d6715718521ea774b786fa9ca1e6fc2db14702"
-     }
- }
-@@ -110,10 +_,14 @@
+-        oldForkCommit = "4a0ed14a386f20d8f7992103dc71130bc2641209"
++        // oldForkCommit = "4a0ed14a386f20d8f7992103dc71130bc2641209"
+
+@@ -110,10 +_,14 @@ sourceSets {
      main {
          java { srcDir("../paper-server/src/main/java"); srcDir("../paper-server/src/generated/java") }
          resources { srcDir("../paper-server/src/main/resources") }
@@ -55,17 +52,17 @@
      }
  }
  val log4jPlugins = sourceSets.create("log4jPlugins") {
-@@ -141,7 +_,8 @@
+@@ -141,7 +_,8 @@ abstract class MockitoAgentProvider : CommandLineArgumentProvider {
  }
  
  dependencies {
 -    implementation(projects.canvasApi)
 +    implementation(projects.shrekApi)
 +    implementation("com.github.luben:zstd-jni:1.5.7-4") // Shrek - Linear region format
-     implementation("ca.spottedleaf:leafpile:1.0.0")
+     implementation("ca.spottedleaf:leafpile:1.2.2")
      implementation("org.jline:jline-terminal-ffm:3.29.0") // use ffm on java 22+
      implementation("org.jline:jline-terminal-jni:3.29.0") // fall back to jni on java 21
-@@ -215,15 +_,15 @@
+@@ -215,15 +_,15 @@ tasks.jar {
          )
          attributes(
              "Main-Class" to "org.bukkit.craftbukkit.Main",

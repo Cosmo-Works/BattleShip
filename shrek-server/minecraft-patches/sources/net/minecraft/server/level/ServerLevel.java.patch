@@ -1,8 +1,16 @@
 --- a/net/minecraft/server/level/ServerLevel.java
 +++ b/net/minecraft/server/level/ServerLevel.java
-@@ -1503,7 +_,13 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
-         entity.tickCount++;
-         entity.totalEntityAge++; // Paper - age-like counter for all entities
+@@ -716,6 +_,7 @@
+         int simulationDistance = this.serverLevelData.canvas$distanceConfig.simulationDistanceOrDefault();
+         this.chunkSource.setSimulationDistance(simulationDistance);
+         // Canvas end - per world distance
++        me.samsuik.sakura.world.KeepLoadedChunks.sync(this);
+     }
+ 
+     // Folia start - region threading
+@@ -1498,7 +_,13 @@
+         ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread("Cannot tick an entity off-main"); // Paper
+         entity.commonTick();
          final boolean isActive = io.papermc.paper.entity.activation.ActivationRange.checkIfActive(entity); // Paper - EAR 2
 -        if (isActive) { // Paper - EAR 2
 +        // Shrek start - cannon entity merge
@@ -15,7 +23,7 @@
          entity.tick();
          // Folia start - region threading
          if (!ca.spottedleaf.moonrise.common.util.TickThread.isTickThreadFor(entity)) {
-@@ -1516,6 +_,8 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
+@@ -1511,6 +_,8 @@
          }
          // Folia end - region threading
          } else {entity.inactiveTick();} // Paper - EAR 2
@@ -24,7 +32,17 @@
  
          for (Entity passenger : entity.getPassengers()) {
              this.tickPassenger(entity, passenger, isActive); // Paper - EAR 2
-@@ -2164,24 +_,95 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
+@@ -2006,6 +_,9 @@
+             try { // Paper - catch CME see below why
+             for (java.util.Iterator<Mob> iterator = regionizedWorldData.getNavigatingMobs(); iterator.hasNext();) { // Folia - region threading
+                 Mob navigatingMob = iterator.next(); // Folia - region threading
++                if (!navigatingMob.aware) {
++                    continue;
++                }
+                 PathNavigation pathNavigation = navigatingMob.getNavigation();
+                 if (pathNavigation.shouldRecomputePath(pos)) {
+                     navigationsToUpdate.add(pathNavigation);
+@@ -2152,29 +_,100 @@
              case STANDARD -> Explosion.BlockInteraction.DESTROY; // CraftBukkit - handle custom explosion type
          };
          Vec3 center = new Vec3(x, y, z);
@@ -115,7 +133,13 @@
 +                    continue;
 +                }
 +                // Shrek end - client visibility settings
-                 player.connection.send(new ClientboundExplodePacket(center, r, blockCount, playerKnockback, explosionParticle, explosionSound, blockParticles));
+                 player.connection
+                     .send(
+                         new ClientboundExplodePacket(
+-                            center, r, blockCount, playerKnockback, explosionParticle, explosionSound, blockParticles, source == null || !source.isSilent()
++                            center, r, blockCount, playerKnockback, explosionParticle, explosionSound, blockParticles, explosion.getDirectSourceEntity() == null || !explosion.getDirectSourceEntity().isSilent()
+                         )
+                     );
              }
          }
 -
@@ -123,7 +147,7 @@
      }
  
      private Explosion.BlockInteraction getDestroyType(final GameRule<Boolean> gameRule) {
-@@ -3072,6 +_,7 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
+@@ -3312,6 +_,7 @@
                  entity.originWorld = ServerLevel.this.getWorld().getUID();
              }
              // Paper end - Entity origin API

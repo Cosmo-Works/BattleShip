@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/level/block/CactusBlock.java
 +++ b/net/minecraft/world/level/block/CactusBlock.java
-@@ -58,11 +_,21 @@ public class CactusBlock extends Block {
+@@ -51,11 +_,21 @@
          net.minecraft.world.level.chunk.LevelChunk chunk = level.getChunkIfLoaded(x >> 4, z >> 4);
          if (chunk == null) return;
  
@@ -22,7 +22,7 @@
  
              while (chunk.getBlockState(pos.below(height)).is(this)) { // Leaf - decrease chunk/block lookups
                  if (++height == level.paperConfig().maxGrowthHeight.cactus && age == 15) { // Paper - Configurable cactus/bamboo/reed growth height
-@@ -75,7 +_,7 @@ public class CactusBlock extends Block {
+@@ -68,10 +_,25 @@
              if (age == 8 && this.canSurvive(this.defaultBlockState(), level, above = pos.above())) {
                  // Leaf end - decrease chunk/block lookups
                  double chanceToGrowFlower = height >= level.paperConfig().maxGrowthHeight.cactus ? 0.25 : 0.1; // Paper - Configurable cactus/bamboo/reed growth height
@@ -31,7 +31,25 @@
                      org.bukkit.craftbukkit.event.CraftEventFactory.handleBlockGrowEvent(level, above, Blocks.CACTUS_FLOWER.defaultBlockState(), Block.UPDATE_ALL); // Paper - block grow event
                  }
              } else if (age == 15 && height < level.paperConfig().maxGrowthHeight.cactus) { // Paper - Configurable cactus/bamboo/reed growth height
-@@ -92,6 +_,9 @@ public class CactusBlock extends Block {
++                // Shrek start - pre-grow event
++                if (gg.shrekmc.event.block.BlockPreGrowEvent.hasListeners()) {
++                    final BlockPos target = above == null ? above = pos.above() : above;
++                    final gg.shrekmc.event.block.BlockPreGrowEvent preGrow = new gg.shrekmc.event.block.BlockPreGrowEvent(
++                        org.bukkit.craftbukkit.block.CraftBlock.at(level, pos),
++                        org.bukkit.craftbukkit.block.CraftBlock.at(level, target),
++                        org.bukkit.Material.CACTUS,
++                        height
++                    );
++                    if (!preGrow.callEvent()) {
++                        level.setBlock(pos, state.setValue(AGE, 0), Block.UPDATE_NONE);
++                        return;
++                    }
++                }
++                // Shrek end - pre-grow event
+                 // Leaf start - check if the cactus can even survive being placed
+                 if (level.canvasConfig().cactusCheckSurvivalBeforeGrowth && !canSurvive(level, above = pos.above())) { // Leaf - Decrease chunk/block lookups
+                     level.levelEvent(LevelEvent.PARTICLES_DESTROY_BLOCK, above, Block.getId(state));
+@@ -85,6 +_,9 @@
                  // Leaf end - check if the cactus can even survive being placed
                  if (!org.bukkit.craftbukkit.event.CraftEventFactory.handleBlockGrowEvent(level, above == null ? above = pos.above() : above, this.defaultBlockState(), Block.UPDATE_ALL)) return; // Paper - block grow event // Leaf - decrease chunk/block lookups
                  BlockState aboveBlock = state.setValue(AGE, 0);

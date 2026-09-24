@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/level/block/piston/MovingPistonBlock.java
 +++ b/net/minecraft/world/level/block/piston/MovingPistonBlock.java
-@@ -106,6 +_,16 @@ public class MovingPistonBlock extends BaseEntityBlock {
+@@ -99,6 +_,16 @@
      @Override
      protected VoxelShape getCollisionShape(final BlockState state, final BlockGetter level, final BlockPos pos, final CollisionContext context) {
          PistonMovingBlockEntity blockEntity = this.getBlockEntity(level, pos);

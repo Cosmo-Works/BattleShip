@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/level/block/entity/BlockEntity.java
 +++ b/net/minecraft/world/level/block/entity/BlockEntity.java
-@@ -53,6 +_,30 @@ public abstract class BlockEntity implements DebugValueSource, TypedInstance<Blo
+@@ -53,6 +_,30 @@
      private BlockState blockState;
      private DataComponentMap components = DataComponentMap.EMPTY;
      public boolean canvas$isValid; // Canvas - optimize block entities

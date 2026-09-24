@@ -1,0 +1,12 @@
+--- a/net/minecraft/world/entity/ai/Brain.java
++++ b/net/minecraft/world/entity/ai/Brain.java
+@@ -434,6 +_,9 @@
+     }
+ 
+     public void tick(final ServerLevel level, final E body) {
++        if (!me.samsuik.sakura.entity.BrainActivation.shouldTickBrain(body)) {
++            return;
++        }
+         this.forgetOutdatedMemories();
+         this.tickSensors(level, body);
+         this.startEachNonRunningBehavior(level, body);

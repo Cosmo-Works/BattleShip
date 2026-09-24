@@ -1,0 +1,75 @@
+--- a/io/papermc/paper/entity/activation/ActivationRange.java
++++ b/io/papermc/paper/entity/activation/ActivationRange.java
+@@ -137,6 +_,16 @@
+         worldData.wakeupInactiveRemainingMonsters = Math.min(worldData.wakeupInactiveRemainingMonsters + 1, world.spigotConfig.wakeUpInactiveMonsters);
+         worldData.wakeupInactiveRemainingFlying = Math.min(worldData.wakeupInactiveRemainingFlying + 1, world.spigotConfig.wakeUpInactiveFlying);
+         // Folia end - region threading
++        final gg.shrekmc.ShrekWorldConfig.Entities.BrainActivation brainActivation = world.shrekConfig().entities.brainActivation;
++        if (brainActivation.enabled) {
++            final int furthestThink = Math.max(1, brainActivation.maxTickFreq);
++            for (final Entity local : worldData.getLocalEntities()) {
++                if (local instanceof Mob) {
++                    local.activatedPriorityReset = false;
++                    local.activatedPriority = furthestThink;
++                }
++            }
++        }
+ 
+         int maxRange = Math.max(monsterActivationRange, animalActivationRange);
+         maxRange = Math.max(maxRange, raiderActivationRange);
+@@ -146,23 +_,25 @@
+         maxRange = Math.max(maxRange, villagerActivationRange);
+         maxRange = Math.min((world.spigotConfig.simulationDistance << 4) - 8, maxRange);
+ 
++        final int[] verticalY = me.samsuik.sakura.entity.VerticalActivation.forTypes(world);
++        final int searchY = me.samsuik.sakura.entity.VerticalActivation.widest(verticalY);
++
+         for (final Player player : world.getLocalPlayers()) { // Folia - region threading
+             player.activatedTick = io.papermc.paper.threadedregions.RegionizedServer.getCurrentTick(); // Folia - region threading
+             if (world.spigotConfig.ignoreSpectatorActivation && player.isSpectator()) {
+                 continue;
+             }
+ 
+-            final int worldHeight = world.getHeight();
+             // Folia start - region threading
+-            final AABB maxBB = player.getBoundingBox().inflate(maxRange, worldHeight, maxRange);
++            final AABB maxBB = player.getBoundingBox().inflate(maxRange, searchY, maxRange);
+             final AABB[] bbByType = new AABB[ActivationType.values().length];
+-            bbByType[ActivationType.MISC.ordinal()] = player.getBoundingBox().inflate(miscActivationRange, worldHeight, miscActivationRange);
+-            bbByType[ActivationType.RAIDER.ordinal()] = player.getBoundingBox().inflate(raiderActivationRange, worldHeight, raiderActivationRange);
+-            bbByType[ActivationType.ANIMAL.ordinal()] = player.getBoundingBox().inflate(animalActivationRange, worldHeight, animalActivationRange);
+-            bbByType[ActivationType.MONSTER.ordinal()] = player.getBoundingBox().inflate(monsterActivationRange, worldHeight, monsterActivationRange);
+-            bbByType[ActivationType.WATER.ordinal()] = player.getBoundingBox().inflate(waterActivationRange, worldHeight, waterActivationRange);
+-            bbByType[ActivationType.FLYING_MONSTER.ordinal()] = player.getBoundingBox().inflate(flyingActivationRange, worldHeight, flyingActivationRange);
+-            bbByType[ActivationType.VILLAGER.ordinal()] = player.getBoundingBox().inflate(villagerActivationRange, worldHeight, villagerActivationRange);
++            bbByType[ActivationType.MISC.ordinal()] = player.getBoundingBox().inflate(miscActivationRange, verticalY[ActivationType.MISC.ordinal()], miscActivationRange);
++            bbByType[ActivationType.RAIDER.ordinal()] = player.getBoundingBox().inflate(raiderActivationRange, verticalY[ActivationType.RAIDER.ordinal()], raiderActivationRange);
++            bbByType[ActivationType.ANIMAL.ordinal()] = player.getBoundingBox().inflate(animalActivationRange, verticalY[ActivationType.ANIMAL.ordinal()], animalActivationRange);
++            bbByType[ActivationType.MONSTER.ordinal()] = player.getBoundingBox().inflate(monsterActivationRange, verticalY[ActivationType.MONSTER.ordinal()], monsterActivationRange);
++            bbByType[ActivationType.WATER.ordinal()] = player.getBoundingBox().inflate(waterActivationRange, verticalY[ActivationType.WATER.ordinal()], waterActivationRange);
++            bbByType[ActivationType.FLYING_MONSTER.ordinal()] = player.getBoundingBox().inflate(flyingActivationRange, verticalY[ActivationType.FLYING_MONSTER.ordinal()], flyingActivationRange);
++            bbByType[ActivationType.VILLAGER.ordinal()] = player.getBoundingBox().inflate(villagerActivationRange, verticalY[ActivationType.VILLAGER.ordinal()], villagerActivationRange);
+             // Folia end - region threading
+ 
+             final java.util.List<Entity> entities = new java.util.ArrayList<>();  // Folia - region threading - bypass getEntities thread check, we perform a check on the entities later
+@@ -178,7 +_,7 @@
+                     continue;
+                 }
+ 
+-                ActivationRange.activateEntity(entity, bbByType); // Folia - region threading
++                ActivationRange.activateEntity(entity, bbByType, player); // Folia - region threading
+             }
+         }
+     }
+@@ -188,7 +_,10 @@
+      *
+      * @param entity
+      */
+-    private static void activateEntity(final Entity entity, final AABB[] bbByType) { // Folia - region threading
++    private static void activateEntity(final Entity entity, final AABB[] bbByType, final Player player) { // Folia - region threading
++        if (entity instanceof Mob) {
++            me.samsuik.sakura.entity.BrainActivation.considerPlayer(entity, player);
++        }
+         if (io.papermc.paper.threadedregions.RegionizedServer.getCurrentTick() > entity.activatedTick) { // Folia - region threading
+             if (entity.defaultActivationState) {
+                 entity.activatedTick = io.papermc.paper.threadedregions.RegionizedServer.getCurrentTick(); // Folia - region threading

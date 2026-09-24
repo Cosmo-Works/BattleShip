@@ -77,7 +77,7 @@ public final class FilterOrModifyPackets {
         if (settings.isToggled(VisibilityTypes.SPAWNERS)) {
             ClientboundLevelChunkPacketData chunkData = null;
             if (packet instanceof final ClientboundLevelChunkWithLightPacket chunkPacket) {
-                chunkData = chunkPacket.getChunkData();
+                chunkData = chunkPacket.chunkData();
             } else if (packet instanceof final ClientboundLevelChunkPacketData chunkPacket) {
                 chunkData = chunkPacket;
             }
@@ -109,7 +109,7 @@ public final class FilterOrModifyPackets {
 
     private static @Nullable List<Packet<?>> extraPackets(final Packet<?> packet) {
         if (packet instanceof final ClientboundLevelChunkWithLightPacket chunkPacket) {
-            return chunkPacket.getChunkData().getExtraPackets();
+            return chunkPacket.chunkData().getExtraPackets();
         }
         if (packet instanceof final ClientboundLevelChunkPacketData chunkData) {
             return chunkData.getExtraPackets();

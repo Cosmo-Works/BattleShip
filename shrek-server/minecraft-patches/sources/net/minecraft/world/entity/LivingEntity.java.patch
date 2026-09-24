@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/entity/LivingEntity.java
 +++ b/net/minecraft/world/entity/LivingEntity.java
-@@ -317,6 +_,66 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
+@@ -316,6 +_,66 @@
      }
  
      // Canvas end - region threading
@@ -67,7 +67,7 @@
      @Override
      public void updateTicks(long fromTickOffset, long fromRedstoneTimeOffset) {
          super.updateTicks(fromTickOffset, fromRedstoneTimeOffset);
-@@ -349,6 +_,13 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
+@@ -348,6 +_,13 @@
          this.setYRot(this.random.nextFloat() * (float) (Math.PI * 2));
          this.yHeadRot = this.getYRot();
          this.brain = this.makeBrain(Brain.Packed.EMPTY);
@@ -81,7 +81,7 @@
      }
  
      @Override
-@@ -582,7 +_,7 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
+@@ -583,7 +_,7 @@
  
      @Override
      protected float getBlockSpeedFactor() {
@@ -90,7 +90,15 @@
      }
  
      private static float computeModifiedFriction(final float friction, final float modifier) {
-@@ -1645,7 +_,7 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
+@@ -1501,6 +_,7 @@
+         }
+ 
+         this.noActionTime = 0;
++        me.samsuik.sakura.player.knockback.KnockbackSync.rememberPlayerAttack(this, source);
+         if (damage < 0.0F) {
+             damage = 0.0F;
+         }
+@@ -1649,7 +_,7 @@
          }
          // Paper end - Check distance in entity interactions
  
@@ -99,7 +107,7 @@
          if (!blocked) {
              this.indicateDamage(xd, zd);
          }
-@@ -1733,6 +_,10 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
+@@ -1737,6 +_,10 @@
              angle = (float) Math.PI;
          }
  
@@ -110,16 +118,17 @@
          BlocksAttacks blocksAttacks = this.getItemBlockingWith().get(DataComponents.BLOCKS_ATTACKS);
          return blocksAttacks.resolveBlockedDamage(source, damage, angle);
      }
-@@ -1799,7 +_,7 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
-     }
+@@ -1806,8 +_,8 @@
  
-     protected void blockedByItem(final LivingEntity defender, final DamageSource source, final float damage) {
--        defender.knockback(0.5, defender.getX() - this.getX(), defender.getZ() - this.getZ(), source, damage, this, io.papermc.paper.event.entity.EntityKnockbackEvent.Cause.SHIELD_BLOCK); // CraftBukkit // Paper - fix attacker & knockback events
+     protected void blockedByItem(final LivingEntity defender, final DamageSource source, final float damage, final boolean fullyBlocked) {
+         if (!fullyBlocked) {
+-            defender.knockback(0.5, defender.getX() - this.getX(), defender.getZ() - this.getZ(), source, damage, this, io.papermc.paper.event.entity.EntityKnockbackEvent.Cause.SHIELD_BLOCK); // CraftBukkit // Paper - fix attacker & knockback events
+         }
 +        defender.knockback((float) this.level().shrekConfig().players.knockback.shieldHitKnockback, defender.getX() - this.getX(), defender.getZ() - this.getZ(), source, damage, this, io.papermc.paper.event.entity.EntityKnockbackEvent.Cause.SHIELD_BLOCK);
      }
  
      private boolean checkTotemDeathProtection(final DamageSource killingDamage) {
-@@ -1939,6 +_,10 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
+@@ -1946,6 +_,10 @@
                  }
  
                  this.postDeathEventTasks.clear(); // Paper
@@ -130,7 +139,7 @@
                  this.level().broadcastEntityEvent(this, EntityEvent.DEATH);
              }
  
-@@ -2124,7 +_,7 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
+@@ -2131,7 +_,7 @@
      }
  
      public void knockback(double power, double xd, double zd, final DamageSource source, final float damage, final boolean comesFromEffect, @Nullable Entity attacker, io.papermc.paper.event.entity.EntityKnockbackEvent.Cause eventCause) { // Paper - knockback events
@@ -139,7 +148,7 @@
          if (true || !(power <= 0.0)) { // CraftBukkit - Call event even when force is 0
              // this.needsSync = true; // Paper - moved down
              Vec3 deltaMovement = this.getDeltaMovement();
-@@ -2135,9 +_,15 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
+@@ -2142,9 +_,15 @@
              }
  
              Vec3 deltaVector = new Vec3(xd, 0.0, zd).normalize().scale(power);
@@ -156,7 +165,17 @@
                  deltaMovement.z / 2.0 - deltaVector.z
              );
              // Paper start - knockback events
-@@ -2353,8 +_,12 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
+@@ -2156,6 +_,9 @@
+ 
+             this.needsSync = true;
+             this.setDeltaMovement(deltaMovement.add(event.getKnockback().getX(), event.getKnockback().getY(), event.getKnockback().getZ()));
++            if (this instanceof final net.minecraft.server.level.ServerPlayer victim) {
++                me.samsuik.sakura.player.knockback.KnockbackSync.applyToKnockback(victim, eventCause);
++            }
+             // Paper end - knockback events
+         }
+     }
+@@ -2360,8 +_,12 @@
          this.currentImpulseImpactPos = null;
      }
  
@@ -170,7 +189,7 @@
              return 0;
          }
  
-@@ -2412,6 +_,9 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
+@@ -2419,6 +_,9 @@
      protected float getDamageAfterArmorAbsorb(final DamageSource damageSource, float damage) {
          if (!damageSource.is(DamageTypeTags.BYPASSES_ARMOR)) {
              // this.hurtArmor(damageSource, damage); // CraftBukkit - actuallyHurt(DamageSource, float, EntityDamageEvent) for damage handling
@@ -180,7 +199,7 @@
              damage = CombatRules.getDamageAfterAbsorb(
                  this, damage, damageSource, this.getArmorValue(), (float)this.getAttributeValue(Attributes.ARMOR_TOUGHNESS)
              );
-@@ -2577,6 +_,10 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
+@@ -2584,6 +_,10 @@
                  armorDamage += (float)event.getDamage(DamageModifier.BLOCKING);
                  armorDamage += (float)event.getDamage(DamageModifier.FREEZING);
                  armorDamage += (float)event.getDamage(DamageModifier.HARD_HAT);
@@ -191,7 +210,7 @@
                  this.hurtArmor(source, armorDamage);
              }
  
-@@ -3121,7 +_,7 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
+@@ -3110,7 +_,7 @@
  
      @Override
      protected double getDefaultGravity() {
@@ -200,7 +219,7 @@
      }
  
      @Override
-@@ -3219,7 +_,7 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
+@@ -3209,7 +_,7 @@
      protected void travelInWater(final Vec3 input, final double baseGravity, final boolean isFalling, final double oldY) {
          float slowDown = this.isSprinting() ? 0.9F : this.getWaterSlowDown();
          float speed = 0.02F;
@@ -209,7 +228,7 @@
          if (!this.onGround()) {
              waterWalker *= 0.5F;
          }
-@@ -3499,7 +_,12 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
+@@ -3492,7 +_,12 @@
                  }
              }
  
@@ -223,7 +242,7 @@
              if (this.tickCount % 20 == 0) {
                  this.getCombatTracker().recheckStatus();
              }
-@@ -3697,6 +_,9 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
+@@ -3690,6 +_,9 @@
                      if (this.level() instanceof ServerLevel serverLevel) {
                          EnchantmentHelper.runLocationChangedEffects(serverLevel, current, this, slot);
                      }
@@ -233,7 +252,7 @@
                  }
              }
  
-@@ -3765,7 +_,11 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
+@@ -3760,7 +_,11 @@
              this.lerpHeadSteps--;
          }
  
@@ -246,7 +265,7 @@
          Vec3 movement = this.getDeltaMovement();
          double dx = movement.x;
          double dy = movement.y;
-@@ -3883,7 +_,7 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
+@@ -3878,7 +_,7 @@
              }
          }
          // Paper end - Add EntityMoveEvent
@@ -255,7 +274,7 @@
              this.hurtServer(serverLevel, this.damageSources().drown(), 1.0F);
          }
      }
-@@ -3960,14 +_,34 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
+@@ -3955,14 +_,34 @@
          }
  
          int maxCramming = ((ServerLevel) this.level()).getGameRules().get(GameRules.MAX_ENTITY_CRAMMING);
@@ -294,7 +313,7 @@
          // Canvas end - only players push config
          if (!pushableEntities.isEmpty()) {
              if (this.level() instanceof ServerLevel serverLevel) {
-@@ -3988,9 +_,9 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
+@@ -3983,9 +_,9 @@
              }
  
              // Paper start - Cap entity collisions
@@ -306,7 +325,7 @@
                      break;
                  }
  
-@@ -4966,7 +_,7 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
+@@ -5034,7 +_,7 @@
  
      @Override
      public boolean isTransmittingWaypoint() {

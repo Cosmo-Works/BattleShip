@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/entity/projectile/ProjectileUtil.java
 +++ b/net/minecraft/world/entity/projectile/ProjectileUtil.java
-@@ -32,7 +_,14 @@ public final class ProjectileUtil {
+@@ -32,7 +_,14 @@
          Vec3 movement = source.getDeltaMovement();
          Level level = source.level();
          Vec3 from = source.position();
@@ -16,7 +16,7 @@
      }
  
      public static Either<BlockHitResult, Collection<EntityHitResult>> getHitEntitiesAlong(
-@@ -75,7 +_,14 @@ public final class ProjectileUtil {
+@@ -75,7 +_,14 @@
              to = hitResult.getLocation();
          }
  

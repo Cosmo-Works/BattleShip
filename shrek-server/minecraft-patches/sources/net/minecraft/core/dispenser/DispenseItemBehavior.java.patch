@@ -1,6 +1,6 @@
 --- a/net/minecraft/core/dispenser/DispenseItemBehavior.java
 +++ b/net/minecraft/core/dispenser/DispenseItemBehavior.java
-@@ -376,6 +_,14 @@ public interface DispenseItemBehavior {
+@@ -377,6 +_,14 @@
                      }
                  }
                  // CraftBukkit end

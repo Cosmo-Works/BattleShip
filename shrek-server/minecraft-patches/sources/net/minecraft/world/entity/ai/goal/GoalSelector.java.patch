@@ -1,0 +1,16 @@
+--- a/net/minecraft/world/entity/ai/goal/GoalSelector.java
++++ b/net/minecraft/world/entity/ai/goal/GoalSelector.java
+@@ -41,8 +_,12 @@
+ 
+     // Paper start - EAR 2
+     public boolean inactiveTick() {
++        return this.inactiveTick(3);
++    }
++
++    public boolean inactiveTick(final int tickRate) {
+         this.curRate++;
+-        return this.curRate % 3 == 0; // TODO newGoalRate was already unused in 1.20.4, check if this is correct
++        return this.curRate % Math.max(1, tickRate) == 0;
+     }
+ 
+     public boolean hasTasks() {

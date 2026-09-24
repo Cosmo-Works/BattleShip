@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/entity/player/Inventory.java
 +++ b/net/minecraft/world/entity/player/Inventory.java
-@@ -146,6 +_,7 @@ public class Inventory implements Container, Nameable {
+@@ -148,6 +_,7 @@
              throw new IllegalArgumentException("Invalid selected slot");
          }
  

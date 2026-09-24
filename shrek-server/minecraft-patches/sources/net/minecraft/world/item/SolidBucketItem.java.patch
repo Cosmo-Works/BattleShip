@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/item/SolidBucketItem.java
 +++ b/net/minecraft/world/item/SolidBucketItem.java
-@@ -27,7 +_,13 @@ public class SolidBucketItem extends BlockItem implements DispensibleContainerIt
+@@ -27,7 +_,13 @@
          InteractionResult placeResult = super.useOn(context);
          Player player = context.getPlayer();
          if (placeResult.consumesAction() && player != null) {

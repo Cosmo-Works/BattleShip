@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/item/Item.java
 +++ b/net/minecraft/world/item/Item.java
-@@ -132,6 +_,13 @@ public class Item implements ItemLike, FeatureElement {
+@@ -145,6 +_,13 @@
          return BY_BLOCK.getOrDefault(block, Items.AIR);
      }
  

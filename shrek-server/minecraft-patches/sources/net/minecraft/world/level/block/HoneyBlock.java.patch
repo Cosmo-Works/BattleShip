@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/level/block/HoneyBlock.java
 +++ b/net/minecraft/world/level/block/HoneyBlock.java
-@@ -80,14 +_,6 @@ public class HoneyBlock extends HalfTransparentBlock {
+@@ -73,14 +_,6 @@
          super.entityInside(state, level, pos, entity, effectApplier, isPrecise);
      }
  
@@ -15,7 +15,7 @@
      private boolean isSlidingDown(final BlockPos pos, final Entity entity) {
          if (entity.onGround()) {
              return false;
-@@ -97,7 +_,7 @@ public class HoneyBlock extends HalfTransparentBlock {
+@@ -90,7 +_,7 @@
              return false;
          }
  
@@ -24,7 +24,7 @@
              return false;
          }
  
-@@ -115,11 +_,13 @@ public class HoneyBlock extends HalfTransparentBlock {
+@@ -108,11 +_,13 @@
  
      private void doSlideMovement(final Entity entity) {
          Vec3 deltaMovement = entity.getDeltaMovement();

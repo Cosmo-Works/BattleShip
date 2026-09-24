@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/level/ServerExplosion.java
 +++ b/net/minecraft/world/level/ServerExplosion.java
-@@ -25,6 +_,7 @@ import net.minecraft.world.entity.projectile.Projectile;
+@@ -25,6 +_,7 @@
  import net.minecraft.world.item.ItemStack;
  import net.minecraft.world.level.block.BaseFireBlock;
  import net.minecraft.world.level.block.Block;
@@ -8,7 +8,7 @@
  import net.minecraft.world.level.block.state.BlockState;
  import net.minecraft.world.level.gameevent.GameEvent;
  import net.minecraft.world.level.gamerules.GameRules;
-@@ -33,6 +_,8 @@ import net.minecraft.world.phys.AABB;
+@@ -33,6 +_,8 @@
  import net.minecraft.world.phys.HitResult;
  import net.minecraft.world.phys.Vec3;
  import org.jspecify.annotations.Nullable;
@@ -17,7 +17,7 @@
  
  public class ServerExplosion implements Explosion {
      private static final ExplosionDamageCalculator EXPLOSION_DAMAGE_CALCULATOR = new ExplosionDamageCalculator();
-@@ -41,8 +_,8 @@ public class ServerExplosion implements Explosion {
+@@ -41,8 +_,8 @@
      private final boolean fire;
      private final Explosion.BlockInteraction blockInteraction;
      private final ServerLevel level;
@@ -28,7 +28,7 @@
      private final float radius;
      private final DamageSource damageSource;
      private final ExplosionDamageCalculator damageCalculator;
-@@ -77,7 +_,7 @@ public class ServerExplosion implements Explosion {
+@@ -77,7 +_,7 @@
              }
          }
  
@@ -37,7 +37,7 @@
      }
  
      private static final int CHUNK_CACHE_SHIFT = 2;
-@@ -91,13 +_,13 @@ public class ServerExplosion implements Explosion {
+@@ -91,13 +_,13 @@
      // resistance = (res + 0.3F) * 0.3F;
      // so for resistance = 0, we need res = -0.3F
      private static final Float ZERO_RESISTANCE = Float.valueOf(-0.3f);
@@ -57,7 +57,7 @@
                                                                                                      final long key, final boolean calculateResistance) {
          ca.spottedleaf.moonrise.patches.collisions.ExplosionBlockCache ret = this.blockCache.get(key);
          if (ret != null) {
-@@ -122,7 +_,7 @@ public class ServerExplosion implements Explosion {
+@@ -122,7 +_,7 @@
              BlockState blockState = ((ca.spottedleaf.moonrise.patches.getblock.GetBlockChunk)chunk).moonrise$getBlock(x, y, z);
              FluidState fluidState = blockState.getFluidState();
  
@@ -66,7 +66,7 @@
  
              ret = new ca.spottedleaf.moonrise.patches.collisions.ExplosionBlockCache(
                      key, pos, blockState, fluidState,
-@@ -136,7 +_,7 @@ public class ServerExplosion implements Explosion {
+@@ -136,7 +_,7 @@
          return ret;
      }
  
@@ -75,20 +75,19 @@
                                    final ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.LazyEntityCollisionContext context,
                                    final ca.spottedleaf.moonrise.patches.collisions.ExplosionBlockCache[] blockCache,
                                    final BlockPos.MutableBlockPos currPos) {
-@@ -146,9 +_,11 @@ public class ServerExplosion implements Explosion {
+@@ -146,8 +_,10 @@
          final double adjZ = ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.COLLISION_EPSILON * (from.z - to.z);
  
          if (adjX == 0.0 && adjY == 0.0 && adjZ == 0.0) {
 -            return false;
 +            return MISSED_COLLISION; // Shrek - optimise explosions
          }
- 
-+        int result = 0; // Shrek - optimise explosions
 +
++        int result = 0; // Shrek - optimise explosions
+ 
          final double toXAdj = to.x - adjX;
          final double toYAdj = to.y - adjY;
-         final double toZAdj = to.z - adjZ;
-@@ -195,7 +_,7 @@ public class ServerExplosion implements Explosion {
+@@ -195,7 +_,7 @@
                      (currZ & BLOCK_EXPLOSION_CACHE_MASK) << (BLOCK_EXPLOSION_CACHE_SHIFT + BLOCK_EXPLOSION_CACHE_SHIFT);
              ca.spottedleaf.moonrise.patches.collisions.ExplosionBlockCache cachedBlock = blockCache[cacheKey];
              if (cachedBlock == null || cachedBlock.key != key) {
@@ -97,7 +96,7 @@
              }
  
              final BlockState blockState = cachedBlock.blockState;
-@@ -215,13 +_,21 @@ public class ServerExplosion implements Explosion {
+@@ -215,13 +_,21 @@
                      }
                  }
  
@@ -122,7 +121,7 @@
              }
  
              // inc the smallest normalized coordinate
-@@ -247,9 +_,10 @@ public class ServerExplosion implements Explosion {
+@@ -247,9 +_,10 @@
          }
      }
  
@@ -135,7 +134,7 @@
          final AABB boundingBox = target.getBoundingBox();
          final double diffX = boundingBox.maxX - boundingBox.minX;
          final double diffY = boundingBox.maxY - boundingBox.minY;
-@@ -285,7 +_,11 @@ public class ServerExplosion implements Explosion {
+@@ -285,7 +_,11 @@
                              Math.fma(dz, diffZ, offZ)
                      );
  
@@ -148,7 +147,7 @@
                          ++missedRays;
                      }
                  }
-@@ -295,6 +_,111 @@ public class ServerExplosion implements Explosion {
+@@ -295,6 +_,111 @@
          return (float)missedRays / (float)totalRays;
      }
      // Paper end - collisions optimisations
@@ -260,7 +259,7 @@
  
      public ServerExplosion(
          final ServerLevel level,
-@@ -318,6 +_,15 @@ public class ServerExplosion implements Explosion {
+@@ -318,6 +_,15 @@
          this.yield = this.blockInteraction == Explosion.BlockInteraction.DESTROY_WITH_DECAY ? 1.0F / this.radius : 1.0F;
          this.yield = Double.isFinite(this.yield) ? this.yield : 0; // Paper - Don't allow infinite default yields
          // Paper end - add yield
@@ -276,7 +275,7 @@
      }
  
      private ExplosionDamageCalculator makeDamageCalculator(final @Nullable Entity source) {
-@@ -325,6 +_,16 @@ public class ServerExplosion implements Explosion {
+@@ -325,6 +_,16 @@
      }
  
      public static float getSeenPercent(final Vec3 center, final Entity entity) {
@@ -293,7 +292,7 @@
          AABB bb = entity.getBoundingBox();
          double xs = 1.0 / ((bb.maxX - bb.minX) * 2.0 + 1.0);
          double ys = 1.0 / ((bb.maxY - bb.minY) * 2.0 + 1.0);
-@@ -342,8 +_,20 @@ public class ServerExplosion implements Explosion {
+@@ -342,8 +_,20 @@
                          double y = Mth.lerp(yy, bb.minY, bb.maxY);
                          double z = Mth.lerp(zz, bb.minZ, bb.maxZ);
                          Vec3 from = new Vec3(x + xOffset, y, z + zOffset);
@@ -316,7 +315,7 @@
                              hits++;
                          }
  
-@@ -368,7 +_,7 @@ public class ServerExplosion implements Explosion {
+@@ -368,7 +_,7 @@
          return this.center;
      }
  
@@ -325,7 +324,7 @@
          // Paper start - collision optimisations
          final ObjectArrayList<BlockPos> ret = new ObjectArrayList<>();
  
-@@ -388,6 +_,27 @@ public class ServerExplosion implements Explosion {
+@@ -388,6 +_,27 @@
              initialCache = this.getOrCacheExplosionBlock(blockX, blockY, blockZ, key, true);
          }
  
@@ -353,7 +352,7 @@
          // only ~1/3rd of the loop iterations in vanilla will result in a ray, as it is iterating the perimeter of
          // a 16x16x16 cube
          // we can cache the rays and their normals as well, so that we eliminate the excess iterations / checks and
-@@ -407,7 +_,7 @@ public class ServerExplosion implements Explosion {
+@@ -407,7 +_,7 @@
  
              ray += 3;
  
@@ -362,7 +361,7 @@
  
              do {
                  final int blockX = Mth.floor(currX);
-@@ -428,6 +_,15 @@ public class ServerExplosion implements Explosion {
+@@ -428,6 +_,15 @@
                  }
  
                  if (cachedBlock.outOfWorld) {
@@ -378,7 +377,7 @@
                      break;
                  }
                  final BlockState iblockdata = cachedBlock.blockState;
-@@ -477,16 +_,48 @@ public class ServerExplosion implements Explosion {
+@@ -477,16 +_,48 @@
              int z0 = Mth.floor(this.center.z - doubleRadius - 1.0);
              int z1 = Mth.floor(this.center.z + doubleRadius + 1.0);
              List<Entity> list = this.level.getEntities(this.excludeSourceFromDamage ? this.source : null, new AABB(x0, y0, z0, x1, y1, z1), entity -> entity.isAlive() && !entity.isSpectator()); // Paper - Fix lag from explosions processing dead entities, Allow explosions to damage source
@@ -428,10 +427,10 @@
                          float knockbackMultiplier = this.damageCalculator.getKnockbackMultiplier(entity);
 -                        float exposure = !shouldDamageEntity && knockbackMultiplier == 0.0F ? 0.0F : this.getBlockDensity(this.center, entity); // Paper - Optimize explosions
 +                        float exposure = !shouldDamageEntity && knockbackMultiplier == 0.0F ? 0.0F : this.getBlockDensity(explosionPos, entity); // Shrek - optimise explosions // Paper - Optimize explosions
-                         if (shouldDamageEntity) {
+                         if (shouldDamageEntity && (this.source == null || this.source.doTeamsAllowDamage(entity))) {
                              // CraftBukkit start
  
-@@ -497,7 +_,7 @@ public class ServerExplosion implements Explosion {
+@@ -497,7 +_,7 @@
                              // - Damaging EnderDragon does nothing
                              // - EnderDragon hitbox always covers the other parts and is therefore always present
                              if (entity instanceof net.minecraft.world.entity.boss.enderdragon.EnderDragonPart) {
@@ -440,7 +439,7 @@
                              }
  
                              entity.lastDamageCancelled = false;
-@@ -505,7 +_,7 @@ public class ServerExplosion implements Explosion {
+@@ -505,7 +_,7 @@
                              if (entity instanceof net.minecraft.world.entity.boss.enderdragon.EnderDragon enderDragon) {
                                  for (net.minecraft.world.entity.boss.enderdragon.EnderDragonPart dragonPart : enderDragon.getSubEntities()) {
                                      // Calculate damage separately for each EntityComplexPart
@@ -449,7 +448,7 @@
                                          dragonPart.hurtServer(this.level, this.damageSource, this.damageCalculator.getEntityDamageAmount(this, dragonPart, exposure));
                                      }
                                  }
-@@ -535,7 +_,7 @@ public class ServerExplosion implements Explosion {
+@@ -535,7 +_,7 @@
                              }
  
                              if (entity.lastDamageCancelled) { // SPIGOT-5339, SPIGOT-6252, SPIGOT-6777: Skip entity if damage event was cancelled
@@ -458,12 +457,12 @@
                              }
                              // CraftBukkit end
                          }
-@@ -554,10 +_,17 @@ public class ServerExplosion implements Explosion {
+@@ -554,10 +_,17 @@
                          }
                          // CraftBukkit end
-                         entity.push(knockback);
+                         entity.pushFromExplosion(knockback);
 +                        if (entity.cannonEntity) {
-+                            entity.hurtMarked = true;
++                            entity.syncVelocity = true;
 +                            entity.needsSync = true;
 +                        }
                          if (entity.is(EntityTypeTags.REDIRECTABLE_PROJECTILE) && entity instanceof Projectile projectile) {
@@ -477,7 +476,7 @@
                          }
  
                          entity.onExplosionHit(this.source);
-@@ -607,13 +_,13 @@ public class ServerExplosion implements Explosion {
+@@ -607,13 +_,13 @@
      }
      // Canvas end - old blast protection logic
  
@@ -493,7 +492,7 @@
          for (int i1 = targetBlocks.size() - 1; i1 >= 0; i1--) {
              org.bukkit.block.Block bblock = org.bukkit.craftbukkit.block.CraftBlock.at(this.level, targetBlocks.get(i1));
              if (!bblock.getType().isAir()) {
-@@ -660,11 +_,25 @@ public class ServerExplosion implements Explosion {
+@@ -660,11 +_,25 @@
                  }
              }
              // CraftBukkit end
@@ -519,7 +518,7 @@
              Block.popResource(this.level, stack.pos, stack.stack);
          }
      }
-@@ -682,14 +_,7 @@ public class ServerExplosion implements Explosion {
+@@ -682,14 +_,7 @@
      }
  
      public int explode() {
@@ -535,7 +534,7 @@
          this.level.gameEvent(this.source, GameEvent.EXPLODE, this.center);
          List<BlockPos> toBlow = this.calculateExplodedPositions();
          this.hurtEntities();
-@@ -701,6 +_,7 @@ public class ServerExplosion implements Explosion {
+@@ -701,6 +_,7 @@
              this.createFire(toBlow);
          }
  
@@ -543,7 +542,7 @@
          // Paper start - collision optimisations
          this.blockCache = null;
          this.chunkPosCache = null;
-@@ -722,7 +_,7 @@ public class ServerExplosion implements Explosion {
+@@ -722,7 +_,7 @@
          stacks.add(new ServerExplosion.StackCollector(pos, stack));
      }
  
@@ -552,13 +551,13 @@
          return this.blockInteraction != Explosion.BlockInteraction.KEEP;
      }
  
-@@ -788,15 +_,15 @@ public class ServerExplosion implements Explosion {
+@@ -788,15 +_,15 @@
      }
  
      // Paper start - Optimize explosions
--    private float getBlockDensity(Vec3 vec3d, Entity entity) {
+-    private float getBlockDensity(Vec3 center, Entity entity) {
 -        if (!this.level.paperConfig().environment.optimizeExplosions) {
--            return this.getSeenFraction(vec3d, entity, this.directMappedBlockCache, this.mutablePos); // Paper - collision optimisations
+-            return this.getSeenFraction(center, entity, this.directMappedBlockCache, this.mutablePos); // Paper - collision optimisations
 +    protected float getBlockDensity(Vec3 vec3d, Entity entity) {
 +        if (!this.brokenPaperBehaviour) { // Shrek - broken paper explosion behaviour
 +            return this.getMechanicAppropriateSeenPercent(vec3d, entity, null); // Shrek - optimise explosions
@@ -567,7 +566,7 @@
          CacheKey key = new CacheKey(this, entity.getBoundingBox());
          Float blockDensity = worldData.explosionDensityCache.get(key); // Folia - region threading
          if (blockDensity == null) {
--            blockDensity = this.getSeenFraction(vec3d, entity, this.directMappedBlockCache, this.mutablePos); // Paper - collision optimisations
+-            blockDensity = this.getSeenFraction(center, entity, this.directMappedBlockCache, this.mutablePos); // Paper - collision optimisations
 +            blockDensity = this.getMechanicAppropriateSeenPercent(vec3d, entity, null); // Shrek - optimise explosions
              worldData.explosionDensityCache.put(key, blockDensity); // Folia - region threading
          }

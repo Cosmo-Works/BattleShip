@@ -1,6 +1,6 @@
 --- a/io/papermc/paper/threadedregions/TickRegionScheduler.java
 +++ b/io/papermc/paper/threadedregions/TickRegionScheduler.java
-@@ -626,6 +_,10 @@ public final class TickRegionScheduler {
+@@ -626,6 +_,10 @@
                  );
  
                  this.addTickTime(time);

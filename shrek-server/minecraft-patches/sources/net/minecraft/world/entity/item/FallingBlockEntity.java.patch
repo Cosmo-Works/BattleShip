@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/entity/item/FallingBlockEntity.java
 +++ b/net/minecraft/world/entity/item/FallingBlockEntity.java
-@@ -54,7 +_,7 @@ import net.minecraft.world.phys.Vec3;
+@@ -56,7 +_,7 @@
  import org.jspecify.annotations.Nullable;
  import org.slf4j.Logger;
  
@@ -9,7 +9,7 @@
      private static final Logger LOGGER = LogUtils.getLogger();
      private static final BlockState DEFAULT_BLOCK_STATE = Blocks.SAND.defaultBlockState();
      private static final int DEFAULT_TIME = 0;
-@@ -74,9 +_,17 @@ public class FallingBlockEntity extends Entity {
+@@ -76,9 +_,17 @@
      private boolean canvas$finishTickOnly; // Canvas - safely continue falling block ticks after End portal transfers
      protected static final EntityDataAccessor<BlockPos> DATA_START_POS = SynchedEntityData.defineId(FallingBlockEntity.class, EntityDataSerializers.BLOCK_POS);
      public boolean autoExpire = true; // Paper - Expand FallingBlock API
@@ -27,7 +27,7 @@
      }
  
      public FallingBlockEntity(final Level level, final double x, final double y, final double z, final BlockState blockState) {
-@@ -91,16 +_,155 @@ public class FallingBlockEntity extends Entity {
+@@ -93,16 +_,155 @@
          this.setStartPos(this.blockPosition());
      }
  
@@ -175,7 +175,7 @@
              state.hasProperty(BlockStateProperties.WATERLOGGED) ? state.setValue(BlockStateProperties.WATERLOGGED, false) : state
          );
          if (!org.bukkit.craftbukkit.event.CraftEventFactory.callEntityChangeBlockEvent(entity, pos, state.getFluidState().createLegacyBlock())) return entity; // CraftBukkit
--        level.setBlock(pos, state.getFluidState().createLegacyBlock(), Block.UPDATE_ALL);
+-        level.setBlockAndUpdate(pos, state.getFluidState().createLegacyBlock());
 +        level.fallingBlockColumnLimits().limitInstantFalling(level, pos); // Shrek - limit instant block falling
 +        // Shrek start - cannon mechanics
 +        if (shrek$mechanicsTarget.atLeast(me.samsuik.sakura.mechanics.MechanicVersion.v1_18_2)) {
@@ -185,7 +185,7 @@
          level.addFreshEntity(entity);
          return entity;
      }
-@@ -120,7 +_,7 @@ public class FallingBlockEntity extends Entity {
+@@ -122,7 +_,7 @@
      }
  
      public void setStartPos(final BlockPos pos) {
@@ -194,7 +194,7 @@
      }
  
      public BlockPos getStartPos() {
-@@ -144,7 +_,7 @@ public class FallingBlockEntity extends Entity {
+@@ -146,7 +_,7 @@
  
      @Override
      protected double getDefaultGravity() {
@@ -203,7 +203,7 @@
      }
  
      @Override
-@@ -159,8 +_,12 @@ public class FallingBlockEntity extends Entity {
+@@ -161,8 +_,12 @@
              // Paper end - Configurable falling blocks height nerf
              // this.handlePortal(); // Folia - region threading
              if (this.level() instanceof ServerLevel serverLevel && (this.isAlive() || this.forceTickAfterTeleportToDuplicate)) {
@@ -218,7 +218,7 @@
                  boolean isStuckInWater = isConcrete && this.level().getFluidState(pos).is(FluidTags.WATER);
                  double moveVec = this.getDeltaMovement().lengthSqr();
                  if (isConcrete && moveVec > 1.0) {
-@@ -176,7 +_,7 @@ public class FallingBlockEntity extends Entity {
+@@ -178,7 +_,7 @@
                      }
                  }
  
@@ -227,7 +227,7 @@
                      if ((this.time > 100 && this.autoExpire) && (pos.getY() <= this.level().getMinY() || pos.getY() > this.level().getMaxY()) || (this.time > 600 && this.autoExpire)) { // Paper - Expand FallingBlock API
                          if (this.dropItem && serverLevel.getGameRules().get(GameRules.ENTITY_DROPS)) {
                              this.spawnAtLocation(serverLevel, block);
-@@ -186,15 +_,21 @@ public class FallingBlockEntity extends Entity {
+@@ -188,15 +_,21 @@
                      }
                  } else {
                      BlockState currentState = this.level().getBlockState(pos);
@@ -252,7 +252,7 @@
                                  if (this.blockState.hasProperty(BlockStateProperties.WATERLOGGED) && this.level().getFluidState(pos).is(Fluids.WATER)) {
                                      this.blockState = this.blockState.setValue(BlockStateProperties.WATERLOGGED, true);
                                  }
-@@ -237,6 +_,10 @@ public class FallingBlockEntity extends Entity {
+@@ -242,6 +_,10 @@
                                      this.discard(org.bukkit.event.entity.EntityRemoveEvent.Cause.DROP); // CraftBukkit - add Bukkit remove cause
                                      this.callOnBrokenAfterFall(block, pos);
                                      this.spawnAtLocation(serverLevel, block);
@@ -263,11 +263,12 @@
                                  }
                              } else {
                                  this.discard(org.bukkit.event.entity.EntityRemoveEvent.Cause.DROP); // CraftBukkit - add Bukkit remove cause
-@@ -253,7 +_,25 @@ public class FallingBlockEntity extends Entity {
+@@ -258,8 +_,26 @@
                  }
              }
  
 -            this.setDeltaMovement(this.getDeltaMovement().scale(this.getAirDrag()));
+             this.setRequiresPrecisePosition(this.horizontalCollision || this.verticalCollision);
 +            // Shrek start - cannon mechanics
 +            final me.samsuik.sakura.mechanics.MinecraftMechanicsTarget shrek$mechanicsTarget = this.shrek$target();
 +            if (shrek$mechanicsTarget.atLeast(me.samsuik.sakura.mechanics.MechanicVersion.v1_12)) {
@@ -285,12 +286,12 @@
 +
 +    private void forcePositionUpdateInWater() {
 +        if (!this.isRemoved() && this.wasTouchingWater && !this.isPushedByFluid()) {
-+            this.hurtMarked = true;
++            this.syncVelocity = true;
 +            this.needsSync = true;
          }
      }
  
-@@ -264,12 +_,29 @@ public class FallingBlockEntity extends Entity {
+@@ -270,12 +_,29 @@
              return false;
          }
  
@@ -322,7 +323,7 @@
              if (
                  this.dropItem
                      && this.level() instanceof final net.minecraft.server.level.ServerLevel serverLevel
-@@ -289,6 +_,11 @@ public class FallingBlockEntity extends Entity {
+@@ -295,6 +_,11 @@
          ) {
              return true;
          }

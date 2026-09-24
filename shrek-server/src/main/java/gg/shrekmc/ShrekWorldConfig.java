@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import me.samsuik.sakura.entity.BrainActivation;
 import me.samsuik.sakura.entity.EntityTravelLimits;
 import me.samsuik.sakura.entity.TntSpread;
 import me.samsuik.sakura.entity.merge.MergeLevel;
@@ -24,6 +25,8 @@ import me.samsuik.sakura.explosion.durable.DurableMaterial;
 import me.samsuik.sakura.explosion.durable.DurableMaterialParser;
 import me.samsuik.sakura.explosion.durable.DurableMaterialSpec;
 import me.samsuik.sakura.mechanics.MinecraftMechanicsTarget;
+import me.samsuik.sakura.world.KeepLoadedArea;
+import me.samsuik.sakura.world.KeepLoadedChunks;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -206,10 +209,12 @@ public class ShrekWorldConfig extends Part {
         entities.parsedChunkTravelLimit.setValue(
             EntityTravelLimits.parseChunkLimits(entities.chunkTravelLimit, LOGGER, worldName)
         );
+        BrainActivation.parseBlacklist(entities.brainActivation, LOGGER, worldName);
         entities.items.blastResistant.parse(LOGGER, worldName);
         entities.items.explosionItemDrops.parse(LOGGER, worldName);
         players.combat.parse(LOGGER, worldName);
         players.knockback.parse(LOGGER, worldName);
+        KeepLoadedChunks.sync(level);
     }
 
     private static int parseDisabledInt(final String raw, final String option, final String worldName) {
@@ -868,6 +873,30 @@ public class ShrekWorldConfig extends Part {
                 .docs("Iron golems take fall damage. Vanilla golems are immune.");
             option("nerfedMobsCanPushEntities")
                 .docs("Unaware (nerfed) mobs still push other entities. Off keeps them from shoving players.");
+            option("despawnAfterPickingUpItems")
+                .docs(
+                    "Mobs that pick up gear can still despawn. Nametagged mobs stay. Picked items drop when they despawn.",
+                    "Same-world and same Folia region only."
+                );
+            option("trackerOcclusionCulling")
+                .docs(
+                    "Hide entities from the tracker when a solid block is between the player's eyes and the entity.",
+                    "Cannon entities, glowing entities, and spectators are never culled. Same-world and same region only."
+                );
+            option("skipSameTypeProjectileHits")
+                .docs("Snowballs, pearls, and similar projectiles skip colliding with another of the same type. Arrows still collide.");
+            option("brainActivation")
+                .docs(
+                    "Tick mob brains and pathfinder goals less often the farther they are from a player.",
+                    "Same-world and same Folia region only. Nearby mobs keep full AI.",
+                    "Mobs in water keep full AI so they can swim. Based on Pufferfish DAB."
+                );
+            option("verticalActivationRange")
+                .docs(
+                    "How far above and below a player entities stay fully active.",
+                    "Spigot's activation range is a full-height cylinder. 0 keeps that. 16 is a usual cap for stacked farms.",
+                    "Same-world and same Folia region only. Matches Spigot's animals, monsters, raiders, misc, water, villagers, and flying-monsters groups."
+                );
         }
 
         public Map<String, Integer> chunkTravelLimit = defaultChunkTravelLimit();
@@ -877,6 +906,11 @@ public class ShrekWorldConfig extends Part {
         public boolean instantDeathAnimation = false;
         public boolean ironGolemsTakeFalldamage = false;
         public boolean nerfedMobsCanPushEntities = false;
+        public boolean despawnAfterPickingUpItems = true;
+        public boolean trackerOcclusionCulling = true;
+        public boolean skipSameTypeProjectileHits = true;
+        public BrainActivation brainActivation = new BrainActivation();
+        public VerticalActivationRange verticalActivationRange = new VerticalActivationRange();
 
         private static Map<String, Integer> defaultChunkTravelLimit() {
             final Map<String, Integer> limits = new LinkedHashMap<>();
@@ -885,6 +919,74 @@ public class ShrekWorldConfig extends Part {
         }
 
         public final CanonicalReference<Map<EntityType<?>, Integer>> parsedChunkTravelLimit = new CanonicalReference<>();
+
+        public static class BrainActivation extends Part {
+            {
+                option("enabled")
+                    .docs("Throttle distant mob AI. Leave on unless you want full vanilla brains at any range.");
+                option("startDistance")
+                    .docs("Blocks to the nearest player before throttling starts.")
+                    .greaterThanOrEqualTo(0);
+                option("maxTickFreq")
+                    .docs("Furthest mobs still think at least this often, in ticks. 20 is once per second.")
+                    .greaterThanOrEqualTo(1);
+                option("activationDistMod")
+                    .docs(
+                        "Higher means distant mobs think more often. 8 is the usual value. Do not go below 6."
+                    )
+                    .between(6, 16);
+                option("skipInWater")
+                    .docs("Do not throttle non-aquatic mobs that are in water, so they can still swim.");
+                option("blacklistedEntities")
+                    .docs("Entity ids that always keep full AI, e.g. villager or minecraft:warden.");
+            }
+
+            public boolean enabled = true;
+            public int startDistance = 12;
+            public int maxTickFreq = 20;
+            public int activationDistMod = 8;
+            public boolean skipInWater = true;
+            public List<String> blacklistedEntities = new ArrayList<>();
+            public final CanonicalReference<Set<EntityType<?>>> parsedBlacklist = new CanonicalReference<>();
+
+            public int startDistanceSquared() {
+                return this.startDistance * this.startDistance;
+            }
+        }
+
+        public static class VerticalActivationRange extends Part {
+            {
+                option("animals")
+                    .docs("Blocks above and below a player for animals. 0 is the full world height.")
+                    .greaterThanOrEqualTo(0);
+                option("monsters")
+                    .docs("Blocks above and below a player for monsters. 0 is the full world height.")
+                    .greaterThanOrEqualTo(0);
+                option("raiders")
+                    .docs("Blocks above and below a player for raiders. 0 is the full world height.")
+                    .greaterThanOrEqualTo(0);
+                option("misc")
+                    .docs("Blocks above and below a player for misc entities. 0 is the full world height.")
+                    .greaterThanOrEqualTo(0);
+                option("water")
+                    .docs("Blocks above and below a player for water mobs. 0 is the full world height.")
+                    .greaterThanOrEqualTo(0);
+                option("villagers")
+                    .docs("Blocks above and below a player for villagers. 0 is the full world height.")
+                    .greaterThanOrEqualTo(0);
+                option("flyingMonsters")
+                    .docs("Blocks above and below a player for flying monsters. 0 is the full world height.")
+                    .greaterThanOrEqualTo(0);
+            }
+
+            public int animals = 0;
+            public int monsters = 0;
+            public int raiders = 0;
+            public int misc = 0;
+            public int water = 0;
+            public int villagers = 0;
+            public int flyingMonsters = 0;
+        }
 
         {
             option("items").docs("Item explosion immunity and which items explosions can drop.");
@@ -979,6 +1081,25 @@ public class ShrekWorldConfig extends Part {
             public boolean slowedDownByWater = true;
             public boolean randomSpreadWhenThrown = true;
         }
+    }
+
+    {
+        option("chunks").docs("Keep chosen areas loaded so joining those chunks does not stall on disk I/O.");
+    }
+
+    public Chunks chunks = new Chunks();
+    public static class Chunks extends Part {
+        {
+            option("keepLoaded")
+                .docs(
+                    "Named squares to load at startup and keep loaded until shutdown.",
+                    "x and z are block coordinates in this world. size is the width in chunks of the square around that point.",
+                    "Example: size 8 around 0, 0 keeps an 8 by 8 chunk square centered on block 0, 0.",
+                    "Same-world only. Size is capped at 64."
+                );
+        }
+
+        public Map<String, KeepLoadedArea> keepLoaded = new LinkedHashMap<>();
     }
 
     {

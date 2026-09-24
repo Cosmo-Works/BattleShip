@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/item/EnderEyeItem.java
 +++ b/net/minecraft/world/item/EnderEyeItem.java
-@@ -60,6 +_,15 @@ public class EnderEyeItem extends Item {
+@@ -60,6 +_,15 @@
          BlockPattern.BlockPatternMatch match = EndPortalFrameBlock.getOrCreatePortalShape().find(level, pos);
          if (match != null) {
              BlockPos blockPos = match.getFrontTopLeft().offset(-3, 0, -3);

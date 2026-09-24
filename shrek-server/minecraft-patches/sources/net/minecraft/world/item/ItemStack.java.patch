@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/item/ItemStack.java
 +++ b/net/minecraft/world/item/ItemStack.java
-@@ -99,7 +_,7 @@ import org.apache.commons.lang3.mutable.MutableBoolean;
+@@ -100,7 +_,7 @@
  import org.jspecify.annotations.Nullable;
  import org.slf4j.Logger;
  
@@ -9,7 +9,7 @@
      private static final List<Component> OP_NBT_WARNING = List.of(
          Component.translatable("item.op_warning.line1").withStyle(ChatFormatting.RED, ChatFormatting.BOLD),
          Component.translatable("item.op_warning.line2").withStyle(ChatFormatting.RED),
-@@ -156,6 +_,19 @@ public final class ItemStack implements DataComponentHolder, ItemInstance {
+@@ -157,6 +_,19 @@
      @Deprecated
      private @Nullable Holder<Item> item;
      private PatchedDataComponentMap components;
@@ -29,7 +29,7 @@
  
      public static DataResult<ItemStack> validateStrict(final ItemStack itemStack) {
          DataResult<?> result = validateComponents(itemStack.getComponents());
-@@ -250,6 +_,17 @@ public final class ItemStack implements DataComponentHolder, ItemInstance {
+@@ -251,6 +_,17 @@
          return !this.isEmpty() && this.components.hasNonDefault(type);
      }
  
@@ -47,7 +47,7 @@
      public ItemStack(final ItemLike item, final int count) {
          this(item.asItem().builtInRegistryHolder(), count);
      }
-@@ -259,7 +_,7 @@ public final class ItemStack implements DataComponentHolder, ItemInstance {
+@@ -260,7 +_,7 @@
      }
  
      public ItemStack(final Holder<Item> item, final int count) {
@@ -56,7 +56,7 @@
      }
  
      public ItemStack(final Holder<Item> item) {
-@@ -267,7 +_,7 @@ public final class ItemStack implements DataComponentHolder, ItemInstance {
+@@ -268,7 +_,7 @@
      }
  
      public ItemStack(final Holder<Item> item, final int count, final DataComponentPatch components) {
@@ -65,7 +65,7 @@
      }
  
      private ItemStack(final Holder<Item> item, final int count, final PatchedDataComponentMap components) {
-@@ -961,11 +_,14 @@ public final class ItemStack implements DataComponentHolder, ItemInstance {
+@@ -967,11 +_,14 @@
      // CraftBukkit start
      public void restorePatch(DataComponentPatch datacomponentpatch) {
          this.components.restorePatch(datacomponentpatch);
@@ -81,7 +81,7 @@
      }
  
      public <T> @Nullable T set(final TypedDataComponent<T> value) {
-@@ -986,7 +_,9 @@ public final class ItemStack implements DataComponentHolder, ItemInstance {
+@@ -992,7 +_,9 @@
      }
  
      public <T> @Nullable T remove(final DataComponentType<? extends T> type) {
@@ -92,7 +92,7 @@
      }
  
      public void applyComponentsAndValidate(final DataComponentPatch patch) {
-@@ -1305,6 +_,7 @@ public final class ItemStack implements DataComponentHolder, ItemInstance {
+@@ -1305,6 +_,7 @@
  
      public void setCount(final int count) {
          this.count = count;

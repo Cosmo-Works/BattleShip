@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/item/enchantment/Enchantment.java
 +++ b/net/minecraft/world/item/enchantment/Enchantment.java
-@@ -372,6 +_,16 @@ public record Enchantment(Component description, Enchantment.EnchantmentDefiniti
+@@ -371,6 +_,16 @@
                      level = event.getLungePower();
                  }
  

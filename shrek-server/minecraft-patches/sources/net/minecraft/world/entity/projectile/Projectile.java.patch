@@ -1,14 +1,14 @@
 --- a/net/minecraft/world/entity/projectile/Projectile.java
 +++ b/net/minecraft/world/entity/projectile/Projectile.java
-@@ -23,6 +_,7 @@ import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
- import net.minecraft.world.item.Item;
+@@ -28,6 +_,7 @@
  import net.minecraft.world.item.ItemStack;
  import net.minecraft.world.item.enchantment.EnchantmentHelper;
+ import net.minecraft.world.level.GameType;
 +import net.minecraft.world.level.ClipContext;
  import net.minecraft.world.level.Level;
  import net.minecraft.world.level.block.state.BlockState;
- import net.minecraft.world.level.gameevent.GameEvent;
-@@ -48,6 +_,14 @@ public abstract class Projectile extends Entity implements TraceableEntity {
+ import net.minecraft.world.level.block.state.pattern.BlockInWorld;
+@@ -59,6 +_,14 @@
      private long canvas$ticketTimer = 0L; // Canvas - configurable projectile types can load chunks
      private final boolean canvas$loadsChunksOverride; // Canvas - configurable projectile types can load chunks
  
@@ -23,7 +23,7 @@
      protected Projectile(final EntityType<? extends Projectile> type, final Level level) {
          super(type, level);
          this.canvas$loadsChunksOverride = level.canvasConfig().entities.projectiles.getDoesProjectileLoadChunksOverridePredicate().test(this); // Canvas - configurable projectile types can load chunks
-@@ -236,7 +_,16 @@ public abstract class Projectile extends Entity implements TraceableEntity {
+@@ -267,7 +_,16 @@
          if (!sourceMovement.isFinite()) {
              sourceMovement = Vec3.ZERO;
          }
@@ -41,7 +41,16 @@
          this.setDeltaMovement(this.getDeltaMovement().add(sourceMovement.x, source.onGround() ? 0.0 : sourceMovement.y, sourceMovement.z));
          }
          // Paper end - allow disabling relative velocity
-@@ -504,7 +_,7 @@ public abstract class Projectile extends Entity implements TraceableEntity {
+@@ -549,7 +_,7 @@
+     }
+ 
+     protected boolean canHitEntity(final Entity entity) {
+-        if (!entity.canBeHitByProjectile()) {
++        if (!entity.canBeHitByProjectile() || !me.samsuik.sakura.entity.SameTypeProjectiles.canCollide(this, entity)) {
+             return false;
+         }
+ 
+@@ -563,7 +_,7 @@
              }
          }
          // Paper end - Cancel hit for vanished entities

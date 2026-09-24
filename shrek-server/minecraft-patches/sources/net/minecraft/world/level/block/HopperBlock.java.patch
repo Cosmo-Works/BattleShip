@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/level/block/HopperBlock.java
 +++ b/net/minecraft/world/level/block/HopperBlock.java
-@@ -124,6 +_,12 @@ public class HopperBlock extends BaseEntityBlock {
+@@ -117,6 +_,12 @@
      private void checkPoweredState(final Level level, final BlockPos pos, final BlockState state) {
          boolean shouldBeOn = !level.hasNeighborSignal(pos);
          if (shouldBeOn != state.getValue(ENABLED)) {

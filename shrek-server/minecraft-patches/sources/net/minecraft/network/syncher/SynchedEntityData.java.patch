@@ -1,6 +1,6 @@
 --- a/net/minecraft/network/syncher/SynchedEntityData.java
 +++ b/net/minecraft/network/syncher/SynchedEntityData.java
-@@ -20,6 +_,30 @@ public class SynchedEntityData {
+@@ -20,6 +_,30 @@
      private final SyncedDataHolder entity;
      private final SynchedEntityData.DataItem<?>[] itemsById;
      private boolean isDirty;
@@ -31,7 +31,7 @@
  
      private SynchedEntityData(final SyncedDataHolder entity, final SynchedEntityData.DataItem<?>[] itemsById) {
          this.entity = entity;
-@@ -58,6 +_,19 @@ public class SynchedEntityData {
+@@ -58,6 +_,19 @@
      }
  
      public <T> void set(final EntityDataAccessor<T> accessor, final T value, final boolean forceDirty) {
@@ -51,7 +51,7 @@
          SynchedEntityData.DataItem<T> dataItem = this.getItem(accessor);
          if (forceDirty || ObjectUtils.notEqual(value, dataItem.getValue())) {
              dataItem.setValue(value);
-@@ -65,6 +_,13 @@ public class SynchedEntityData {
+@@ -65,6 +_,13 @@
              dataItem.setDirty(true);
              this.isDirty = true;
          }
@@ -65,7 +65,7 @@
      }
  
      // CraftBukkit start - add method from above
-@@ -197,6 +_,35 @@ public class SynchedEntityData {
+@@ -197,6 +_,35 @@
          private T value;
          private final T initialValue;
          private boolean dirty;

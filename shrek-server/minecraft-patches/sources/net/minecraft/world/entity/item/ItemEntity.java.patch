@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/entity/item/ItemEntity.java
 +++ b/net/minecraft/world/entity/item/ItemEntity.java
-@@ -380,6 +_,9 @@ public class ItemEntity extends Entity implements TraceableEntity {
+@@ -373,6 +_,9 @@
  
      @Override
      public boolean ignoreExplosion(final Explosion explosion) {

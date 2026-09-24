@@ -1,6 +1,6 @@
 --- a/net/minecraft/server/level/ChunkMap.java
 +++ b/net/minecraft/server/level/ChunkMap.java
-@@ -1075,7 +_,11 @@ public class ChunkMap extends SimpleRegionStorage implements ChunkHolder.PlayerP
+@@ -1074,7 +_,11 @@
                  if (tracker == null) {
                      continue;
                  }
@@ -13,7 +13,7 @@
                  if (((ca.spottedleaf.moonrise.patches.entity_tracker.EntityTrackerTrackedEntity)tracker).moonrise$hasPlayers()
                      || ((ca.spottedleaf.moonrise.patches.chunk_system.entity.ChunkSystemEntity)entity).moonrise$getChunkStatus().isOrAfter(FullChunkStatus.ENTITY_TICKING)) {
                      tracker.serverEntity.sendChanges();
-@@ -1293,12 +_,29 @@ public class ChunkMap extends SimpleRegionStorage implements ChunkHolder.PlayerP
+@@ -1288,12 +_,29 @@
              return !this.seenBy.isEmpty();
          }
          // Paper end - optimise entity tracker
@@ -31,19 +31,19 @@
 +        }
 +        // Shrek end - reduce entity tracker player updates
  
-         public TrackedEntity(final Entity entity, final int range, final int updateInterval, final boolean trackDelta) {
+         public TrackedEntity(final Entity entity, final int range, final UpdateInterval updateInterval, final boolean trackDelta) {
              this.serverEntity = new ServerEntity(ChunkMap.this.level, entity, updateInterval, trackDelta, this, this.seenBy); // Paper
              this.entity = entity;
              this.range = range;
              this.lastSectionPos = SectionPos.of(entity);
 +            // Shrek start - reduce entity tracker player updates
-+            this.playerUpdateInterval = Math.max(1, Math.min(updateInterval, 20));
++            this.playerUpdateInterval = Math.max(1, Math.min(entity.getType().hasUpdateInterval() ? entity.getType().updateInterval() : 20, 20));
 +            this.entityPosition = entity.position();
 +            // Shrek end - reduce entity tracker player updates
          }
  
          @Override
-@@ -1376,6 +_,7 @@ public class ChunkMap extends SimpleRegionStorage implements ChunkHolder.PlayerP
+@@ -1371,6 +_,7 @@
                      && this.entity.broadcastToPlayer(player)
                      && ChunkMap.this.isChunkTracked(player, this.entity.chunkPosition().x(), this.entity.chunkPosition().z());
                  // Paper end - Configurable entity tracking range by Y
@@ -51,3 +51,11 @@
                  // Folia start - region threading
                  if (visibleToPlayer && (this.entity instanceof ServerPlayer thisEntity) && thisEntity.broadcastedDeath) {
                      visibleToPlayer = false;
+@@ -1381,6 +_,7 @@
+                     visibleToPlayer = false;
+                 }
+                 // CraftBukkit end
++                visibleToPlayer = visibleToPlayer && !me.samsuik.sakura.player.visibility.TrackerOcclusion.hiddenFrom(this.entity, player, this.seenBy.contains(player.connection));
+                 if (visibleToPlayer) {
+                     if (this.seenBy.add(player.connection)) {
+                         // Paper start - entity tracking events

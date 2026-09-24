@@ -1,17 +1,16 @@
 --- a/net/minecraft/world/level/redstone/NeighborUpdater.java
 +++ b/net/minecraft/world/level/redstone/NeighborUpdater.java
-@@ -14,9 +_,13 @@ import net.minecraft.world.level.block.Blocks;
+@@ -14,8 +_,12 @@
  import net.minecraft.world.level.block.state.BlockState;
  import org.jspecify.annotations.Nullable;
  
 -public interface NeighborUpdater {
 +    public interface NeighborUpdater {
      Direction[] UPDATE_ORDER = new Direction[]{Direction.WEST, Direction.EAST, Direction.DOWN, Direction.UP, Direction.NORTH, Direction.SOUTH};
- 
++
 +    default int getUpdateDepth() {
 +        return 0;
 +    }
-+
+ 
      void shapeUpdate(Direction direction, BlockState neighborState, BlockPos pos, BlockPos neighborPos, @Block.UpdateFlags int updateFlags, int updateLimit);
  
-     void neighborChanged(BlockPos pos, Block changedBlock, @Nullable Orientation orientation);

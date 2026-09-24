@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/level/chunk/ChunkAccess.java
 +++ b/net/minecraft/world/level/chunk/ChunkAccess.java
-@@ -396,6 +_,17 @@ public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeM
+@@ -394,6 +_,17 @@
      private final int minSection;
      private final int maxSection;
      // Paper end - get block chunk optimisation

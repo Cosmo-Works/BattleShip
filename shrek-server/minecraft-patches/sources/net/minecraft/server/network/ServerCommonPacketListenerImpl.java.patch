@@ -1,6 +1,24 @@
 --- a/net/minecraft/server/network/ServerCommonPacketListenerImpl.java
 +++ b/net/minecraft/server/network/ServerCommonPacketListenerImpl.java
-@@ -383,6 +_,16 @@ public abstract class ServerCommonPacketListenerImpl implements ServerCommonPack
+@@ -272,7 +_,7 @@
+         if (io.canvasmc.canvas.GlobalConfiguration.getInstance().networking.purpurAlternativeKeepalive) {
+             if (this.checkIfClosed(now)) {
+                 long currTime = System.nanoTime();
+-                if ((currTime - this.keepAlive.lastKeepAliveTx) >= java.util.concurrent.TimeUnit.SECONDS.toNanos(1L)) { // 1 second
++                if ((currTime - this.keepAlive.lastKeepAliveTx) >= me.samsuik.sakura.player.knockback.KnockbackSync.keepAliveIntervalNanos(this)) { // 1 second
+                     this.keepAlive.lastKeepAliveTx = currTime;
+                     if (this.keepAlivePending && keepAlives.size() * 1000L >= KEEPALIVE_LIMIT) {
+                         this.disconnect(TIMEOUT_DISCONNECTION_MESSAGE, io.papermc.paper.connection.DisconnectionReason.TIMEOUT);
+@@ -288,7 +_,7 @@
+         if (this.checkIfClosed(now)) {
+             long currTime = System.nanoTime();
+ 
+-            if ((currTime - this.keepAlive.lastKeepAliveTx) >= java.util.concurrent.TimeUnit.SECONDS.toNanos(1L)) {
++            if ((currTime - this.keepAlive.lastKeepAliveTx) >= me.samsuik.sakura.player.knockback.KnockbackSync.keepAliveIntervalNanos(this)) {
+                 this.keepAlive.lastKeepAliveTx = currTime;
+ 
+                 io.papermc.paper.util.KeepAlive.PendingKeepAlive pka = new io.papermc.paper.util.KeepAlive.PendingKeepAlive(currTime, now);
+@@ -382,6 +_,16 @@
          } else if (packet instanceof net.minecraft.network.protocol.game.ClientboundSetDefaultSpawnPositionPacket defaultSpawnPositionPacket && this instanceof ServerGamePacketListenerImpl serverGamePacketListener) {
              serverGamePacketListener.player.compassTarget = org.bukkit.craftbukkit.util.CraftLocation.toBukkit(defaultSpawnPositionPacket.respawnData().pos(), serverGamePacketListener.getPlayer().level());
          }

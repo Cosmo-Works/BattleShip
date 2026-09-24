@@ -368,7 +368,7 @@ public abstract class SpecialisedExplosion<E extends Entity & SakuraEntity> exte
         }
 
         entity.setDeltaMovement(moveX, moveY, moveZ);
-        entity.hurtMarked = true;
+        entity.syncVelocity = true;
         entity.needsSync = true;
     }
 

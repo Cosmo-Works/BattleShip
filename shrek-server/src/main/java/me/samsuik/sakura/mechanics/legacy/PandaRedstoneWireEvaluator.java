@@ -14,7 +14,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.ComparatorBlock;
 import net.minecraft.world.level.block.DiodeBlock;
-import net.minecraft.world.level.block.RedStoneWireBlock;
+import net.minecraft.world.level.block.RedstoneWireBlock;
 import net.minecraft.world.level.block.RedstoneWallTorchBlock;
 import net.minecraft.world.level.block.piston.PistonBaseBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -38,7 +38,7 @@ public final class PandaRedstoneWireEvaluator extends RedstoneWireEvaluator {
     private final ArrayDeque<BlockPos> turnOn = new ArrayDeque<>();
     private final LinkedHashSet<BlockPos> updatedRedstoneWire = new LinkedHashSet<>();
 
-    public PandaRedstoneWireEvaluator(final RedStoneWireBlock wireBlock) {
+    public PandaRedstoneWireEvaluator(final RedstoneWireBlock wireBlock) {
         super(wireBlock);
     }
 
@@ -82,7 +82,7 @@ public final class PandaRedstoneWireEvaluator extends RedstoneWireEvaluator {
                 continue;
             }
             final BlockState state = level.getBlockState(pos);
-            final int oldPower = state.getValue(RedStoneWireBlock.POWER);
+            final int oldPower = state.getValue(RedstoneWireBlock.POWER);
             final int blockPower = this.getBlockSignal(level, pos);
             final int wirePower = this.getIncomingWireSignal(level, pos);
             final int newPower = Math.max(blockPower, wirePower);
@@ -103,7 +103,7 @@ public final class PandaRedstoneWireEvaluator extends RedstoneWireEvaluator {
                 continue;
             }
             final BlockState state = level.getBlockState(pos);
-            final int oldPower = state.getValue(RedStoneWireBlock.POWER);
+            final int oldPower = state.getValue(RedstoneWireBlock.POWER);
             final int blockPower = this.getBlockSignal(level, pos);
             final int wirePower = this.getIncomingWireSignal(level, pos);
             int newPower = Math.max(blockPower, wirePower);
@@ -128,7 +128,7 @@ public final class PandaRedstoneWireEvaluator extends RedstoneWireEvaluator {
         if (!state.is(this.wireBlock)) {
             return;
         }
-        final int power = state.getValue(RedStoneWireBlock.POWER);
+        final int power = state.getValue(RedstoneWireBlock.POWER);
         if (power < otherPower - 1 && !this.turnOn.contains(pos)) {
             this.turnOn.add(pos);
         }
@@ -141,7 +141,7 @@ public final class PandaRedstoneWireEvaluator extends RedstoneWireEvaluator {
         final BlockState state = ownedByThisRegion(level, pos) ? level.getBlockState(pos) : this.wireBlock.defaultBlockState();
         int ownPower = 0;
         if (state.is(this.wireBlock)) {
-            ownPower = state.getValue(RedStoneWireBlock.POWER);
+            ownPower = state.getValue(RedstoneWireBlock.POWER);
         }
         for (final Direction facingHorizontal : FACINGS_HORIZONTAL) {
             this.addWireToList(level, pos.relative(facingHorizontal), ownPower);
@@ -176,7 +176,7 @@ public final class PandaRedstoneWireEvaluator extends RedstoneWireEvaluator {
             }
             final BlockState state = level.getBlockState(offsetPos);
             final boolean connected = connectedSides.contains(facing.getOpposite()) || facing == Direction.DOWN;
-            if ((connected || (facing.getAxis().isHorizontal() && RedStoneWireBlock.shouldConnectTo(state, facing)))
+            if ((connected || (facing.getAxis().isHorizontal() && state.shouldRedstoneWireConnectTo(level, offsetPos, facing)))
                 && canBlockBePoweredFromSide(state, facing, true)) {
                 set.add(offsetPos);
             }
@@ -215,7 +215,7 @@ public final class PandaRedstoneWireEvaluator extends RedstoneWireEvaluator {
             return sidesToPower;
         }
         for (final Direction direction : FACINGS_HORIZONTAL) {
-            final RedstoneSide side = state.getValue(RedStoneWireBlock.PROPERTY_BY_DIRECTION.get(direction));
+            final RedstoneSide side = state.getValue(RedstoneWireBlock.PROPERTY_BY_DIRECTION.get(direction));
             if (side.isConnected()) {
                 sidesToPower.add(direction);
             }
@@ -230,7 +230,7 @@ public final class PandaRedstoneWireEvaluator extends RedstoneWireEvaluator {
     }
 
     private void setWireState(final Level level, final BlockPos pos, final BlockState state, final int power) {
-        level.setBlock(pos, state.setValue(RedStoneWireBlock.POWER, power), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+        level.setBlock(pos, state.setValue(RedstoneWireBlock.POWER, power), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
         this.updatedRedstoneWire.add(pos);
     }
 

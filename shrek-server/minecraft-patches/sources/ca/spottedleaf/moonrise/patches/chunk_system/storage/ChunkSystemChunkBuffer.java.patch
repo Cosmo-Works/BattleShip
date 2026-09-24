@@ -7,7 +7,7 @@
  import java.io.IOException;
  
  public interface ChunkSystemChunkBuffer {
-@@ -8,5 +_,5 @@ public interface ChunkSystemChunkBuffer {
+@@ -8,5 +_,5 @@
  
      public void moonrise$setWriteOnClose(final boolean value);
  

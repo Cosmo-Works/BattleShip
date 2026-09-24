@@ -1,6 +1,6 @@
 --- a/io/papermc/paper/threadedregions/RegionizedWorldData.java
 +++ b/io/papermc/paper/threadedregions/RegionizedWorldData.java
-@@ -163,6 +_,13 @@ public final class RegionizedWorldData {
+@@ -163,6 +_,14 @@
              into.phantomSpawnerNextTick = Math.max(from.phantomSpawnerNextTick, into.phantomSpawnerNextTick);
              // chunkHoldersToBroadcast
              into.chunkHoldersToBroadcast.addAll(from.chunkHoldersToBroadcast);
@@ -11,10 +11,11 @@
 +            into.shrekEntityManager.mergeFrom(from.shrekEntityManager);
 +            into.shrekDurableBlockManager.mergeFrom(from.shrekDurableBlockManager);
 +            // Shrek end - per-region tick scheduler and block state watchers
++            into.shrekPathCache.clear(); // Shrek - faster pathfinding: section versions are per region
          }
  
          @Override
-@@ -342,6 +_,15 @@ public final class RegionizedWorldData {
+@@ -342,6 +_,15 @@
                      into.chunkHoldersToBroadcast.add(chunkHolder);
                  }
              }
@@ -30,7 +31,7 @@
          }
      };
  
-@@ -461,6 +_,18 @@ public final class RegionizedWorldData {
+@@ -461,11 +_,24 @@
      public int wakeupInactiveRemainingVillagers;
      // Paper end
      public int currentPrimedTnt = 0; // Spigot
@@ -49,9 +50,15 @@
      @VisibleForDebug
      public NaturalSpawner.@Nullable SpawnState lastSpawnState;
      public boolean shouldSignal = true;
-@@ -506,6 +_,10 @@ public final class RegionizedWorldData {
+     public final Map<ServerExplosion.CacheKey, Float> explosionDensityCache = new HashMap<>(64, 0.25f);
+     public final PathTypeCache pathTypesByPosCache = new PathTypeCache();
++    public final gg.shrekmc.pathfinding.RegionPathCache shrekPathCache = new gg.shrekmc.pathfinding.RegionPathCache(); // Shrek - faster pathfinding
+     public final List<LevelChunk> temporaryChunkTickList = new it.unimi.dsi.fastutil.objects.ObjectArrayList<>(); // Canvas - optimized collection
+     public final Set<ChunkHolder> chunkHoldersToBroadcast = new ReferenceLinkedOpenHashSet<>();
+ 
+@@ -506,6 +_,10 @@
          this.wireHandler = new alternate.current.wire.WireHandler(world);
-         this.turbo = new io.papermc.paper.redstone.RedstoneWireTurbo((RedStoneWireBlock)Blocks.REDSTONE_WIRE);
+         this.turbo = new io.papermc.paper.redstone.RedstoneWireTurbo((RedstoneWireBlock)Blocks.REDSTONE_WIRE);
          this.regionData = regionData;
 +        this.shrekBlockStateChangeTracker = new me.samsuik.sakura.tracking.block_change.BlockStateChangeTracker(world); // Shrek - per-region block state watchers
 +        this.shrekDurableBlockManager = new me.samsuik.sakura.explosion.DurableBlockManager(world); // Shrek - explosion durable blocks
@@ -60,10 +67,13 @@
  
          // tasks may be drained before the region ticks, so we must set up the tick data early just in case
          this.updateTickData();
-@@ -726,6 +_,29 @@ public final class RegionizedWorldData {
-         }
-     }
- 
+@@ -723,6 +_,29 @@
+             }
+         } finally {
+             iterator.finishedIterating();
++        }
++    }
++
 +    public IteratorSafeOrderedReferenceSet<Entity> tickingEntities() {
 +        return this.entityTickList;
 +    }
@@ -84,9 +94,6 @@
 +                this.entityTickList.size(),
 +                io.papermc.paper.threadedregions.TickRegionScheduler.getTickRate()
 +            );
-+        }
-+    }
-+
-     public void addEntity(final @NonNull Entity entity) {
-         if (!TickThread.isTickThreadFor(this.world, entity.chunkPosition())) {
-             throw new IllegalArgumentException("Entity " + entity + " is not under this region's control");
+         }
+     }
+ 

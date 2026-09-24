@@ -1,8 +1,8 @@
 --- a/net/minecraft/world/level/block/ChestBlock.java
 +++ b/net/minecraft/world/level/block/ChestBlock.java
-@@ -162,6 +_,15 @@ public class ChestBlock extends AbstractChestBlock<ChestBlockEntity> implements
-         return CODEC;
-     }
+@@ -148,6 +_,15 @@
+         }
+     };
  
 +    // Shrek start - state watchers
 +    private void changedBlockState(final LevelReader level, final BlockPos pos) {
@@ -16,7 +16,7 @@
      protected ChestBlock(
          final Supplier<BlockEntityType<? extends ChestBlockEntity>> blockEntityType,
          final SoundEvent openSound,
-@@ -204,9 +_,11 @@ public class ChestBlock extends AbstractChestBlock<ChestBlockEntity> implements
+@@ -190,9 +_,11 @@
                  && neighbourType != ChestType.SINGLE
                  && state.getValue(FACING) == neighbourState.getValue(FACING)
                  && getConnectedDirection(neighbourState) == directionToNeighbour.getOpposite()) {

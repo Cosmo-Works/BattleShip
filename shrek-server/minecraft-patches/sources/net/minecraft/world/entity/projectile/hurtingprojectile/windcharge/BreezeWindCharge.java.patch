@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/entity/projectile/hurtingprojectile/windcharge/BreezeWindCharge.java
 +++ b/net/minecraft/world/entity/projectile/hurtingprojectile/windcharge/BreezeWindCharge.java
-@@ -22,6 +_,7 @@ public class BreezeWindCharge extends AbstractWindCharge {
+@@ -22,6 +_,7 @@
  
      @Override
      public void explode(final Vec3 position) {

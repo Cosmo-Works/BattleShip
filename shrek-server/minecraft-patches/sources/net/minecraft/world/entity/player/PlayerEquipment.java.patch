@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/entity/player/PlayerEquipment.java
 +++ b/net/minecraft/world/entity/player/PlayerEquipment.java
-@@ -13,6 +_,7 @@ public class PlayerEquipment extends EntityEquipment {
+@@ -13,6 +_,7 @@
  
      @Override
      public ItemStack set(final EquipmentSlot slot, final ItemStack itemStack) {

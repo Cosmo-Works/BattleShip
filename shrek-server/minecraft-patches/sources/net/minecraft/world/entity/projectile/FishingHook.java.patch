@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/entity/projectile/FishingHook.java
 +++ b/net/minecraft/world/entity/projectile/FishingHook.java
-@@ -306,6 +_,10 @@ public class FishingHook extends Projectile {
+@@ -306,6 +_,10 @@
          if (!this.level().isClientSide()) {
              this.setHookedEntity(hitResult.getEntity());
          }
@@ -11,11 +11,11 @@
      }
  
      @Override
-@@ -603,7 +_,7 @@ public class FishingHook extends Projectile {
+@@ -608,7 +_,7 @@
  
      public void pullEntity(final Entity entity) {
          Entity owner = this.getOwner();
--        if (owner != null) {
+-        if (owner != null && entity.canSimulateMovement()) {
 +        if (owner != null && (this.level().shrekConfig().players.fishingHooksPullEntities || entity instanceof ItemEntity)) {
              Vec3 delta = new Vec3(owner.getX() - this.getX(), owner.getY() - this.getY(), owner.getZ() - this.getZ()).scale(0.1);
              entity.setDeltaMovement(entity.getDeltaMovement().add(delta));

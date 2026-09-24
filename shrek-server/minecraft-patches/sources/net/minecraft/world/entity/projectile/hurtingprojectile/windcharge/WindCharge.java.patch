@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/entity/projectile/hurtingprojectile/windcharge/WindCharge.java
 +++ b/net/minecraft/world/entity/projectile/hurtingprojectile/windcharge/WindCharge.java
-@@ -28,6 +_,13 @@ public class WindCharge extends AbstractWindCharge {
+@@ -28,6 +_,13 @@
      private static final float MIN_CAMERA_DISTANCE_SQUARED = Mth.square(3.5F);
      private int noDeflectTicks = 5;
  
@@ -14,7 +14,7 @@
      public WindCharge(final EntityType<? extends AbstractWindCharge> type, final Level level) {
          super(type, level);
      }
-@@ -60,6 +_,7 @@ public class WindCharge extends AbstractWindCharge {
+@@ -61,6 +_,7 @@
  
      @Override
      public void explode(final Vec3 position) {

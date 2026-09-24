@@ -1,8 +1,8 @@
 --- a/net/minecraft/world/level/block/LadderBlock.java
 +++ b/net/minecraft/world/level/block/LadderBlock.java
-@@ -33,6 +_,11 @@ public class LadderBlock extends Block implements SimpleWaterloggedBlock {
-         return CODEC;
-     }
+@@ -26,6 +_,11 @@
+     public static final BooleanProperty WATERLOGGED = BlockStateProperties.WATERLOGGED;
+     public static final Map<Direction, VoxelShape> SHAPES = Shapes.rotateHorizontal(Block.boxZ(16.0, 13.0, 16.0));
  
 +    @Override
 +    public boolean hasDynamicShape() {
@@ -12,7 +12,7 @@
      protected LadderBlock(final BlockBehaviour.Properties properties) {
          super(properties);
          this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(WATERLOGGED, false));
-@@ -40,7 +_,7 @@ public class LadderBlock extends Block implements SimpleWaterloggedBlock {
+@@ -33,7 +_,7 @@
  
      @Override
      protected VoxelShape getShape(final BlockState state, final BlockGetter level, final BlockPos pos, final CollisionContext context) {

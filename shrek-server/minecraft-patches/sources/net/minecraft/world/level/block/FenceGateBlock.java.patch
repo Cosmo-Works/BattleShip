@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/level/block/FenceGateBlock.java
 +++ b/net/minecraft/world/level/block/FenceGateBlock.java
-@@ -184,13 +_,15 @@ public class FenceGateBlock extends HorizontalDirectionalBlock {
+@@ -174,13 +_,15 @@
      ) {
          if (!level.isClientSide()) {
              boolean hasPower = level.hasNeighborSignal(pos);

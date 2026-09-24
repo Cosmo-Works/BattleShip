@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/level/block/piston/PistonMovingBlockEntity.java
 +++ b/net/minecraft/world/level/block/piston/PistonMovingBlockEntity.java
-@@ -57,6 +_,52 @@ public class PistonMovingBlockEntity extends BlockEntity {
+@@ -55,6 +_,52 @@
      }
  
      // Folia end - region threading
@@ -53,9 +53,9 @@
      public PistonMovingBlockEntity(final BlockPos worldPosition, final BlockState blockState) {
          super(BlockEntityTypes.PISTON, worldPosition, blockState);
      }
-@@ -180,6 +_,12 @@ public class PistonMovingBlockEntity extends BlockEntity {
+@@ -163,6 +_,12 @@
  
-                     double delta = 0.0;
+                         double delta = 0.0;
  
 +                    // Shrek start - configure server mechanics
 +                    if (entity.mechanicsTarget().before(me.samsuik.sakura.mechanics.MechanicVersion.v1_11)) {
@@ -63,10 +63,10 @@
 +                        return;
 +                    }
 +                    // Shrek end - configure server mechanics
-                     for (AABB shapeAabb : shapeAabbs) {
-                         AABB movingAABB = PistonMath.getMovementArea(moveByPositionAndProgress(pos, shapeAabb, self), movement, deltaProgress);
-                         AABB entityAabb = entity.getBoundingBox();
-@@ -206,9 +_,24 @@ public class PistonMovingBlockEntity extends BlockEntity {
+                         for (AABB shapeAabb : shapeAabbs) {
+                             AABB movingAABB = PistonMath.getMovementArea(moveByPositionAndProgress(pos, shapeAabb, self), movement, deltaProgress);
+                             AABB entityAabb = entity.getBoundingBox();
+@@ -190,9 +_,24 @@
      private static void moveEntityByPiston(final Direction pistonDirection, final Entity entity, final double delta, final Direction movement) {
          NOCLIP.set(pistonDirection);
          Vec3 previousPos = entity.position();
@@ -93,7 +93,7 @@
          NOCLIP.set(null);
      }
  
-@@ -322,12 +_,21 @@ public class PistonMovingBlockEntity extends BlockEntity {
+@@ -306,12 +_,21 @@
      }
  
      public static void tick(final Level level, final BlockPos pos, final BlockState state, final PistonMovingBlockEntity entity) {
@@ -115,7 +115,7 @@
                  level.removeBlockEntity(pos);
                  entity.setRemoved();
                  if (level.getBlockState(pos).is(Blocks.MOVING_PISTON)) {
-@@ -347,12 +_,22 @@ public class PistonMovingBlockEntity extends BlockEntity {
+@@ -331,12 +_,22 @@
              }
          } else {
              float newProgress = entity.progress + 0.5F;

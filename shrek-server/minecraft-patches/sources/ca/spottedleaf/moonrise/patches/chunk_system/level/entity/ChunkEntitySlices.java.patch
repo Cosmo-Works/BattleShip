@@ -1,6 +1,6 @@
 --- a/ca/spottedleaf/moonrise/patches/chunk_system/level/entity/ChunkEntitySlices.java
 +++ b/ca/spottedleaf/moonrise/patches/chunk_system/level/entity/ChunkEntitySlices.java
-@@ -66,6 +_,23 @@ public final class ChunkEntitySlices {
+@@ -66,6 +_,23 @@
          this.isTransient = value;
      }
  
@@ -24,7 +24,7 @@
      public ChunkEntitySlices(final Level world, final int chunkX, final int chunkZ, final FullChunkStatus status,
                               final ChunkData chunkData, final int minSection, final int maxSection) { // inclusive, inclusive
          this.minSection = minSection;
-@@ -336,7 +_,12 @@ public final class ChunkEntitySlices {
+@@ -336,7 +_,12 @@
  
      public boolean getEntities(final Entity except, final AABB box, final List<Entity> into, final Predicate<? super Entity> predicate,
                                 final int maxCount) {
@@ -38,7 +38,7 @@
      }
  
      public <T extends Entity> void getEntities(final EntityType<?> type, final AABB box, final List<? super T> into,
-@@ -350,10 +_,15 @@ public final class ChunkEntitySlices {
+@@ -350,10 +_,15 @@
  
      public <T extends Entity> boolean getEntities(final EntityType<?> type, final AABB box, final List<? super T> into,
                                                    final Predicate<? super T> predicate, final int maxCount) {
@@ -55,7 +55,7 @@
          }
  
          return false;
-@@ -395,12 +_,17 @@ public final class ChunkEntitySlices {
+@@ -395,12 +_,17 @@
  
      public <T extends Entity> boolean getEntities(final Class<? extends T> clazz, final Entity except, final AABB box, final List<? super T> into,
                                                    final Predicate<? super T> predicate, final int maxCount) {
@@ -75,7 +75,7 @@
          }
      }
  
-@@ -509,6 +_,11 @@ public final class ChunkEntitySlices {
+@@ -509,6 +_,11 @@
              ++this.count;
          }
  
@@ -87,7 +87,7 @@
          public void removeEntity(final Entity entity, final int sectionIndex) {
              final BasicEntityList<Entity> list = this.entitiesBySection[sectionIndex];
  
-@@ -564,6 +_,11 @@ public final class ChunkEntitySlices {
+@@ -564,6 +_,11 @@
  
          public boolean getEntitiesLimited(final Entity except, final AABB box, final List<Entity> into, final Predicate<? super Entity> predicate,
                                            final int maxCount) {
@@ -99,7 +99,7 @@
              if (this.count == 0) {
                  return false;
              }
-@@ -586,8 +_,19 @@ public final class ChunkEntitySlices {
+@@ -586,8 +_,19 @@
  
                  final Entity[] storage = list.storage;
  

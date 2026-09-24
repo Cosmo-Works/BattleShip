@@ -1,15 +1,15 @@
 --- a/net/minecraft/server/level/ServerEntity.java
 +++ b/net/minecraft/server/level/ServerEntity.java
-@@ -142,7 +_,7 @@ public class ServerEntity {
+@@ -154,7 +_,7 @@
              this.entity.syncPosition = false;
          }
  
--        if (this.forceStateResync || this.tickCount % this.updateInterval == 0 || this.entity.needsSync || this.entity.getEntityData().isDirty()) { // Paper - fix desync when a player is added to the tracker
-+        if (this.forceStateResync || this.tickCount % this.updateInterval == 0 || this.entity.needsSync || this.entity.getEntityData().isForeignDirty()) { // Shrek - packet obfuscation and reduction // Paper - fix desync when a player is added to the tracker
+-        if (this.forceStateResync || this.entity.needsSync || this.updateInterval.test(this.tickCount) || this.entity.getEntityData().isDirty()) { // Paper - fix desync when a player is added to the tracker
++        if (this.forceStateResync || this.updateInterval.test(this.tickCount) || this.entity.needsSync || this.entity.getEntityData().isForeignDirty()) { // Shrek - packet obfuscation and reduction // Paper - fix desync when a player is added to the tracker
              byte yRotn = Mth.packDegrees(this.entity.getYRot());
              byte xRotn = Mth.packDegrees(this.entity.getXRot());
              boolean shouldSendRotation = Math.abs(yRotn - this.lastSentYRot) >= 1 || Math.abs(xRotn - this.lastSentXRot) >= 1;
-@@ -457,7 +_,14 @@ public class ServerEntity {
+@@ -470,7 +_,14 @@
          List<SynchedEntityData.DataValue<?>> packedValues = entityData.packDirty();
          if (packedValues != null) {
              this.trackedDataValues = entityData.getNonDefaultValues();

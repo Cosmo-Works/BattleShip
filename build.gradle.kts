@@ -3,7 +3,7 @@ import org.gradle.api.tasks.testing.logging.TestLogEvent
 
 plugins {
     java
-    id("io.canvasmc.weaver.patcher") version "2.4.5" // always keep in check with canvas's actual used release
+    id("io.canvasmc.weaver.patcher") version "2.5.1" // always keep in check with canvas's actual used release
 }
 
 val paperMavenPublicUrl = "https://repo.papermc.io/repository/maven-public/"
@@ -14,7 +14,8 @@ paperweight {
     // It controls whether empty patches should be deleted automatically or kept
     // the default value is true but it can sometimes break git's 3way apply in rare cases, so it's left configurable
     // NOTE: this option is duplicated in the server build file, so make sure to set it to what you like too. What you set here doesn't get respected there automatically.
-    filterPatches = true
+    filterPatches = false
+    gitFilePatches = false
     upstreams.canvas {
         ref = providers.gradleProperty("canvasCommit")
 

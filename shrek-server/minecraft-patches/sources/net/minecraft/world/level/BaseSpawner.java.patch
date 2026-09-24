@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/level/BaseSpawner.java
 +++ b/net/minecraft/world/level/BaseSpawner.java
-@@ -69,57 +_,27 @@ public abstract class BaseSpawner {
+@@ -70,57 +_,27 @@
      // able to fetch the current region and pull the Canvas config from there
  
      private int getMinSpawnDelayDefault() {
@@ -64,7 +64,7 @@
      }
      // Canvas end - spawner configs
  
-@@ -158,7 +_,7 @@ public abstract class BaseSpawner {
+@@ -164,7 +_,7 @@
          tickDelay = level.paperConfig().tickRates.mobSpawner;
          if (tickDelay == -1) { return; } // If disabled
          // Paper end - Configurable mob spawner tick rate
@@ -73,7 +73,7 @@
              if (this.spawnDelay < -tickDelay) { // Paper - Configurable mob spawner tick rate
                  this.delay(level, pos);
              }
-@@ -166,6 +_,11 @@ public abstract class BaseSpawner {
+@@ -172,6 +_,11 @@
              if (this.spawnDelay > 0) {
                  this.spawnDelay -= tickDelay; // Paper - Configurable mob spawner tick rate
              } else {
@@ -85,7 +85,7 @@
                  boolean delay = false;
                  RandomSource random = level.getRandom();
                  SpawnData nextSpawnData = this.getOrCreateNextSpawnData(level, random, pos);
-@@ -198,7 +_,7 @@ public abstract class BaseSpawner {
+@@ -204,7 +_,7 @@
                                  if (!customSpawnRules.isValidPosition(spawnBlockPos, level)) {
                                      continue;
                                  }
@@ -94,7 +94,7 @@
                                  continue;
                              }
  
-@@ -226,7 +_,7 @@ public abstract class BaseSpawner {
+@@ -232,7 +_,7 @@
                                  return;
                              }
  
@@ -103,7 +103,7 @@
                                      EntityTypeTest.forExactClass(entity.getClass()),
                                      new AABB(pos.getX(), pos.getY(), pos.getZ(), pos.getX() + 1, pos.getY() + 1, pos.getZ() + 1).inflate(this.spawnRange),
                                      EntitySelector.NO_SPECTATORS
-@@ -239,8 +_,8 @@ public abstract class BaseSpawner {
+@@ -245,8 +_,8 @@
  
                              entity.snapTo(entity.getX(), entity.getY(), entity.getZ(), random.nextFloat() * 360.0F, 0.0F);
                              if (entity instanceof Mob mob) {

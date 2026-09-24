@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/level/redstone/CollectingNeighborUpdater.java
 +++ b/net/minecraft/world/level/redstone/CollectingNeighborUpdater.java
-@@ -23,6 +_,11 @@ public class CollectingNeighborUpdater implements NeighborUpdater {
+@@ -23,6 +_,11 @@
      private int count = 0;
      private @Nullable Consumer<BlockPos> debugListener;
  
@@ -12,7 +12,7 @@
      public CollectingNeighborUpdater(final Level level, final int maxChainedNeighborUpdates) {
          this.level = level;
          this.maxChainedNeighborUpdates = maxChainedNeighborUpdates;
-@@ -106,6 +_,7 @@ public class CollectingNeighborUpdater implements NeighborUpdater {
+@@ -106,6 +_,7 @@
                  }
              }
          } finally {

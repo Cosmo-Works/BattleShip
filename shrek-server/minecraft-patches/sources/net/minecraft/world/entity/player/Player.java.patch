@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/entity/player/Player.java
 +++ b/net/minecraft/world/entity/player/Player.java
-@@ -186,6 +_,36 @@ public abstract class Player extends Avatar implements ContainerUser {
+@@ -186,6 +_,36 @@
          return (org.bukkit.craftbukkit.entity.CraftHumanEntity) super.getBukkitEntity();
      }
      // CraftBukkit end
@@ -37,7 +37,7 @@
  
      public Player(final Level level, final GameProfile gameProfile) {
          super(EntityTypes.PLAYER, level);
-@@ -545,7 +_,7 @@ public abstract class Player extends Avatar implements ContainerUser {
+@@ -545,7 +_,7 @@
  
      public void increaseScore(final int amount) {
          int score = this.getScore();
@@ -46,7 +46,7 @@
      }
  
      public void startAutoSpinAttack(final int activationTicks, final float dmg, final ItemStack itemStackUsed) {
-@@ -705,6 +_,8 @@ public abstract class Player extends Avatar implements ContainerUser {
+@@ -697,6 +_,8 @@
      public boolean isInvulnerableTo(final ServerLevel level, final DamageSource source) {
          if (super.isInvulnerableTo(level, source)) {
              return true;
@@ -55,7 +55,7 @@
          } else if (source.is(DamageTypeTags.IS_DROWNING)) {
              return !level.getGameRules().get(GameRules.DROWNING_DAMAGE);
          } else if (source.is(DamageTypeTags.IS_FALL)) {
-@@ -746,6 +_,11 @@ public abstract class Player extends Avatar implements ContainerUser {
+@@ -738,6 +_,11 @@
              }
          }
  
@@ -67,7 +67,7 @@
          // return damage != 0.0F && super.hurtServer(level, source, damage);
          // CraftBukkit start - Don't filter out 0 damage
          boolean damaged = super.hurtServer(level, source, damage);
-@@ -1031,19 +_,26 @@ public abstract class Player extends Avatar implements ContainerUser {
+@@ -1030,19 +_,26 @@
  
          if (playerAttackEntityEvent.callEvent() && willAttack) { // Logic moved to willAttack local variable.
          // Paper end - PlayerAttackEntityEvent
@@ -97,7 +97,7 @@
                          this.playServerSideSound(SoundEvents.PLAYER_ATTACK_KNOCKBACK);
                          knockbackAttack = true;
                      } else {
-@@ -1069,10 +_,17 @@ public abstract class Player extends Avatar implements ContainerUser {
+@@ -1068,10 +_,17 @@
                      Vec3 oldMovement = entity.getDeltaMovement();
                      boolean wasHurt = entity.hurtOrSimulate(damageSource, totalDamage);
                      if (wasHurt) {
@@ -118,7 +118,7 @@
                              this.doSweepAttack(entity, baseDamage, damageSource, attackStrengthScale);
                          }
  
-@@ -1098,6 +_,9 @@ public abstract class Player extends Avatar implements ContainerUser {
+@@ -1097,6 +_,9 @@
      }
  
      private void playServerSideSound(final SoundEvent sound) {
@@ -128,7 +128,7 @@
          sendSoundEffect(this, this.getX(), this.getY(), this.getZ(), sound, this.getSoundSource(), 1.0F, 1.0F); // Paper - send while respecting visibility
      }
  
-@@ -1129,7 +_,7 @@ public abstract class Player extends Avatar implements ContainerUser {
+@@ -1128,7 +_,7 @@
              && !this.isMobilityRestricted()
              && !this.isPassenger()
              && entity instanceof LivingEntity
@@ -137,7 +137,7 @@
      }
  
      private boolean isSweepAttack(final boolean fullStrengthAttack, final boolean criticalAttack, final boolean knockbackAttack) {
-@@ -1170,7 +_,7 @@ public abstract class Player extends Avatar implements ContainerUser {
+@@ -1169,7 +_,7 @@
          if (entity instanceof LivingEntity livingEntity) {
              float actualDamage = oldLivingEntityHealth - livingEntity.getHealth();
              this.awardStat(Stats.DAMAGE_DEALT, Math.round(actualDamage * 10.0F));
@@ -146,11 +146,10 @@
                  int count = (int)(actualDamage * 0.5);
                  ((ServerLevel)this.level())
                      .sendParticles(ParticleTypes.DAMAGE_INDICATOR, entity.getX(), entity.getY(0.5), entity.getZ(), count, 0.1, 0.0, 0.1, 0.2);
-@@ -1218,9 +_,32 @@ public abstract class Player extends Avatar implements ContainerUser {
-         final DamageSource damageSource,
+@@ -1218,8 +_,31 @@
          final float damage,
          final boolean comesFromEffect
-+    ) {
+     ) {
 +        this.sakura$causeExtraKnockback(entity, knockbackAmount, oldMovement, damageSource, damage, comesFromEffect, true);
 +    }
 +
@@ -162,7 +161,7 @@
 +        final float damage,
 +        final boolean comesFromEffect,
 +        final boolean bypassKnockbackDelay
-     ) {
++    ) {
          if (knockbackAmount > 0.0F) {
 -            if (entity instanceof LivingEntity livingTarget) {
 +            final long millis = System.currentTimeMillis();
@@ -180,7 +179,7 @@
                  livingTarget.knockback(
                      knockbackAmount, Mth.sin(this.getYRot() * Mth.DEG_TO_RAD), -Mth.cos(this.getYRot() * Mth.DEG_TO_RAD), damageSource, damage, comesFromEffect, this, io.papermc.paper.event.entity.EntityKnockbackEvent.Cause.ENTITY_ATTACK // Paper - knockback events
                  );
-@@ -1292,7 +_,13 @@ public abstract class Player extends Avatar implements ContainerUser {
+@@ -1291,7 +_,13 @@
                      if (nearby.hurtServer(serverLevel, damageSource.knownCause(org.bukkit.event.entity.EntityDamageEvent.DamageCause.ENTITY_SWEEP_ATTACK), enchantedDamage) && !nearby.lastDamageCancelled) {
                          // Paper end - Only apply knockback if the event is not canceled
                          nearby.knockback(

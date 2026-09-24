@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/level/chunk/storage/RegionFile.java
 +++ b/net/minecraft/world/level/chunk/storage/RegionFile.java
-@@ -22,7 +_,7 @@ import net.minecraft.world.level.ChunkPos;
+@@ -22,7 +_,7 @@
  import org.jspecify.annotations.Nullable;
  import org.slf4j.Logger;
  
@@ -9,7 +9,7 @@
      private static final Logger LOGGER = LogUtils.getLogger();
      public static final int MAX_CHUNK_SIZE = 500 * 1024 * 1024; // Paper - don't write garbage data to disk if writing serialization fails
      private static final int SECTOR_BYTES = 4096;
-@@ -907,8 +_,8 @@ public class RegionFile implements AutoCloseable, ca.spottedleaf.moonrise.patche
+@@ -907,8 +_,8 @@
          }
  
          @Override

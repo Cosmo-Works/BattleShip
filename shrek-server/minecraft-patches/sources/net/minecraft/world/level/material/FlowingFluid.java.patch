@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/level/material/FlowingFluid.java
 +++ b/net/minecraft/world/level/material/FlowingFluid.java
-@@ -153,12 +_,12 @@ public abstract class FlowingFluid extends Fluid {
+@@ -152,12 +_,12 @@
      }
  
      protected void spread(final ServerLevel level, final BlockPos pos, final BlockState state, final FluidState fluidState) {
@@ -15,7 +15,7 @@
                  Fluid newBelowFluidType = newBelowFluid.getType();
                  if (belowFluid.canBeReplacedWith(level, belowPos, newBelowFluidType, Direction.DOWN)
                      && canHoldSpecificFluid(level, belowPos, belowState, newBelowFluidType)) {
-@@ -201,6 +_,9 @@ public abstract class FlowingFluid extends Fluid {
+@@ -200,6 +_,9 @@
                  BlockPos neighborPos = pos.relative(spread);
                  final BlockState neighborState = level.getBlockStateIfLoaded(neighborPos); // Paper - Prevent chunk loading from fluid flowing
                  if (neighborState == null) continue; // Paper - Prevent chunk loading from fluid flowing
@@ -25,7 +25,7 @@
                  // CraftBukkit start
                  org.bukkit.block.Block source = org.bukkit.craftbukkit.block.CraftBlock.at(level, pos);
                  org.bukkit.event.block.BlockFromToEvent event = new org.bukkit.event.block.BlockFromToEvent(source, org.bukkit.craftbukkit.block.CraftBlock.notchToBlockFace(spread));
-@@ -215,17 +_,76 @@ public abstract class FlowingFluid extends Fluid {
+@@ -214,17 +_,76 @@
          }
      }
  
@@ -104,7 +104,7 @@
                  if (fluidState.isSource()) {
                      neighbourSources++;
                  }
-@@ -238,19 +_,11 @@ public abstract class FlowingFluid extends Fluid {
+@@ -237,19 +_,11 @@
              BlockState belowState = level.getBlockState(mutablePos.setWithOffset(pos, Direction.DOWN));
              FluidState belowFluid = belowState.getFluidState();
              if (belowState.isSolid() || this.isSourceBlockOfThisType(belowFluid)) {
@@ -126,7 +126,7 @@
      }
  
      // Paper start - fluid method optimisations
-@@ -523,7 +_,7 @@ public abstract class FlowingFluid extends Fluid {
+@@ -522,7 +_,7 @@
              if (testState == null) continue; // Paper - Prevent chunk loading from fluid flowing
              FluidState testFluidState = testState.getFluidState();
              if (this.canMaybePassThrough(level, pos, state, direction, testPos, testState, testFluidState)) {
@@ -135,7 +135,7 @@
                  if (canHoldSpecificFluid(level, testPos, testState, newFluid.getType())) {
                      if (context == null) {
                          context = new FlowingFluid.SpreadContext(level, pos);
-@@ -574,6 +_,13 @@ public abstract class FlowingFluid extends Fluid {
+@@ -563,6 +_,13 @@
      }
  
      public static boolean canHoldSpecificFluid(final BlockGetter level, final BlockPos pos, final BlockState state, final Fluid newFluid) {
@@ -149,7 +149,7 @@
          return !(state.getBlock() instanceof LiquidBlockContainer container) || container.canPlaceLiquid(null, level, pos, state, newFluid);
      }
  
-@@ -586,7 +_,7 @@ public abstract class FlowingFluid extends Fluid {
+@@ -575,7 +_,7 @@
      @Override
      public void tick(final ServerLevel level, final BlockPos pos, BlockState blockState, FluidState fluidState) {
          if (!fluidState.isSource()) {

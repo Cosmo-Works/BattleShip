@@ -1,6 +1,14 @@
 --- a/net/minecraft/world/entity/Mob.java
 +++ b/net/minecraft/world/entity/Mob.java
-@@ -153,6 +_,23 @@ public abstract class Mob extends LivingEntity implements Targeting, EquipmentUs
+@@ -146,6 +_,7 @@
+     private DropChances dropChances = DropChances.DEFAULT;
+     private boolean canPickUpLoot = false;
+     public boolean persistenceRequired = false;
++    public int pickedUpEquipment;
+     private final Map<PathType, Float> pathfindingMalus = Maps.newEnumMap(PathType.class);
+     public Optional<ResourceKey<LootTable>> lootTable = Optional.empty();
+     public long lootTableSeed;
+@@ -154,6 +_,23 @@
      private int homeRadius = -1;
      public boolean aware = true; // CraftBukkit
  
@@ -24,7 +32,7 @@
      protected Mob(final EntityType<? extends Mob> type, final Level level) {
          super(type, level);
          this.goalSelector = new GoalSelector();
-@@ -166,6 +_,9 @@ public abstract class Mob extends LivingEntity implements Targeting, EquipmentUs
+@@ -167,6 +_,9 @@
          if (level instanceof ServerLevel) {
              this.registerGoals();
          }
@@ -34,3 +42,106 @@
      }
  
      protected void registerGoals() {
+@@ -219,10 +_,10 @@
+     public void inactiveTick() {
+         super.inactiveTick();
+         if (!this.aware) return; // Paper - Do not tick AI for inactive unaware mobs
+-        if (this.goalSelector.inactiveTick()) {
++        if (this.goalSelector.inactiveTick(me.samsuik.sakura.entity.BrainActivation.goalSelectorRate(this, true))) {
+             this.goalSelector.tick();
+         }
+-        if (this.targetSelector.inactiveTick()) {
++        if (this.targetSelector.inactiveTick(me.samsuik.sakura.entity.BrainActivation.goalSelectorRate(this, true))) {
+             this.targetSelector.tick();
+         }
+     }
+@@ -443,6 +_,9 @@
+         super.addAdditionalSaveData(output);
+         output.putBoolean("CanPickUpLoot", this.canPickUpLoot());
+         output.putBoolean("PersistenceRequired", this.persistenceRequired);
++        if (this.pickedUpEquipment != 0) {
++            output.putInt("Shrek.PickedUpEquipment", this.pickedUpEquipment);
++        }
+         if (!this.dropChances.equals(DropChances.DEFAULT)) {
+             output.store("drop_chances", DropChances.CODEC, this.dropChances);
+         }
+@@ -477,6 +_,7 @@
+         if (isLevelAtLeast(input, 1) || persistenceRequired) {
+             this.persistenceRequired = persistenceRequired;
+         }
++        this.pickedUpEquipment = input.getIntOr("Shrek.PickedUpEquipment", 0);
+         // CraftBukkit end
+         this.dropChances = input.read("drop_chances", DropChances.CODEC).orElse(DropChances.DEFAULT);
+         this.readLeashData(input);
+@@ -644,7 +_,7 @@
+ 
+             ItemStack toEquip = slot.limit(itemStack);
+             this.setItemSlotAndDropWhenKilled(slot, toEquip);
+-            this.persistenceRequired = true;
++            me.samsuik.sakura.entity.PickedLoot.afterPickup(this, slot);
+             return toEquip;
+         } else {
+             return ItemStack.EMPTY;
+@@ -779,7 +_,7 @@
+     @Override
+     public void checkDespawn() {
+         if (this.level().getDifficulty() == Difficulty.PEACEFUL && !this.getType().isAllowedInPeaceful()) {
+-            this.discard(EntityRemoveEvent.Cause.DESPAWN); // CraftBukkit - add Bukkit remove cause
++            this.despawnNaturally();
+         } else {
+             boolean isPersistent = this.isPersistenceRequired() || this.requiresCustomPersistence();
+             Entity player = this.level().findNearbyPlayer(this, -1.0, EntitySelector.PLAYER_AFFECTS_SPAWNING); // Paper - Affects Spawning API
+@@ -794,7 +_,7 @@
+                 final double distanceSquared = dxSqr + dzSqr + dySqr;
+                 // Despawn if hard/soft limit is exceeded
+                 if (!isPersistent && despawnRangePair.hard().shouldDespawn(shape, dxSqr, dySqr, dzSqr, dy) && this.removeWhenFarAway(distanceSquared)) {
+-                    this.discard(EntityRemoveEvent.Cause.DESPAWN); // CraftBukkit - add Bukkit remove cause
++                    this.despawnNaturally();
+                 }
+ 
+                 if (despawnRangePair.soft().shouldDespawn(shape, dxSqr, dySqr, dzSqr, dy)) {
+@@ -802,7 +_,7 @@
+                         && this.noActionTime > 600
+                         && this.random.nextInt(800) == 0
+                         && this.removeWhenFarAway(distanceSquared)) {
+-                        this.discard(EntityRemoveEvent.Cause.DESPAWN); // CraftBukkit - add Bukkit remove cause
++                        this.despawnNaturally();
+                     }
+                 } else {
+                     // Paper end - Configurable despawn distances
+@@ -812,6 +_,11 @@
+         }
+     }
+ 
++    private void despawnNaturally() {
++        me.samsuik.sakura.entity.PickedLoot.dropOnDespawn(this);
++        this.discard(EntityRemoveEvent.Cause.DESPAWN);
++    }
++
+     @Override
+     protected final void serverAiStep() {
+         this.noActionTime++;
+@@ -827,11 +_,19 @@
+         this.sensing.tick();
+         int idBasedTickCount = this.tickCount + this.getId();
+         if (idBasedTickCount % 2 != 0 && this.tickCount > 1) {
+-            this.targetSelector.tickRunningGoals(false);
+-            this.goalSelector.tickRunningGoals(false);
++            if (this.targetSelector.inactiveTick(me.samsuik.sakura.entity.BrainActivation.goalSelectorRate(this, false))) {
++                this.targetSelector.tickRunningGoals(false);
++            }
++            if (this.goalSelector.inactiveTick(me.samsuik.sakura.entity.BrainActivation.goalSelectorRate(this, false))) {
++                this.goalSelector.tickRunningGoals(false);
++            }
+         } else {
+-            this.targetSelector.tick();
+-            this.goalSelector.tick();
++            if (this.targetSelector.inactiveTick(me.samsuik.sakura.entity.BrainActivation.goalSelectorRate(this, false))) {
++                this.targetSelector.tick();
++            }
++            if (this.goalSelector.inactiveTick(me.samsuik.sakura.entity.BrainActivation.goalSelectorRate(this, false))) {
++                this.goalSelector.tick();
++            }
+         }
+ 
+         this.navigation.tick();

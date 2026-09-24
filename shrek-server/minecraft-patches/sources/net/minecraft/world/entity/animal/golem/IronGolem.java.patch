@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/entity/animal/golem/IronGolem.java
 +++ b/net/minecraft/world/entity/animal/golem/IronGolem.java
-@@ -60,6 +_,11 @@ public class IronGolem extends AbstractGolem implements NeutralMob {
+@@ -60,6 +_,11 @@
      private long persistentAngerEndTime;
      private @Nullable EntityReference<LivingEntity> persistentAngerTarget;
  
