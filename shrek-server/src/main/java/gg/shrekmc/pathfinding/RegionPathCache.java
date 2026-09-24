@@ -33,6 +33,7 @@ public final class RegionPathCache {
     private final Long2LongOpenHashMap sectionVersions = new Long2LongOpenHashMap();
     private final PathPositionCache staticTypes = new PathPositionCache(1 << 14);
     private final Object2ObjectOpenHashMap<MobProfile, PathPositionCache> mobTypes = new Object2ObjectOpenHashMap<>();
+    private final PathResultCache results = new PathResultCache();
 
     private long epoch;
 
@@ -86,6 +87,15 @@ public final class RegionPathCache {
         this.sectionVersions.clear();
         this.staticTypes.clear();
         this.mobTypes.clear();
+        this.results.clear();
+    }
+
+    public PathResultCache results() {
+        return this.results;
+    }
+
+    public static boolean freshTime(final int time, final int now) {
+        return ((now - time) & TIME_MASK) <= TTL_UNITS;
     }
 
     public static long pack(final int ordinal, final int version, final int time) {

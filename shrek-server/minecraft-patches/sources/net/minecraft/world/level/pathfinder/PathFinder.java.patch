@@ -1,0 +1,30 @@
+--- a/net/minecraft/world/level/pathfinder/PathFinder.java
++++ b/net/minecraft/world/level/pathfinder/PathFinder.java
+@@ -52,6 +_,19 @@
+             return null;
+         }
+ 
++        // Shrek start - faster pathfinding: reuse the result of an identical search over unchanged blocks
++        WalkNodeEvaluator walk = this.nodeEvaluator instanceof WalkNodeEvaluator evaluator && !this.captureDebug.getAsBoolean() ? evaluator : null;
++        gg.shrekmc.pathfinding.PathResultCache.Key resultKey = walk == null ? null
++            : walk.shrek$resultKey(from, targets, maxPathLength, reachRange, (int) (this.maxVisitedNodes * maxVisitedNodesMultiplier));
++        if (resultKey != null) {
++            Path cached = walk.shrek$cachedResult(resultKey);
++            if (cached != null) {
++                this.nodeEvaluator.done();
++                return cached;
++            }
++        }
++        // Shrek end - faster pathfinding
++
+         // Paper start - Perf: remove streams and optimize collection
+         List<Map.Entry<Target, BlockPos>> tos = Lists.newArrayList();
+         for (BlockPos pos : targets) {
+@@ -59,6 +_,7 @@
+         }
+         // Paper end - Perf: remove streams and optimize collection
+         Path path = this.findPath(from, tos, maxPathLength, reachRange, maxVisitedNodesMultiplier);
++        if (resultKey != null) walk.shrek$storeResult(resultKey, path); // Shrek - faster pathfinding
+         this.nodeEvaluator.done();
+         return path;
+     }

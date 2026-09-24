@@ -8,7 +8,7 @@
  import it.unimi.dsi.fastutil.objects.Object2BooleanMap;
  import it.unimi.dsi.fastutil.objects.Object2BooleanOpenHashMap;
  import java.util.EnumSet;
-@@ -30,7 +_,28 @@
+@@ -30,7 +_,31 @@
  public class WalkNodeEvaluator extends NodeEvaluator {
      public static final double SPACE_BETWEEN_WALL_POSTS = 0.5;
      private static final double DEFAULT_MOB_JUMP_HEIGHT = 1.125;
@@ -34,11 +34,14 @@
 +    private gg.shrekmc.pathfinding.RegionPathCache lastProfileRegion;
 +    private gg.shrekmc.pathfinding.PathPositionCache lastProfileTypes;
 +    private boolean footprintVolatile;
++    private int readMinX, readMinY, readMinZ, readMaxX, readMaxY, readMaxZ;
++    private boolean positionSensitive;
++    private gg.shrekmc.pathfinding.RegionPathCache.MobProfile searchProfile;
 +    // Shrek end - faster pathfinding
      private final Object2BooleanMap<AABB> collisionCache = new Object2BooleanOpenHashMap<>();
      private final Node[] reusableNeighbors = new Node[Direction.Plane.HORIZONTAL.length()];
  
-@@ -38,6 +_,26 @@
+@@ -38,6 +_,30 @@
      public void prepare(final PathNavigationRegion level, final Mob entity) {
          super.prepare(level, entity);
          entity.onPathfindingStart();
@@ -61,11 +64,15 @@
 +        this.sectionVersions.clear();
 +        this.profileResolved = false;
 +        this.profileTypes = null;
++        this.searchProfile = null;
++        this.readMinX = this.readMinY = this.readMinZ = Integer.MAX_VALUE;
++        this.readMaxX = this.readMaxY = this.readMaxZ = Integer.MIN_VALUE;
++        this.positionSensitive = false;
 +        // Shrek end - faster pathfinding
      }
  
      @Override
-@@ -48,6 +_,78 @@
+@@ -48,6 +_,211 @@
          super.done();
      }
  
@@ -118,19 +125,152 @@
 +            || this.entityWidth > 4 || this.entityHeight > 4 || this.entityDepth > 4) {
 +            return null;
 +        }
-+        float[] malus = new float[PATH_TYPE_VALUES.length];
-+        for (PathType type : PATH_TYPE_VALUES) {
-+            malus[type.ordinal()] = this.malus(type);
-+        }
-+        gg.shrekmc.pathfinding.RegionPathCache.MobProfile profile = new gg.shrekmc.pathfinding.RegionPathCache.MobProfile(
-+            this.entityWidth, this.entityHeight, this.entityDepth, this.canPassDoors(), this.canOpenDoors(), malus);
-+        if (this.lastProfileRegion != this.regionCache || !profile.equals(this.lastProfile)) {
++        gg.shrekmc.pathfinding.RegionPathCache.MobProfile profile = this.currentProfile();
++        if (this.lastProfileRegion != this.regionCache || profile != this.lastProfile) {
 +            this.lastProfile = profile;
 +            this.lastProfileRegion = this.regionCache;
 +            this.lastProfileTypes = this.regionCache.mobTypes(profile);
 +        }
 +        this.profileTypes = this.lastProfileTypes;
 +        return this.profileTypes;
++    }
++
++    private gg.shrekmc.pathfinding.RegionPathCache.MobProfile currentProfile() {
++        if (this.searchProfile != null) {
++            return this.searchProfile;
++        }
++        float[] malus = new float[PATH_TYPE_VALUES.length];
++        for (PathType type : PATH_TYPE_VALUES) {
++            malus[type.ordinal()] = this.malus(type);
++        }
++        gg.shrekmc.pathfinding.RegionPathCache.MobProfile profile = new gg.shrekmc.pathfinding.RegionPathCache.MobProfile(
++            this.entityWidth, this.entityHeight, this.entityDepth, this.canPassDoors(), this.canOpenDoors(), malus);
++        this.searchProfile = profile.equals(this.lastProfile) ? this.lastProfile : profile;
++        return this.searchProfile;
++    }
++
++    private void trackRead(final int minX, final int minY, final int minZ, final int maxX, final int maxY, final int maxZ) {
++        if (minX < this.readMinX) this.readMinX = minX;
++        if (minY < this.readMinY) this.readMinY = minY;
++        if (minZ < this.readMinZ) this.readMinZ = minZ;
++        if (maxX > this.readMaxX) this.readMaxX = maxX;
++        if (maxY > this.readMaxY) this.readMaxY = maxY;
++        if (maxZ > this.readMaxZ) this.readMaxZ = maxZ;
++    }
++
++    public gg.shrekmc.pathfinding.PathResultCache.@Nullable Key shrek$resultKey(
++        final Node start, final Set<BlockPos> targets, final float maxPathLength, final int reachRange, final int maxVisitedNodes
++    ) {
++        if (this.regionCache == null || this.getClass() != WalkNodeEvaluator.class) {
++            return null;
++        }
++        long[] targetKeys = new long[targets.size()];
++        int index = 0;
++        for (BlockPos target : targets) {
++            targetKeys[index++] = target.asLong();
++        }
++        return new gg.shrekmc.pathfinding.PathResultCache.Key(
++            this.mob.getType(), this.mob.getBbWidth(), this.mob.getBbHeight(), this.currentProfile(), this.canFloat(), this.canWalkOverFences(),
++            this.maxUpStep(), this.maxFallDistance(), BlockPos.asLong(start.x, start.y, start.z),
++            this.mob.blockPosition().asLong(), targetKeys, maxPathLength, reachRange, maxVisitedNodes);
++    }
++
++    public @Nullable Path shrek$cachedResult(final gg.shrekmc.pathfinding.PathResultCache.Key key) {
++        gg.shrekmc.pathfinding.PathResultCache results = this.regionCache.results();
++        gg.shrekmc.pathfinding.PathResultCache.Entry entry = results.get(key);
++        if (entry == null) {
++            return null;
++        }
++        if (!gg.shrekmc.pathfinding.RegionPathCache.freshTime(entry.time(), this.searchTime)) {
++            results.remove(key);
++            return null;
++        }
++        for (int cx = entry.minChunkX(); cx <= entry.maxChunkX(); cx++) {
++            for (int cz = entry.minChunkZ(); cz <= entry.maxChunkZ(); cz++) {
++                if (!this.navigationRegion.shrek$hasLoadedChunk(cx, cz)) {
++                    return null;
++                }
++            }
++        }
++        long[] sections = entry.sections();
++        int[] versions = entry.versions();
++        for (int i = 0; i < sections.length; i++) {
++            if (this.regionCache.sectionVersion(sections[i]) != versions[i]) {
++                results.remove(key);
++                return null;
++            }
++        }
++        if (entry.positionSensitive()
++            && (this.mob.getX() != entry.x() || this.mob.getY() != entry.y() || this.mob.getZ() != entry.z()
++                || this.mob.getMainHandItem().getItem() != entry.mainHand()
++                || this.mob.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.FEET).getItem() != entry.feet())) {
++            return null;
++        }
++        int[] nodes = entry.nodes();
++        float[] costs = entry.costs();
++        java.util.List<Node> copy = new java.util.ArrayList<>(nodes.length / 4);
++        Node previous = null;
++        for (int i = 0, n = nodes.length / 4; i < n; i++) {
++            Node node = new Node(nodes[i * 4], nodes[i * 4 + 1], nodes[i * 4 + 2]);
++            int flags = nodes[i * 4 + 3];
++            node.type = PATH_TYPE_VALUES[flags & 0xFF];
++            node.closed = (flags & PERSISTABLE) != 0;
++            node.walkedDistance = costs[i * 5];
++            node.costMalus = costs[i * 5 + 1];
++            node.g = costs[i * 5 + 2];
++            node.h = costs[i * 5 + 3];
++            node.f = costs[i * 5 + 4];
++            node.cameFrom = previous;
++            copy.add(node);
++            previous = node;
++        }
++        results.hit();
++        return new Path(copy, BlockPos.of(entry.target()), entry.reached());
++    }
++
++    public void shrek$storeResult(final gg.shrekmc.pathfinding.PathResultCache.Key key, final @Nullable Path path) {
++        if (path == null || this.readMinX > this.readMaxX || !this.loadedInSnapshot(this.readMinX, this.readMinZ, this.readMaxX, this.readMaxZ)) {
++            return;
++        }
++        int minSX = this.readMinX >> 4, minSY = this.readMinY >> 4, minSZ = this.readMinZ >> 4;
++        int maxSX = this.readMaxX >> 4, maxSY = this.readMaxY >> 4, maxSZ = this.readMaxZ >> 4;
++        long count = (long) (maxSX - minSX + 1) * (maxSY - minSY + 1) * (maxSZ - minSZ + 1);
++        if (count > gg.shrekmc.pathfinding.PathResultCache.MAX_SECTIONS) {
++            return;
++        }
++        long[] sections = new long[(int) count];
++        int[] versions = new int[(int) count];
++        int index = 0;
++        for (int sx = minSX; sx <= maxSX; sx++) {
++            for (int sy = minSY; sy <= maxSY; sy++) {
++                for (int sz = minSZ; sz <= maxSZ; sz++) {
++                    long section = net.minecraft.core.SectionPos.asLong(sx, sy, sz);
++                    sections[index] = section;
++                    versions[index] = this.regionCache.sectionVersion(section);
++                    index++;
++                }
++            }
++        }
++        int size = path.getNodeCount();
++        int[] nodes = new int[size * 4];
++        float[] costs = new float[size * 5];
++        for (int i = 0; i < size; i++) {
++            Node node = path.getNode(i);
++            nodes[i * 4] = node.x;
++            nodes[i * 4 + 1] = node.y;
++            nodes[i * 4 + 2] = node.z;
++            nodes[i * 4 + 3] = node.type.ordinal() | (node.closed ? PERSISTABLE : 0);
++            costs[i * 5] = node.walkedDistance;
++            costs[i * 5 + 1] = node.costMalus;
++            costs[i * 5 + 2] = node.g;
++            costs[i * 5 + 3] = node.h;
++            costs[i * 5 + 4] = node.f;
++        }
++        this.regionCache.results().put(key, new gg.shrekmc.pathfinding.PathResultCache.Entry(
++            this.searchTime, sections, versions, this.readMinX >> 4, this.readMinZ >> 4, this.readMaxX >> 4, this.readMaxZ >> 4,
++            this.positionSensitive, this.mob.getX(), this.mob.getY(), this.mob.getZ(),
++            this.mob.getMainHandItem().getItem(), this.mob.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.FEET).getItem(),
++            nodes, costs, path.getTarget().asLong(), path.canReach()));
 +    }
 +
 +    private int maxFallDistance() {
@@ -187,11 +327,12 @@
              Direction secondDirection = direction.getClockWise();
              if (this.isDiagonalValid(pos, this.reusableNeighbors[direction.get2DDataValue()], this.reusableNeighbors[secondDirection.get2DDataValue()])) {
                  Node diagonalNode = this.findAcceptedNode(
-@@ -204,10 +_,19 @@
+@@ -204,10 +_,20 @@
      }
  
      protected double getFloorLevel(final BlockPos pos) {
 +        // Shrek start - faster pathfinding: memoise per position during a search
++        this.trackRead(pos.getX(), pos.getY() - 1, pos.getZ(), pos.getX(), pos.getY(), pos.getZ());
 +        long key = pos.asLong();
 +        long cached = this.floorLevels.get(key);
 +        if (cached != gg.shrekmc.pathfinding.PathPositionCache.MISSING) {
@@ -250,12 +391,15 @@
              if (pathType != PathType.OPEN) {
                  if (pathCost >= 0.0F) {
                      return this.getNodeAndUpdateCostToMax(x, currentY, z, pathType, pathCost);
-@@ -368,33 +_,69 @@
+@@ -368,33 +_,73 @@
      }
  
      private boolean hasCollisions(final AABB aabb) {
 -        return this.collisionCache.computeIfAbsent(aabb, bb -> !this.currentContext.level().noCollision(this.mob, aabb));
 +        // Shrek start - faster pathfinding: no capturing lambda per lookup
++        this.positionSensitive = true;
++        this.trackRead(Mth.floor(aabb.minX) - 1, Mth.floor(aabb.minY) - 1, Mth.floor(aabb.minZ) - 1,
++            Mth.floor(aabb.maxX) + 1, Mth.floor(aabb.maxY) + 1, Mth.floor(aabb.maxZ) + 1);
 +        if (this.collisionCache.containsKey(aabb)) {
 +            return this.collisionCache.getBoolean(aabb);
 +        }
@@ -268,6 +412,7 @@
      protected PathType getCachedPathType(final int x, final int y, final int z) {
 -        return this.pathTypesByPosCacheByMob.computeIfAbsent(BlockPos.asLong(x, y, z), k -> this.getPathTypeOfMob(this.currentContext, x, y, z, this.mob));
 +        // Shrek start - faster pathfinding
++        this.trackRead(x - 1, y - 1, z - 1, x + this.entityWidth, y + this.entityHeight, z + this.entityDepth);
 +        long key = BlockPos.asLong(x, y, z);
 +        long cached = this.pathTypesByPosCacheByMob.get(key);
 +        if (cached != gg.shrekmc.pathfinding.PathPositionCache.MISSING) {
@@ -384,7 +529,7 @@
      public Set<PathType> getPathTypeWithinMobBB(final PathfindingContext context, final int x, final int y, final int z) {
          EnumSet<PathType> blockTypes = EnumSet.noneOf(PathType.class);
  
-@@ -454,7 +_,37 @@
+@@ -454,7 +_,38 @@
  
      @Override
      public PathType getPathType(final PathfindingContext context, final int x, final int y, final int z) {
@@ -393,6 +538,7 @@
 +        if (context != this.currentContext) {
 +            return getPathTypeStatic(context, new BlockPos.MutableBlockPos(x, y, z));
 +        }
++        this.trackRead(x - 1, y - 1, z - 1, x + 1, y + 1, z + 1);
 +        long key = BlockPos.asLong(x, y, z);
 +        long cached = this.staticPathTypes.get(key);
 +        if (cached != gg.shrekmc.pathfinding.PathPositionCache.MISSING) {
