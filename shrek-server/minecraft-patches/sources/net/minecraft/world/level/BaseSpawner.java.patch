@@ -64,6 +64,18 @@
      }
      // Canvas end - spawner configs
  
+@@ -135,6 +_,11 @@
+     }
+ 
+     public boolean isNearPlayer(final Level level, final BlockPos pos) {
++        // Shrek start - player-simulated chunks and always-active spawners (negative range)
++        if (this.requiredPlayerRange < 0 || gg.shrekmc.chunk.ShrekChunkSimulation.activatesSpawner(level, pos)) {
++            return true;
++        }
++        // Shrek end - player-simulated chunks and always-active spawners (negative range)
+         return level.canvas$hasNearbyAlivePlayerThatAffectsSpawningForSpawner(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, this.requiredPlayerRange); // Paper - Affects Spawning API // Canvas - optimize spawners
+     }
+ 
 @@ -164,7 +_,7 @@
          tickDelay = level.paperConfig().tickRates.mobSpawner;
          if (tickDelay == -1) { return; } // If disabled
