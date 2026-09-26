@@ -1,0 +1,147 @@
+--- a/ca/spottedleaf/moonrise/patches/chunk_system/player/RegionizedPlayerChunkLoader.java
++++ b/ca/spottedleaf/moonrise/patches/chunk_system/player/RegionizedPlayerChunkLoader.java
+@@ -306,6 +_,11 @@
+     public void tick() {
+         TickThread.ensureTickThread("Cannot tick player chunk loader async");
+         long currTime = System.nanoTime();
++        // Shrek start - parallel chunk loader queues
++        if (gg.shrekmc.ShrekServerConfig.parallel().chunkLoaderQueues && this.shrek$tickParallel(currTime)) {
++            return;
++        }
++        // Shrek end - parallel chunk loader queues
+         for (final ServerPlayer player : new java.util.ArrayList<>(this.world.getLocalPlayers())) { // Folia - region threading
+             final PlayerChunkLoaderData loader = ((ChunkSystemServerPlayer)player).moonrise$getChunkLoader();
+             if (loader == null || loader.removed || loader.world != this.world) {
+@@ -317,6 +_,58 @@
+         }
+     }
+ 
++    // Shrek start - parallel chunk loader queues
++    private boolean shrek$tickParallel(final long currTime) {
++        final java.util.List<ServerPlayer> players = new java.util.ArrayList<>(this.world.getLocalPlayers());
++        final int minPerBatch = gg.shrekmc.ShrekServerConfig.parallel().minPlayersPerBatch;
++        if (players.size() < minPerBatch * 2) {
++            return false;
++        }
++        final PlayerChunkLoaderData[] loaders = new PlayerChunkLoaderData[players.size()];
++        final PlayerChunkLoaderData[] rebuild = new PlayerChunkLoaderData[players.size()];
++        int rebuildCount = 0;
++        for (int i = 0; i < loaders.length; ++i) {
++            final PlayerChunkLoaderData loader = ((ChunkSystemServerPlayer)players.get(i)).moonrise$getChunkLoader();
++            if (loader == null || loader.removed || loader.world != this.world) {
++                continue;
++            }
++            loaders[i] = loader;
++            if (loader.shrek$updateBegin()) {
++                rebuild[rebuildCount++] = loader;
++            }
++        }
++        final int count = rebuildCount;
++        final int batches = gg.shrekmc.parallel.RegionParallel.batchesFor(count, Math.max(1, minPerBatch / 4));
++        gg.shrekmc.parallel.RegionParallel.run(batches, batch -> {
++            final int from = (int) ((long) count * batch / batches);
++            final int to = (int) ((long) count * (batch + 1) / batches);
++            for (int i = from; i < to; ++i) {
++                final PlayerChunkLoaderData loader = rebuild[i];
++                if (!loader.removed) {
++                    loader.shrek$rebuildQueues(true);
++                }
++            }
++        });
++        final java.util.Set<PlayerChunkLoaderData> rebuilt = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
++        for (int i = 0; i < count; ++i) {
++            rebuilt.add(rebuild[i]);
++        }
++        for (final PlayerChunkLoaderData loader : loaders) {
++            if (loader == null || loader.removed || loader.world != this.world) {
++                continue;
++            }
++            if (rebuilt.contains(loader)) {
++                loader.shrek$updateFinish();
++                if (loader.removed) {
++                    continue;
++                }
++            }
++            loader.updateQueues(currTime);
++        }
++        return true;
++    }
++    // Shrek end - parallel chunk loader queues
++
+     public static final class PlayerChunkLoaderData {
+ 
+         private static final AtomicLong ID_GENERATOR = new AtomicLong();
+@@ -919,6 +_,17 @@
+         }
+ 
+         void update() {
++            // Shrek start - parallel chunk loader queues
++            if (this.shrek$updateBegin()) {
++                this.shrek$rebuildQueues(false);
++                this.shrek$updateFinish();
++            }
++        }
++
++        private final it.unimi.dsi.fastutil.longs.LongArrayList shrek$deferredUnloads = new it.unimi.dsi.fastutil.longs.LongArrayList();
++
++        boolean shrek$updateBegin() {
++            // Shrek end - parallel chunk loader queues
+             TickThread.ensureTickThread(this.player, "Cannot update player asynchronously");
+             if (this.removed) {
+                 throw new IllegalStateException("Updating removed player chunk loader");
+@@ -958,7 +_,7 @@
+                     && this.canGenerateChunks == canGenerateChunks
+             ) {
+                 // nothing we care about changed, so we're not re-calculating
+-                return;
++                return false; // Shrek - parallel chunk loader queues
+             }
+ 
+             // update distance maps
+@@ -991,6 +_,18 @@
+             this.lastLoadDistance = loadViewDistance;
+             this.lastTickDistance = tickViewDistance;
+             this.canGenerateChunks = canGenerateChunks;
++            return true; // Shrek - parallel chunk loader queues
++        }
++
++        // Shrek start - parallel chunk loader queues
++        void shrek$rebuildQueues(final boolean deferUnloads) {
++            final int currentChunkX = this.lastChunkX;
++            final int currentChunkZ = this.lastChunkZ;
++            final int sendViewDistance = this.lastSendDistance;
++            final int loadViewDistance = this.lastLoadDistance;
++            final int tickViewDistance = this.lastTickDistance;
++            final boolean canGenerateChunks = this.canGenerateChunks;
++            // Shrek end - parallel chunk loader queues
+ 
+             // +1 since we need to load chunks +1 around the load view distance...
+             final long[] toIterate = ParallelSearchRadiusIteration.getEuclideanIteration(loadViewDistance + 1);
+@@ -1016,7 +_,7 @@
+                 if (!sendChunk && sentChunk) {
+                     // have sent the chunk, but don't want it anymore
+                     // unload it now
+-                    this.sendUnloadChunkRaw(chunkX, chunkZ);
++                    if (deferUnloads) this.shrek$deferredUnloads.add(chunk); else this.sendUnloadChunkRaw(chunkX, chunkZ); // Shrek - parallel chunk loader queues
+                 }
+ 
+                 final byte stage = this.chunkTicketStage.get(chunk);
+@@ -1061,6 +_,18 @@
+                 }
+             }
+ 
++        } // Shrek - parallel chunk loader queues
++
++        // Shrek start - parallel chunk loader queues
++        void shrek$updateFinish() {
++            final int currentChunkX = this.lastChunkX;
++            final int currentChunkZ = this.lastChunkZ;
++            for (int i = 0, len = this.shrek$deferredUnloads.size(); i < len; ++i) {
++                final long chunk = this.shrek$deferredUnloads.getLong(i);
++                this.sendUnloadChunkRaw(CoordinateUtils.getChunkX(chunk), CoordinateUtils.getChunkZ(chunk));
++            }
++            this.shrek$deferredUnloads.clear();
++            // Shrek end - parallel chunk loader queues
+             // update the chunk center
+             // this must be done last so that the client does not ignore any of our unload chunk packets above
+             if (this.lastSentChunkCenterX != currentChunkX || this.lastSentChunkCenterZ != currentChunkZ) {

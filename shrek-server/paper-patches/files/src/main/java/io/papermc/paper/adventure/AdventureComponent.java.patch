@@ -1,0 +1,36 @@
+--- a/src/main/java/io/papermc/paper/adventure/AdventureComponent.java
++++ b/src/main/java/io/papermc/paper/adventure/AdventureComponent.java
+@@ -52,6 +_,33 @@
+         return PlainTextComponentSerializer.plainText().serialize(this.adventure);
+     }
+ 
++    // Shrek start - collapse check without converting
++    @Override
++    public @Nullable String tryCollapseToString() {
++        final net.minecraft.network.chat.Component vanilla = this.vanilla;
++        if (vanilla != null || !gg.shrekmc.ShrekServerConfig.network().adventureCollapseWithoutConversion) {
++            return this.deepConverted().tryCollapseToString();
++        }
++        if (this.adventure instanceof final TextComponent text) {
++            if (!text.children().isEmpty()) {
++                return null;
++            }
++            if (text.style().isEmpty()) {
++                return text.content();
++            }
++            return this.deepConverted().tryCollapseToString();
++        }
++        if (this.adventure instanceof net.kyori.adventure.text.TranslatableComponent
++            || this.adventure instanceof net.kyori.adventure.text.KeybindComponent
++            || this.adventure instanceof net.kyori.adventure.text.ScoreComponent
++            || this.adventure instanceof net.kyori.adventure.text.SelectorComponent
++            || this.adventure instanceof net.kyori.adventure.text.NBTComponent<?>) {
++            return null;
++        }
++        return this.deepConverted().tryCollapseToString();
++    }
++    // Shrek end - collapse check without converting
++
+     @Override
+     public List<net.minecraft.network.chat.Component> getSiblings() {
+         return this.deepConverted().getSiblings();

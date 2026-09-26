@@ -9,13 +9,44 @@
          }
          // Paper end - Sync offhand slot in menus
  
-@@ -519,6 +_,9 @@
+@@ -519,6 +_,15 @@
          return this.viewDistanceHolder;
      }
      // Paper end - rewrite chunk system
 +    // Shrek - client visibility settings
 +    public final me.samsuik.sakura.player.visibility.PlayerVisibilitySettings visibilitySettings = new me.samsuik.sakura.player.visibility.PlayerVisibilitySettings();
 +    public final me.samsuik.sakura.player.knockback.KnockbackSyncState knockbackSync = new me.samsuik.sakura.player.knockback.KnockbackSyncState();
++    // Shrek start - spawn crowd
++    public final gg.shrekmc.spawn.CrowdView shrekCrowdView = new gg.shrekmc.spawn.CrowdView();
++    public boolean shrekSprintHidden;
++    public boolean shrekTrackerBypass; // Shrek - per-entity tracker cap
++    public int shrekTrackerBypassCheckedAt = -1_000_000; // Shrek - per-entity tracker cap
++    // Shrek end - spawn crowd
  
      public ServerPlayer(final MinecraftServer server, final ServerLevel level, final GameProfile gameProfile, final ClientInformation clientInformation) {
          super(level, gameProfile);
+@@ -3112,12 +_,21 @@
+ 
+     @Override
+     public void crit(final Entity entity) {
+-        this.level().getChunkSource().sendToTrackingPlayersAndSelf(this, new ClientboundAnimatePacket(entity, ClientboundAnimatePacket.CRITICAL_HIT));
+-    }
++        this.shrek$sendAboutTarget(entity, new ClientboundAnimatePacket(entity, ClientboundAnimatePacket.CRITICAL_HIT)); // Shrek - entity packets only to its trackers
++    }
++
++    // Shrek start - entity packets only to its trackers
++    private void shrek$sendAboutTarget(final Entity target, final ClientboundAnimatePacket packet) {
++        this.level().getChunkSource().chunkMap.sendToTrackingPlayersFiltered(this, packet, target::shrek$isTrackedBy);
++        if (target.shrek$isTrackedBy(this)) {
++            this.connection.send(packet);
++        }
++    }
++    // Shrek end - entity packets only to its trackers
+ 
+     @Override
+     public void magicCrit(final Entity entity) {
+-        this.level().getChunkSource().sendToTrackingPlayersAndSelf(this, new ClientboundAnimatePacket(entity, ClientboundAnimatePacket.MAGIC_CRITICAL_HIT));
++        this.shrek$sendAboutTarget(entity, new ClientboundAnimatePacket(entity, ClientboundAnimatePacket.MAGIC_CRITICAL_HIT)); // Shrek - entity packets only to its trackers
+     }
+ 
+     @Override

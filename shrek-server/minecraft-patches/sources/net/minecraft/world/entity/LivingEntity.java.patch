@@ -210,6 +210,47 @@
                  this.hurtArmor(source, armorDamage);
              }
  
+@@ -2702,6 +_,14 @@
+         this.entityData.set(DATA_STINGER_COUNT_ID, count);
+     }
+ 
++    // Shrek start - one swing broadcast per tick
++    private long shrek$lastSwingTick = Long.MIN_VALUE;
++    private @Nullable InteractionHand shrek$lastSwingHand;
++    private @Nullable SwingAnimation shrek$lastSwingAnimation;
++    private int shrek$lastSwingDuration;
++    private boolean shrek$lastSwingToSelf;
++    // Shrek end - one swing broadcast per tick
++
+     private int getModifiedSwingDuration(final SwingAnimation animation) {
+         int swingDuration = animation.duration();
+         if (MobEffectUtil.hasDigSpeed(this)) {
+@@ -2719,7 +_,24 @@
+     }
+ 
+     public boolean swing(final InteractionHand hand, final SwingAnimation animation, final boolean sendToSwingingEntity) {
+-        if (this.swingState.startIfAble(hand, animation, this.getModifiedSwingDuration(animation))) {
++        final int swingDuration = this.getModifiedSwingDuration(animation); // Shrek - one swing broadcast per tick
++        if (this.swingState.startIfAble(hand, animation, swingDuration)) {
++            // Shrek start - one swing broadcast per tick
++            if (this.level() instanceof ServerLevel && gg.shrekmc.ShrekServerConfig.network().oneSwingBroadcastPerTick) {
++                final long tick = io.papermc.paper.threadedregions.RegionizedServer.getCurrentTick();
++                final boolean repeat = this.shrek$lastSwingTick == tick && this.shrek$lastSwingHand == hand
++                    && java.util.Objects.equals(this.shrek$lastSwingAnimation, animation) && this.shrek$lastSwingDuration == swingDuration
++                    && this.shrek$lastSwingToSelf == sendToSwingingEntity;
++                this.shrek$lastSwingTick = tick;
++                this.shrek$lastSwingHand = hand;
++                this.shrek$lastSwingAnimation = animation;
++                this.shrek$lastSwingDuration = swingDuration;
++                this.shrek$lastSwingToSelf = sendToSwingingEntity;
++                if (repeat) {
++                    return true;
++                }
++            }
++            // Shrek end - one swing broadcast per tick
+             if (this.level() instanceof ServerLevel serverLevel) {
+                 ClientboundSwingAnimationPacket packet = new ClientboundSwingAnimationPacket(this, hand, animation);
+                 ServerChunkCache chunkSource = serverLevel.getChunkSource();
 @@ -3110,7 +_,7 @@
  
      @Override

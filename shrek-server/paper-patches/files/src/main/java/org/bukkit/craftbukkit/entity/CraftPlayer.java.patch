@@ -23,8 +23,7 @@
      }
  
      @Override
-@@ -2844,6 +_,13 @@
-     @Override
+@@ -2854,6 +_,13 @@
      public boolean isAllowingServerListings() {
          return this.getHandle().allowsListing();
      }
@@ -37,3 +36,4 @@
 +    // Shrek end - client visibility settings
  
      // Paper start
+     @Override

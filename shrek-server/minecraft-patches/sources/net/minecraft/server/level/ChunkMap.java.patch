@@ -1,5 +1,22 @@
 --- a/net/minecraft/server/level/ChunkMap.java
 +++ b/net/minecraft/server/level/ChunkMap.java
+@@ -1065,6 +_,16 @@
+         final ca.spottedleaf.moonrise.common.misc.NearbyPlayers nearbyPlayers = this.level.moonrise$getNearbyPlayers();
+         worldData.iteratingTrackerEntities = true;
+         // Folia end - region threading
++        // Shrek start - parallel entity tracker
++        if (gg.shrekmc.parallel.ParallelTracker.shouldRun(worldData.trackerEntities.size())) {
++            try {
++                gg.shrekmc.parallel.ParallelTracker.tick(this.level, worldData, nearbyPlayers);
++            } finally {
++                worldData.iteratingTrackerEntities = false;
++            }
++            return;
++        }
++        // Shrek end - parallel entity tracker
+         try {
+             final ca.spottedleaf.moonrise.common.list.ReferenceList<net.minecraft.world.entity.Entity> trackerEntities = worldData.trackerEntities; // Folia - region threading
+             final Entity[] trackerEntitiesRaw = trackerEntities.getRawDataUnchecked();
 @@ -1074,7 +_,11 @@
                  if (tracker == null) {
                      continue;
@@ -13,10 +30,55 @@
                  if (((ca.spottedleaf.moonrise.patches.entity_tracker.EntityTrackerTrackedEntity)tracker).moonrise$hasPlayers()
                      || ((ca.spottedleaf.moonrise.patches.chunk_system.entity.ChunkSystemEntity)entity).moonrise$getChunkStatus().isOrAfter(FullChunkStatus.ENTITY_TICKING)) {
                      tracker.serverEntity.sendChanges();
-@@ -1288,12 +_,29 @@
+@@ -1230,14 +_,39 @@
+             this.lastChunkUpdate = currChunkUpdate;
+             this.lastTrackedChunk = chunk;
+ 
++            // Shrek start - tracker full update frequency and per-entity tracker cap (adapted from ShreddedPaper)
++            final boolean candidatesChanged = lastChunkUpdate != currChunkUpdate || lastTrackedChunk != chunk;
++            final boolean fullUpdate = gg.shrekmc.tracker.ShrekTracker.fullUpdate(++this.shrek$trackerTicks);
++            final int maxTrackers = gg.shrekmc.tracker.ShrekTracker.maximumTrackersPerEntity();
++            if (maxTrackers > 0 && players.size() > maxTrackers) {
++                if (fullUpdate || candidatesChanged || this.shrek$allowedTrackers == null) {
++                    this.shrek$allowedTrackers = gg.shrekmc.tracker.ShrekTracker.nearestTrackers(this.entity, players, maxTrackers, this.shrek$allowedTrackers);
++                }
++            } else {
++                this.shrek$allowedTrackers = null;
++            }
++            final it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet<ServerPlayer> allowedTrackers = this.shrek$allowedTrackers;
++            // Shrek end - tracker full update frequency and per-entity tracker cap (adapted from ShreddedPaper)
++
+             final ServerPlayer[] playersRaw = players.getRawDataUnchecked();
+ 
+             for (int i = 0, len = players.size(); i < len; ++i) {
+                 final ServerPlayer player = playersRaw[i];
++                // Shrek start - tracker full update frequency and per-entity tracker cap (adapted from ShreddedPaper)
++                if (allowedTrackers != null && !allowedTrackers.contains(player)) {
++                    if (this.seenBy.contains(player.connection)) {
++                        this.removePlayer(player);
++                    }
++                    continue;
++                }
++                if (!fullUpdate && (this.seenBy.contains(player.connection) || gg.shrekmc.spawn.ShrekSpawnCrowd.skipUnseen(player, this.entity))) {
++                    continue;
++                }
++                // Shrek end - tracker full update frequency and per-entity tracker cap (adapted from ShreddedPaper)
+                 this.updatePlayer(player);
+             }
+ 
+-            if (lastChunkUpdate != currChunkUpdate || lastTrackedChunk != chunk) {
++            if (candidatesChanged) {
+                 // need to purge any players possible not in the chunk list
+                 for (final ServerPlayerConnection conn : new java.util.ArrayList<>(this.seenBy)) {
+                     final ServerPlayer player = conn.getPlayer();
+@@ -1288,12 +_,34 @@
              return !this.seenBy.isEmpty();
          }
          // Paper end - optimise entity tracker
++        // Shrek start - tracker full update frequency and per-entity tracker cap
++        private int shrek$trackerTicks;
++        private it.unimi.dsi.fastutil.objects.@org.jspecify.annotations.Nullable ReferenceOpenHashSet<ServerPlayer> shrek$allowedTrackers;
++        // Shrek end - tracker full update frequency and per-entity tracker cap
 +        // Shrek start - reduce entity tracker player updates
 +        private final int playerUpdateInterval;
 +        private net.minecraft.world.phys.Vec3 entityPosition;
@@ -39,10 +101,42 @@
 +            // Shrek start - reduce entity tracker player updates
 +            this.playerUpdateInterval = Math.max(1, Math.min(entity.getType().hasUpdateInterval() ? entity.getType().updateInterval() : 20, 20));
 +            this.entityPosition = entity.position();
++            this.shrek$trackerTicks = entity.getId(); // Shrek - tracker full update frequency - stagger full updates between entities
 +            // Shrek end - reduce entity tracker player updates
          }
  
          @Override
+@@ -1308,9 +_,12 @@
+ 
+         @Override
+         public void sendToTrackingPlayers(final Packet<? super ClientGamePacketListener> packet) {
++            final gg.shrekmc.network.SharedFrames.Broadcast shrek$broadcast = gg.shrekmc.network.SharedFrames.begin(packet, this.seenBy.size()); // Shrek - shared broadcast frames
++            try { // Shrek - shared broadcast frames
+             for (ServerPlayerConnection connection : this.seenBy) {
+                 connection.send(packet);
+             }
++            } finally { gg.shrekmc.network.SharedFrames.end(shrek$broadcast); } // Shrek - shared broadcast frames
+         }
+ 
+         @Override
+@@ -1349,6 +_,17 @@
+         public void updatePlayer(final ServerPlayer player) {
+             org.spigotmc.AsyncCatcher.catchOp("player tracker update"); // Spigot
+             if (player != this.entity) {
++                // Shrek start - parallel entity tracker - the checks are in shrek$baseVisible so the parallel scan can run them
++                boolean visibleToPlayer = this.shrek$baseVisible(player);
++                visibleToPlayer = visibleToPlayer && (!(this.entity instanceof ServerPlayer trackedPlayer) || gg.shrekmc.spawn.ShrekSpawnCrowd.canTrack(player, trackedPlayer, this.seenBy.contains(player.connection))); // Shrek - spawn crowd
++                this.shrek$apply(player, visibleToPlayer);
++                // Shrek end - parallel entity tracker
++            }
++        }
++
++        // Shrek start - parallel entity tracker
++        public final boolean shrek$baseVisible(final ServerPlayer player) {
++            {
+                 // Paper start - remove allocation of Vec3 here
+                 // Vec3 deltaToPlayer = player.position().subtract(this.entity.position());
+                 double deltaToPlayerX = player.getX() - this.entity.getX();
 @@ -1371,6 +_,7 @@
                      && this.entity.broadcastToPlayer(player)
                      && ChunkMap.this.isChunkTracked(player, this.entity.chunkPosition().x(), this.entity.chunkPosition().z());
@@ -51,11 +145,88 @@
                  // Folia start - region threading
                  if (visibleToPlayer && (this.entity instanceof ServerPlayer thisEntity) && thisEntity.broadcastedDeath) {
                      visibleToPlayer = false;
-@@ -1381,6 +_,7 @@
+@@ -1381,6 +_,13 @@
                      visibleToPlayer = false;
                  }
                  // CraftBukkit end
 +                visibleToPlayer = visibleToPlayer && !me.samsuik.sakura.player.visibility.TrackerOcclusion.hiddenFrom(this.entity, player, this.seenBy.contains(player.connection));
++                return visibleToPlayer;
++            }
++        }
++
++        public final void shrek$apply(final ServerPlayer player, final boolean visibleToPlayer) {
++            {
                  if (visibleToPlayer) {
                      if (this.seenBy.add(player.connection)) {
                          // Paper start - entity tracking events
+@@ -1400,6 +_,70 @@
+                 }
+             }
+         }
++
++        public final gg.shrekmc.parallel.ParallelTracker.@org.jspecify.annotations.Nullable Scan shrek$scan(final ca.spottedleaf.moonrise.common.misc.NearbyPlayers.@org.jspecify.annotations.Nullable TrackedChunk chunk) {
++            final ca.spottedleaf.moonrise.common.list.ReferenceList<ServerPlayer> players = chunk == null ? null : chunk.getPlayers(ca.spottedleaf.moonrise.common.misc.NearbyPlayers.NearbyMapType.VIEW_DISTANCE);
++            if (players == null) {
++                return this.seenBy.isEmpty() && this.lastTrackedChunk == null ? null : gg.shrekmc.parallel.ParallelTracker.Scan.clear(this);
++            }
++            final long lastChunkUpdate = this.lastChunkUpdate;
++            final long currChunkUpdate = chunk.getUpdateCount();
++            final ca.spottedleaf.moonrise.common.misc.NearbyPlayers.TrackedChunk lastTrackedChunk = this.lastTrackedChunk;
++            this.lastChunkUpdate = currChunkUpdate;
++            this.lastTrackedChunk = chunk;
++
++            final boolean candidatesChanged = lastChunkUpdate != currChunkUpdate || lastTrackedChunk != chunk;
++            final boolean fullUpdate = gg.shrekmc.tracker.ShrekTracker.fullUpdate(++this.shrek$trackerTicks);
++            final int maxTrackers = gg.shrekmc.tracker.ShrekTracker.maximumTrackersPerEntity();
++            if (maxTrackers > 0 && players.size() > maxTrackers) {
++                if (fullUpdate || candidatesChanged || this.shrek$allowedTrackers == null) {
++                    this.shrek$allowedTrackers = gg.shrekmc.tracker.ShrekTracker.nearestTrackers(this.entity, players, maxTrackers, this.shrek$allowedTrackers);
++                }
++            } else {
++                this.shrek$allowedTrackers = null;
++            }
++            final it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet<ServerPlayer> allowedTrackers = this.shrek$allowedTrackers;
++            final boolean crowdCapped = this.entity instanceof ServerPlayer;
++
++            gg.shrekmc.parallel.ParallelTracker.Scan scan = null;
++            final ServerPlayer[] playersRaw = players.getRawDataUnchecked();
++            for (int i = 0, len = players.size(); i < len; ++i) {
++                final ServerPlayer player = playersRaw[i];
++                if (player == null || player == this.entity) {
++                    continue;
++                }
++                final boolean seen = this.seenBy.contains(player.connection);
++                if (allowedTrackers != null && !allowedTrackers.contains(player)) {
++                    if (seen) {
++                        scan = gg.shrekmc.parallel.ParallelTracker.Scan.remove(scan, this, player);
++                    }
++                    continue;
++                }
++                if (!fullUpdate && (seen || gg.shrekmc.spawn.ShrekSpawnCrowd.skipUnseen(player, this.entity))) {
++                    continue;
++                }
++                final boolean visible = this.shrek$baseVisible(player);
++                if (visible && crowdCapped) {
++                    scan = gg.shrekmc.parallel.ParallelTracker.Scan.crowd(scan, this, player);
++                } else if (visible != seen) {
++                    scan = visible ? gg.shrekmc.parallel.ParallelTracker.Scan.add(scan, this, player) : gg.shrekmc.parallel.ParallelTracker.Scan.remove(scan, this, player);
++                }
++            }
++            if (candidatesChanged) {
++                for (final ServerPlayerConnection conn : this.seenBy) {
++                    final ServerPlayer player = conn.getPlayer();
++                    if (!players.contains(player)) {
++                        scan = gg.shrekmc.parallel.ParallelTracker.Scan.remove(scan, this, player);
++                    }
++                }
++            }
++            return scan;
++        }
++
++        public final Entity shrek$entity() {
++            return this.entity;
++        }
++        // Shrek end - parallel entity tracker
+ 
+         private int scaledRange(final int range) {
+             return ChunkMap.this.level.getServer().getScaledTrackingDistance(range);

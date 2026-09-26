@@ -1,0 +1,51 @@
+--- a/net/minecraft/network/PacketProcessor.java
++++ b/net/minecraft/network/PacketProcessor.java
+@@ -36,7 +_,10 @@
+             return false;
+         }
+ 
++        if (this.shrek$collapsed(task)) return true; // Shrek - collapse redundant move packets
++        final long shrek$start = gg.shrekmc.debug.RegionPhaseTiming.start(gg.shrekmc.debug.RegionPhaseTiming.Phase.PACKETS); // Shrek - region phase timing
+         task.handle();
++        gg.shrekmc.debug.RegionPhaseTiming.packet(task.packet().getClass(), shrek$start); // Shrek - region phase timing
+         return true;
+     }
+     // Paper end - improve tick loop
+@@ -67,10 +_,36 @@
+     public void processQueuedPackets() {
+         if (!this.closed) {
+             while (!this.packetsToBeHandled.isEmpty()) {
+-                this.packetsToBeHandled.poll().handle();
++                // Shrek start - collapse redundant move packets
++                final PacketProcessor.ListenerAndPacket<?> task = this.packetsToBeHandled.poll();
++                if (!this.shrek$collapsed(task)) {
++                    task.handle();
++                }
++                // Shrek end - collapse redundant move packets
+             }
+         }
+     }
++
++    // Shrek start - collapse redundant move packets
++    private boolean shrek$collapsed(final PacketProcessor.ListenerAndPacket<?> task) {
++        if (!(task.listener() instanceof net.minecraft.server.network.ServerGamePacketListenerImpl listener)
++            || !(task.packet() instanceof net.minecraft.network.protocol.game.ServerboundMovePlayerPacket packet)
++            || packet.hasPosition()
++            || !gg.shrekmc.ShrekServerConfig.movement().collapseRedundantMovePackets) {
++            return false;
++        }
++        final PacketProcessor.ListenerAndPacket<?> next = this.packetsToBeHandled.peek();
++        if (next == null || next.listener() != listener
++            || !(next.packet() instanceof net.minecraft.network.protocol.game.ServerboundMovePlayerPacket later)
++            || (packet.hasRotation() && !later.hasRotation())
++            || packet.isOnGround() != later.isOnGround()
++            || packet.horizontalCollision() != later.horizontalCollision()
++            || !listener.shouldHandleMessage(packet)) {
++            return false;
++        }
++        return listener.shrek$skipRedundantMove(packet);
++    }
++    // Shrek end - collapse redundant move packets
+ 
+     @Override
+     public void close() {

@@ -1,0 +1,11 @@
+--- a/net/minecraft/server/Services.java
++++ b/net/minecraft/server/Services.java
+@@ -40,7 +_,7 @@
+ 
+ 
+     public static Services create(final MinecraftServicesDiscoveryService serviceAccess, final File nameCacheDir, final File userCacheFile, final joptsimple.OptionSet options) throws Exception { // Paper - add options to load paper config files; add userCacheFile parameter
+-        SessionService sessionService = serviceAccess.createMinecraftSessionService();
++        SessionService sessionService = gg.shrekmc.profile.ProfileLookupGuard.wrap(serviceAccess.createMinecraftSessionService()); // Shrek - do not retry failed profile lookups
+         GameProfileRepository profileRepository = serviceAccess.createProfileRepository();
+         UserNameToIdResolver profileCache = new CachedUserNameToIdResolver(profileRepository, userCacheFile); // Paper
+         // Paper start - load paper config files from cli options

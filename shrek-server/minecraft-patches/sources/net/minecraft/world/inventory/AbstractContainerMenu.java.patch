@@ -1,5 +1,17 @@
 --- a/net/minecraft/world/inventory/AbstractContainerMenu.java
 +++ b/net/minecraft/world/inventory/AbstractContainerMenu.java
+@@ -67,6 +_,11 @@
+     private final List<ContainerListener> containerListeners = Lists.newArrayList();
+     private @Nullable ContainerSynchronizer synchronizer;
+     private boolean suppressRemoteUpdates;
++    public final gg.shrekmc.inventory.SlotSync shrek$slotSync = new gg.shrekmc.inventory.SlotSync(); // Shrek - skip unchanged slots
++
++    public final boolean shrek$remoteUpdatesSuppressed() { // Shrek - skip unchanged slots
++        return this.suppressRemoteUpdates;
++    }
+     // CraftBukkit start
+     public boolean checkReachable = true;
+     public abstract org.bukkit.inventory.InventoryView getBukkitView();
 @@ -193,7 +_,7 @@
  
          for (int slotsSize = this.slots.size(); i < slotsSize; i++) {
@@ -27,6 +39,29 @@
          }
      }
      // CraftBukkit end
+@@ -260,12 +_,21 @@
+     }
+ 
+     public void broadcastChanges() {
+-        for (int i = 0; i < this.slots.size(); i++) {
++        // Shrek start - skip unchanged slots
++        final int slotCount = this.slots.size();
++        final boolean skipUnchanged = gg.shrekmc.inventory.SlotSync.skipUnchanged(this, slotCount);
++        for (int i = 0; i < slotCount; i++) {
+             ItemStack current = this.slots.get(i).getItem();
++            if (skipUnchanged && this.shrek$slotSync.unchanged(i, current, this.lastSlots.get(i), this.remoteSlots.get(i))) {
++                continue;
++            }
++            final long version = current.shrek$version();
+             Supplier<ItemStack> currentCopy = Suppliers.memoize(current::copy);
+             this.triggerSlotListeners(i, current, currentCopy);
+             this.synchronizeSlotToRemote(i, current, currentCopy);
++            this.shrek$slotSync.checked(i, current, version, this.lastSlots.get(i), this.remoteSlots.get(i), this.suppressRemoteUpdates);
+         }
++        // Shrek end - skip unchanged slots
+ 
+         this.synchronizeCarriedToRemote();
+ 
 @@ -317,7 +_,7 @@
      public void synchronizeSlotToRemote(final int i, final ItemStack current, final Supplier<ItemStack> currentCopy) {
          if (!this.suppressRemoteUpdates) {

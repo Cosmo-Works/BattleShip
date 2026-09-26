@@ -1,0 +1,14 @@
+--- a/net/minecraft/server/level/ChunkHolder.java
++++ b/net/minecraft/server/level/ChunkHolder.java
+@@ -221,6 +_,11 @@
+     }
+ 
+     public boolean blockChanged(final BlockPos pos) {
++        // Shrek start - chunk packet cache - block entity data re-sent without a block change
++        if (this.newChunkHolder.getCurrentChunk() instanceof LevelChunk changed) {
++            changed.shrek$invalidatePacket();
++        }
++        // Shrek end - chunk packet cache
+         LevelChunk chunk = this.playersSentChunkTo.size() == 0 ? null : this.getChunkToSend(); // Paper - rewrite chunk system
+         if (chunk == null) {
+             return false;

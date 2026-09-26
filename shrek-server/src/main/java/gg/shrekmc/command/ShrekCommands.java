@@ -36,7 +36,10 @@ public class ShrekCommands {
             new FpsSubCommand(),
             new FreezeSubCommand(),
             new TpsSubCommand(),
-            new LocalConfigSubCommand()
+            new LocalConfigSubCommand(),
+            new gg.shrekmc.command.subcommands.CrowdSubCommand(),
+            new gg.shrekmc.command.subcommands.RegionsSubCommand(),
+            new gg.shrekmc.command.subcommands.GateSubCommand()
         );
     }
 

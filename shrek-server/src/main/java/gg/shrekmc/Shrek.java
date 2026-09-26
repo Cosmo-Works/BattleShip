@@ -9,6 +9,7 @@ public final class Shrek {
         ShrekServerConfig.ensureLoaded();
         ShrekWorldConfig.ensureLoaded();
         ShrekAPI.chunkSimulation(gg.shrekmc.chunk.ShrekChunkSimulation.INSTANCE);
+        ShrekAPI.spawnCrowd(gg.shrekmc.spawn.ShrekSpawnCrowd.INSTANCE);
     }
 
     private Shrek() {

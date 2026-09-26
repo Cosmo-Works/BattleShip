@@ -1,0 +1,26 @@
+--- a/net/minecraft/server/network/config/PrepareSpawnTask.java
++++ b/net/minecraft/server/network/config/PrepareSpawnTask.java
+@@ -133,7 +_,7 @@
+                         spawnPosition.complete(io.papermc.paper.util.MCUtil.toVec3(loc));
+                     }
+                 });
+-                ServerPlayer.fudgeSpawnLocation(spawnLevel, spawnComplete);
++                gg.shrekmc.join.JoinFastPath.fudgeSpawnLocation(spawnLevel, spawnComplete); // Shrek - reuse recent spawn positions for new players
+             }
+             // Folia end - region threading
+             // Paper end - move logic in Entity to here, to use bukkit supplied world UUID & reset to main world spawn if no valid world is found
+@@ -289,6 +_,14 @@
+                 }
+                 // Paper end - PlayerSpawnLocationEvent
+                 ChunkPos spawnChunk = ChunkPos.containing(BlockPos.containing(spawnPosition));
++                // Shrek start - skip the spawn region round trip when the spawn chunks are already loaded
++                if (gg.shrekmc.join.JoinFastPath.skipLoadedChunkWaits()) {
++                    this.spawnLevel.getChunkSource().addTicketWithRadius(TicketType.PLAYER_SPAWN, spawnChunk, 3);
++                    if (gg.shrekmc.join.JoinFastPath.chunksAtLeast(this.spawnLevel, spawnChunk.x(), spawnChunk.z(), 3, net.minecraft.server.level.FullChunkStatus.FULL)) {
++                        this.chunkLoadFuture = CompletableFuture.completedFuture(null);
++                    }
++                }
++                if (this.chunkLoadFuture == null) // Shrek end - skip the spawn region round trip when the spawn chunks are already loaded
+                 this.chunkLoadFuture = ((ca.spottedleaf.moonrise.patches.chunk_system.MoonriseChunkLoadCounter)this.chunkLoadCounter).trackLoadWithRadius(this.spawnLevel, spawnChunk, 3, net.minecraft.world.level.chunk.status.ChunkStatus.FULL, ca.spottedleaf.concurrentutil.util.Priority.HIGH, () -> { Preparing.this.spawnLevel.getChunkSource().addTicketWithRadius(TicketType.PLAYER_SPAWN, spawnChunk, 3); }); // Paper - rewrite chunk system
+                 PrepareSpawnTask.this.loadListener.start(LevelLoadListener.Stage.LOAD_PLAYER_CHUNKS, this.chunkLoadCounter.totalChunks());
+                 PrepareSpawnTask.this.loadListener.updateFocus(this.spawnLevel.dimension(), spawnChunk);

@@ -1,0 +1,103 @@
+--- a/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/ChunkHolderManager.java
++++ b/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/ChunkHolderManager.java
+@@ -752,8 +_,22 @@
+         }
+     }
+ 
++    // Shrek start - count keep-dimension-active tickets as one number
++    private final boolean shrek$countKeepActive = gg.shrekmc.ShrekServerConfig.ticking().countKeepDimensionActiveTickets;
++    private final java.util.concurrent.atomic.AtomicLong shrek$keepActiveTickets = new java.util.concurrent.atomic.AtomicLong();
++
++    public boolean shrek$hasKeepDimensionActiveTickets() {
++        if (this.shrek$countKeepActive) {
++            return this.shrek$keepActiveTickets.get() > 0L;
++        }
++        final ConcurrentChainedLong2LongHashTable counters = this.ticketCounters.get(ca.spottedleaf.moonrise.patches.chunk_system.ticket.ChunkSystemTicketType.COUNTER_TYPE_KEEP_DIMENSION_ACTIVE);
++        return counters != null && !counters.isEmpty();
++    }
++    // Shrek end - count keep-dimension-active tickets as one number
++
+     private void addTicketCounter(final TicketType type, final long pos) {
+         for (final long counterType : ((ChunkSystemTicketType<?>)(Object)type).moonrise$getCounterTypes()) {
++            if (this.shrek$countKeepActive && counterType == ca.spottedleaf.moonrise.patches.chunk_system.ticket.ChunkSystemTicketType.COUNTER_TYPE_KEEP_DIMENSION_ACTIVE) { this.shrek$keepActiveTickets.incrementAndGet(); continue; } // Shrek - count keep-dimension-active tickets as one number
+             this.ticketCounters.computeIfAbsent(counterType, (final long counterId) -> {
+                 return new ConcurrentChainedLong2LongHashTable();
+             }).addTo(pos, 1L, 1L);
+@@ -762,6 +_,7 @@
+ 
+     private void removeTicketCounter(final TicketType type, final long pos) {
+         for (final long counterType : ((ChunkSystemTicketType<?>)(Object)type).moonrise$getCounterTypes()) {
++            if (this.shrek$countKeepActive && counterType == ca.spottedleaf.moonrise.patches.chunk_system.ticket.ChunkSystemTicketType.COUNTER_TYPE_KEEP_DIMENSION_ACTIVE) { this.shrek$keepActiveTickets.decrementAndGet(); continue; } // Shrek - count keep-dimension-active tickets as one number
+             this.ticketCounters.get(counterType).decFrom(pos, 1L, 0L);
+         }
+     }
+@@ -907,9 +_,12 @@
+         if (removeDelay == NO_TIMEOUT_MARKER) {
+             return false;
+         }
+-        --removeDelay;
++        // Shrek start - purge stale tickets frequency (from ShreddedPaper)
++        final int frequency = Math.max(1, gg.shrekmc.ShrekServerConfig.ticking().purgeStaleTicketsFrequency);
++        removeDelay -= frequency;
+         ((ChunkSystemTicket<?>)(Object)ticket).moonrise$setRemoveDelay(removeDelay);
+-        return removeDelay <= 0L;
++        return removeDelay <= 1L - frequency;
++        // Shrek end - purge stale tickets frequency (from ShreddedPaper)
+     }
+ 
+     public void tick() {
+@@ -1541,10 +_,54 @@
+     }
+ 
+     public void performTicketUpdates(final Collection<TicketOperation<?, ?>> operations) {
++        // Shrek start - batch ticket updates
++        if (operations.size() > 1 && gg.shrekmc.ShrekServerConfig.ticking().batchTicketUpdates) {
++            int minX = Integer.MAX_VALUE;
++            int minZ = Integer.MAX_VALUE;
++            int maxX = Integer.MIN_VALUE;
++            int maxZ = Integer.MIN_VALUE;
++            for (final TicketOperation<?, ?> operation : operations) {
++                final int x = CoordinateUtils.getChunkX(operation.chunkCoord);
++                final int z = CoordinateUtils.getChunkZ(operation.chunkCoord);
++                minX = Math.min(minX, x);
++                minZ = Math.min(minZ, z);
++                maxX = Math.max(maxX, x);
++                maxZ = Math.max(maxZ, z);
++            }
++            final ReentrantAreaLock.Node ticketLock = this.ticketLockArea.lock(minX, minZ, maxX, maxZ);
++            try {
++                for (final TicketOperation<?, ?> operation : operations) {
++                    this.shrek$processTicketOpLocked(operation);
++                }
++            } finally {
++                this.ticketLockArea.unlock(ticketLock);
++            }
++            return;
++        }
++        // Shrek end - batch ticket updates
+         for (final TicketOperation<?, ?> operation : operations) {
+             this.processTicketOp(operation);
+         }
+     }
++
++    // Shrek start - batch ticket updates
++    private <T, V> void shrek$processTicketOpLocked(final TicketOperation<T, V> operation) {
++        final long chunk = operation.chunkCoord;
++        switch (operation.op) {
++            case ADD -> this.addTicketAtLevel(operation.ticketType, chunk, operation.ticketLevel, operation.identifier, false);
++            case REMOVE -> this.removeTicketAtLevel(operation.ticketType, chunk, operation.ticketLevel, operation.identifier, false);
++            case ADD_IF_REMOVED -> {
++                if (this.removeTicketAtLevel(operation.ticketType2, chunk, operation.ticketLevel2, operation.identifier2, false)) {
++                    this.addTicketAtLevel(operation.ticketType, chunk, operation.ticketLevel, operation.identifier, false);
++                }
++            }
++            case ADD_AND_REMOVE -> {
++                this.addTicketAtLevel(operation.ticketType, chunk, operation.ticketLevel, operation.identifier, false);
++                this.removeTicketAtLevel(operation.ticketType2, chunk, operation.ticketLevel2, operation.identifier2, false);
++            }
++        }
++    }
++    // Shrek end - batch ticket updates
+ 
+     private final ThreadLocal<Boolean> BLOCK_TICKET_UPDATES = ThreadLocal.withInitial(() -> {
+         return Boolean.FALSE;

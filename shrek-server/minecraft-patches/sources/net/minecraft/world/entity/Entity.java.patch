@@ -8,6 +8,17 @@
  import net.minecraft.world.level.entity.EntityAccess;
  import net.minecraft.world.level.entity.EntityInLevelCallback;
  import net.minecraft.world.level.gameevent.DynamicGameEventListener;
+@@ -366,6 +_,10 @@
+     protected static final int FLAG_ONFIRE = 0;
+     private static final int FLAG_SHIFT_KEY_DOWN = 1;
+     private static final int FLAG_SPRINTING = 3;
++    // Shrek start - spawn crowd
++    public static final EntityDataAccessor<Byte> SHREK_SHARED_FLAGS = DATA_SHARED_FLAGS_ID;
++    public static final byte SHREK_SPRINTING_FLAG_MASK = 1 << FLAG_SPRINTING;
++    // Shrek end - spawn crowd
+     private static final int FLAG_SWIMMING = 4;
+     public static final int FLAG_INVISIBLE = 5;
+     protected static final int FLAG_GLOWING = 6;
 @@ -445,6 +_,9 @@
      public long activatedTick = Integer.MIN_VALUE;
      public boolean isTemporarilyActive;
@@ -77,15 +88,161 @@
          } else {
              this.defaultActivationState = false;
          }
-@@ -1195,7 +_,7 @@
+@@ -762,10 +_,21 @@
      }
  
+     // CraftBukkit start
++    // Shrek start - entity packets only to its trackers
++    public boolean shrek$isTrackedBy(final ServerPlayer player) {
++        if (player == this) {
++            return true;
++        }
++        final net.minecraft.server.level.ChunkMap.TrackedEntity tracker = this.moonrise$getTrackedEntity();
++        return tracker != null && player.connection != null && tracker.seenBy.contains(player.connection);
++    }
++    // Shrek end - entity packets only to its trackers
++
+     public void refreshEntityData(ServerPlayer to) {
+         List<SynchedEntityData.DataValue<?>> values = this.entityData.packAll(); // Paper - Update EVERYTHING not just not default
++        if (to != this) values = gg.shrekmc.spawn.ShrekSpawnCrowd.dataForOthers(this, values); // Shrek - spawn crowd
+ 
+-        if (to.getBukkitEntity().canSee(this.getBukkitEntity())) { // Paper
++        if (to.getBukkitEntity().canSee(this.getBukkitEntity()) && this.shrek$isTrackedBy(to)) { // Paper // Shrek - entity packets only to its trackers
+             to.connection.send(new net.minecraft.network.protocol.game.ClientboundSetEntityDataPacket(this.getId(), values));
+         }
+     }
+@@ -774,7 +_,7 @@
+     // This method should only be used if the data of an entity could have become desynced
+     // due to interactions on the client.
+     public void resendPossiblyDesyncedEntityData(ServerPlayer player) {
+-        if (player.getBukkitEntity().canSee(this.getBukkitEntity())) {
++        if (player.getBukkitEntity().canSee(this.getBukkitEntity()) && this.shrek$isTrackedBy(player)) { // Shrek - entity packets only to its trackers (a spawn sent to a non-tracker is never removed)
+             ServerLevel level = (ServerLevel) this.level();
+             net.minecraft.server.level.ChunkMap.TrackedEntity tracker = this.moonrise$getTrackedEntity(); // Folia - region threading
+             if (tracker == null) {
+@@ -784,12 +_,13 @@
+             final List<Packet<? super ClientGamePacketListener>> list = new ArrayList<>();
+             serverEntity.sendPairingData(player, list::add);
+             player.connection.send(new net.minecraft.network.protocol.game.ClientboundBundlePacket(list));
++            serverEntity.shrek$syncEquipmentAfterPairing(); // Shrek - entity packets only after the spawn
+         }
+     }
+ 
+     // This method allows you to specifically resend certain data accessors to the client
+     public void resendPossiblyDesyncedDataValues(List<EntityDataAccessor<?>> accessors, ServerPlayer to) {
+-        if (!to.getBukkitEntity().canSee(this.getBukkitEntity())) {
++        if (!to.getBukkitEntity().canSee(this.getBukkitEntity()) || !this.shrek$isTrackedBy(to)) { // Shrek - entity packets only to its trackers
+             return;
+         }
+ 
+@@ -1194,11 +_,76 @@
+         return this.mainSupportingBlockPos.isPresent() && this.mainSupportingBlockPos.get().equals(pos);
+     }
+ 
++    // Shrek start - cache the supporting block check
++    private @Nullable AABB shrek$supportBox;
++    private long shrek$supportChunkVersion;
++    private @Nullable Object shrek$supportChunk;
++    private boolean shrek$supportDescending;
++    private @Nullable ItemStack shrek$supportMainHand;
++    private long shrek$supportMainHandVersion;
++    private @Nullable ItemStack shrek$supportFeet;
++    private long shrek$supportFeetVersion;
++    private double shrek$supportFallDistance;
++    private Optional<BlockPos> shrek$supportResult = Optional.empty();
++
++    private boolean shrek$supportCached(final AABB box, final net.minecraft.world.level.chunk.@Nullable ChunkAccess chunk) {
++        if (chunk == null || this.shrek$supportBox == null || !this.shrek$supportBox.equals(box) || this.shrek$supportChunk != chunk
++            || this.shrek$supportChunkVersion != chunk.shrek$packetVersion() || this.shrek$supportDescending != this.isDescending()
++            || this.shrek$supportFallDistance != this.fallDistance || !(this instanceof LivingEntity living)) {
++            return false;
++        }
++        final ItemStack mainHand = living.getMainHandItem();
++        final ItemStack feet = living.getItemBySlot(EquipmentSlot.FEET);
++        return mainHand == this.shrek$supportMainHand && mainHand.shrek$version() == this.shrek$supportMainHandVersion
++            && feet == this.shrek$supportFeet && feet.shrek$version() == this.shrek$supportFeetVersion;
++    }
++
++    private void shrek$rememberSupport(final AABB box, final net.minecraft.world.level.chunk.@Nullable ChunkAccess chunk, final Optional<BlockPos> result) {
++        if (chunk == null || !(this instanceof LivingEntity living)) {
++            this.shrek$supportBox = null;
++            return;
++        }
++        this.shrek$supportBox = box;
++        this.shrek$supportChunk = chunk;
++        this.shrek$supportChunkVersion = chunk.shrek$packetVersion();
++        this.shrek$supportDescending = this.isDescending();
++        this.shrek$supportFallDistance = this.fallDistance;
++        this.shrek$supportMainHand = living.getMainHandItem();
++        this.shrek$supportMainHandVersion = this.shrek$supportMainHand.shrek$version();
++        this.shrek$supportFeet = living.getItemBySlot(EquipmentSlot.FEET);
++        this.shrek$supportFeetVersion = this.shrek$supportFeet.shrek$version();
++        this.shrek$supportResult = result;
++    }
++
++    private net.minecraft.world.level.chunk.@Nullable ChunkAccess shrek$supportChunk(final AABB testArea) {
++        if (!(this instanceof net.minecraft.server.level.ServerPlayer) || !gg.shrekmc.ShrekServerConfig.movement().cacheSupportingBlock) {
++            return null;
++        }
++        final int minChunkX = Mth.floor(testArea.minX - 1.0) >> 4;
++        final int maxChunkX = Mth.floor(testArea.maxX + 1.0) >> 4;
++        final int minChunkZ = Mth.floor(testArea.minZ - 1.0) >> 4;
++        final int maxChunkZ = Mth.floor(testArea.maxZ + 1.0) >> 4;
++        if (minChunkX != maxChunkX || minChunkZ != maxChunkZ) {
++            return null;
++        }
++        return this.level.getChunkIfLoadedImmediately(minChunkX, minChunkZ);
++    }
++    // Shrek end - cache the supporting block check
++
      protected void checkSupportingBlock(final boolean onGround, final @Nullable Vec3 movement) {
 -        if (onGround) {
 +        if (onGround && this.mechanicsTarget.atLeast(me.samsuik.sakura.mechanics.MechanicVersion.v1_20)) { // Shrek - configure server mechanics
              AABB boundingBox = this.getBoundingBox();
              AABB testArea = new AABB(boundingBox.minX, boundingBox.minY - 1.0E-6, boundingBox.minZ, boundingBox.maxX, boundingBox.minY, boundingBox.maxZ);
-             Optional<BlockPos> supportingBlock = this.level.findSupportingBlock(this, testArea);
+-            Optional<BlockPos> supportingBlock = this.level.findSupportingBlock(this, testArea);
++            // Shrek start - cache the supporting block check
++            final net.minecraft.world.level.chunk.ChunkAccess supportChunk = this.shrek$supportChunk(testArea);
++            Optional<BlockPos> supportingBlock;
++            if (this.shrek$supportCached(testArea, supportChunk)) {
++                supportingBlock = this.shrek$supportResult;
++            } else {
++                supportingBlock = this.level.findSupportingBlock(this, testArea);
++                this.shrek$rememberSupport(testArea, supportChunk, supportingBlock);
++            }
++            // Shrek end - cache the supporting block check
+             if (supportingBlock.isPresent() || this.onGroundNoBlocks) {
+                 this.mainSupportingBlockPos = supportingBlock;
+             } else if (movement != null) {
+@@ -1229,6 +_,28 @@
+ 
+         final Vec3 originalMovement = delta; // Paper - Expose pre-collision velocity
+         ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread("Cannot move an entity off-main");
++        // Shrek start - skip zero player moves (idea from Gale/VMP, MIT; made exact)
++        if (moverType == MoverType.PLAYER && delta.x == 0.0 && delta.y == 0.0 && delta.z == 0.0
++            && this instanceof net.minecraft.server.level.ServerPlayer && !this.noPhysics
++            && this.stuckSpeedMultiplier.lengthSqr() <= 1.0E-7
++            && this.getDeltaMovement().equals(Vec3.ZERO)
++            && this.moveDist <= this.nextStep
++            && !this.isLocalInstanceAuthoritative()
++            && this.mechanicsTarget.atLeast(me.samsuik.sakura.mechanics.MechanicVersion.v26_2)
++            && gg.shrekmc.ShrekServerConfig.movement().skipZeroPlayerMoves) {
++            final Vec3 pos = this.position();
++            final Vec3 newPosition = pos.add(delta);
++            this.addMovementThisTick(new Entity.Movement(pos, newPosition, delta));
++            this.setPos(newPosition);
++            this.recordMovement(moverType, delta);
++            this.horizontalCollision = false;
++            this.minorHorizontalCollision = false;
++            if (!this.isRemoved()) {
++                this.setDeltaMovement(new Vec3(0.0, 0.0, 0.0));
++            }
++            return;
++        }
++        // Shrek end - skip zero player moves
+         if (this.noPhysics) {
+             // Canvas start - region threading
+             Vec3 pos = this.position();
 @@ -1248,7 +_,10 @@
              this.verticalCollisionBelow = false;
              this.minorHorizontalCollision = false;
@@ -565,6 +722,22 @@
      private void debugBlockIntersection(final ServerLevel level, final BlockPos pos, final boolean insideBlock, final boolean insideFluid) {
          DebugEntityBlockIntersection type;
          if (insideFluid) {
+@@ -2082,6 +_,7 @@
+     }
+ 
+     private void walkingStepSound(final BlockPos onPos, final BlockState onState) {
++        if (gg.shrekmc.spawn.ShrekSpawnCrowd.hidesMovementSounds(this)) return; // Shrek - spawn crowd
+         this.playStepSound(onPos, onState);
+         if (this.shouldPlayAmethystStepSound(onState)) {
+             this.playAmethystStepSound();
+@@ -2089,6 +_,7 @@
+     }
+ 
+     protected void waterSwimSound() {
++        if (gg.shrekmc.spawn.ShrekSpawnCrowd.hidesMovementSounds(this)) return; // Shrek - spawn crowd
+         Entity entity = Objects.requireNonNullElse(this.getControllingPassenger(), this);
+         float volumeModifier = entity == this ? 0.35F : 0.4F;
+         Vec3 deltaMovement = entity.getDeltaMovement();
 @@ -3994,7 +_,7 @@
              }
              return;

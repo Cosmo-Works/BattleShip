@@ -1,6 +1,66 @@
 --- a/net/minecraft/network/protocol/game/ClientboundLevelChunkPacketData.java
 +++ b/net/minecraft/network/protocol/game/ClientboundLevelChunkPacketData.java
-@@ -48,6 +_,10 @@
+@@ -33,26 +_,74 @@
+         HEIGHTMAPS_STREAM_CODEC,
+         p -> p.heightmaps,
+         ByteBufCodecs.byteArray(TWO_MEGABYTES),
+-        p -> p.buffer,
++        p -> p.shrek$buffer(), // Shrek - per-player filtered copies
+         ClientboundLevelChunkPacketData.BlockEntityInfo.STREAM_CODEC.apply(ByteBufCodecs.list()),
+         p -> p.blockEntitiesData,
+         ClientboundLevelChunkPacketData::new
+     );
+     private final Map<Heightmap.Types, long[]> heightmaps;
+-    private final byte[] buffer;
++    private byte[] buffer; // Shrek - async chunk serialization - set later for snapshot packets, published by the ready flag
+     private final List<ClientboundLevelChunkPacketData.BlockEntityInfo> blockEntitiesData;
+     // Paper start - Handle oversized block entities in chunks
+     private final java.util.List<net.minecraft.network.protocol.Packet<?>> extraPackets = new java.util.ArrayList<>();
+     private static final int BLOCK_ENTITY_LIMIT = Integer.getInteger("Paper.excessiveTELimit", 750);
+ 
++    // Shrek start - per-player filtered copies
++    private @org.jspecify.annotations.Nullable ClientboundLevelChunkPacketData shrek$source;
++
++    public boolean shrek$isFilteredCopy() {
++        return this.shrek$source != null;
++    }
++
++    public byte[] shrek$buffer() {
++        return this.shrek$source != null ? this.shrek$source.shrek$buffer() : this.buffer;
++    }
++
++    public boolean shrek$hasBlockEntities(final java.util.function.Predicate<BlockEntityType<?>> remove) {
++        for (final ClientboundLevelChunkPacketData.BlockEntityInfo info : this.blockEntitiesData) {
++            if (remove.test(info.type)) {
++                return true;
++            }
++        }
++        for (final net.minecraft.network.protocol.Packet<?> extra : this.extraPackets) {
++            if (extra instanceof ClientboundBlockEntityDataPacket blockEntityPacket && remove.test(blockEntityPacket.getType())) {
++                return true;
++            }
++        }
++        return false;
++    }
++
++    public ClientboundLevelChunkPacketData shrek$withoutBlockEntities(final java.util.function.Predicate<BlockEntityType<?>> remove) {
++        final List<ClientboundLevelChunkPacketData.BlockEntityInfo> kept = new java.util.ArrayList<>(this.blockEntitiesData.size());
++        for (final ClientboundLevelChunkPacketData.BlockEntityInfo info : this.blockEntitiesData) {
++            if (!remove.test(info.type)) {
++                kept.add(info);
++            }
++        }
++        final ClientboundLevelChunkPacketData copy = new ClientboundLevelChunkPacketData(this.heightmaps, null, kept);
++        copy.shrek$source = this;
++        for (final net.minecraft.network.protocol.Packet<?> extra : this.extraPackets) {
++            if (!(extra instanceof ClientboundBlockEntityDataPacket blockEntityPacket && remove.test(blockEntityPacket.getType()))) {
++                copy.extraPackets.add(extra);
++            }
++        }
++        return copy;
++    }
++    // Shrek end - per-player filtered copies
++
      public List<net.minecraft.network.protocol.Packet<?>> getExtraPackets() {
          return this.extraPackets;
      }
@@ -11,3 +71,85 @@
      // Paper end - Handle oversized block entities in chunks
      // Paper start - Async-Anti-Xray - Ready flag for the connection
      private volatile boolean ready = true;
+ 
+     public boolean isReady() {
++        if (this.shrek$source != null) return this.shrek$source.isReady(); // Shrek - per-player filtered copies
+         return this.ready;
+     }
+ 
+@@ -64,7 +_,7 @@
+     @Deprecated @io.papermc.paper.annotation.DoNotUse // Paper - Anti-Xray - Add chunk packet info
+     public ClientboundLevelChunkPacketData(final LevelChunk levelChunk) {
+         // Paper start - Anti-Xray - Add chunk packet info
+-        this(levelChunk, null);
++        this(levelChunk, (io.papermc.paper.antixray.ChunkPacketInfo<net.minecraft.world.level.block.state.BlockState>) null); // Shrek - async chunk serialization - disambiguate
+     }
+     public ClientboundLevelChunkPacketData(final LevelChunk levelChunk, final io.papermc.paper.antixray.ChunkPacketInfo<net.minecraft.world.level.block.state.BlockState> chunkPacketInfo) {
+         // Paper end - Anti-Xray - Add chunk packet info
+@@ -95,6 +_,57 @@
+         }
+     }
+ 
++    // Shrek start - async chunk serialization (idea from DivineMC's Async Chunk Sending, GPLv3)
++    private net.minecraft.world.level.chunk.LevelChunkSection @org.jspecify.annotations.Nullable [] shrek$sections;
++    public volatile gg.shrekmc.network.SharedFrames.@org.jspecify.annotations.Nullable Frame shrek$frame;
++
++    public ClientboundLevelChunkPacketData(final LevelChunk levelChunk, final net.minecraft.world.level.chunk.LevelChunkSection[] sectionCopies) {
++        this.heightmaps = levelChunk.getHeightmaps()
++            .stream()
++            .filter(entryx -> ((Heightmap.Types)entryx.getKey()).sendToClient())
++            .collect(Collectors.toMap(Entry::getKey, entryx -> (long[])((Heightmap)entryx.getValue()).getRawData().clone()));
++        this.shrek$sections = sectionCopies;
++        this.blockEntitiesData = Lists.newArrayList();
++        int totalTileEntities = 0;
++        for (BlockEntity blockEntity : levelChunk.canvas$getAllBlockEntities()) {
++            if (++totalTileEntities > BLOCK_ENTITY_LIMIT) {
++                net.minecraft.network.protocol.Packet<ClientGamePacketListener> packet = blockEntity.getUpdatePacket();
++                if (packet != null) {
++                    this.extraPackets.add(packet);
++                    continue;
++                }
++            }
++            this.blockEntitiesData.add(ClientboundLevelChunkPacketData.BlockEntityInfo.create(blockEntity));
++        }
++        this.ready = false;
++    }
++
++    public void shrek$serialize() {
++        try {
++            final net.minecraft.world.level.chunk.LevelChunkSection[] sections = java.util.Objects.requireNonNull(this.shrek$sections, "already serialized");
++            int size = 0;
++            for (final net.minecraft.world.level.chunk.LevelChunkSection section : sections) {
++                size += section.getSerializedSize();
++            }
++            final byte[] buffer = new byte[size];
++            final ByteBuf byteBuf = Unpooled.wrappedBuffer(buffer);
++            byteBuf.writerIndex(0);
++            final FriendlyByteBuf friendlyByteBuf = new FriendlyByteBuf(byteBuf);
++            int chunkSectionIndex = 0;
++            for (final net.minecraft.world.level.chunk.LevelChunkSection section : sections) {
++                section.write(friendlyByteBuf, null, chunkSectionIndex++);
++            }
++            if (byteBuf.writerIndex() != buffer.length) {
++                throw new IllegalStateException("Didn't fill chunk buffer: expected " + buffer.length + " bytes, got " + byteBuf.writerIndex());
++            }
++            this.buffer = buffer;
++            this.shrek$sections = null;
++        } finally {
++            this.ready = true;
++        }
++    }
++    // Shrek end - async chunk serialization
++
+     private ClientboundLevelChunkPacketData(
+         final Map<Heightmap.Types, long[]> heightmaps, final byte[] buffer, final List<ClientboundLevelChunkPacketData.BlockEntityInfo> blockEntitiesData
+     ) {
+@@ -151,7 +_,7 @@
+     }
+ 
+     public FriendlyByteBuf getReadBuffer() {
+-        return new FriendlyByteBuf(Unpooled.wrappedBuffer(this.buffer));
++        return new FriendlyByteBuf(Unpooled.wrappedBuffer(this.shrek$buffer())); // Shrek - per-player filtered copies
+     }
+ 
+     public Map<Heightmap.Types, long[]> getHeightmaps() {

@@ -1,11 +1,9 @@
 // Ported from Sakura (https://github.com/Samsuik/Sakura), licensed under the MIT License.
 package me.samsuik.sakura.player.visibility;
 
-import java.util.List;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.network.protocol.game.ClientboundBlockEventPacket;
-import net.minecraft.network.protocol.game.ClientboundLevelChunkPacketData;
 import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
@@ -67,53 +65,43 @@ public final class FilterOrModifyPackets {
         return state != VisibilityState.OFF;
     }
 
-    public static boolean filterOrModifyPacket(final Packet<?> packet, final ServerPlayer player) {
-        final VisibilitySettings settings = player.visibilitySettings;
-        final List<Packet<?>> extraPackets = extraPackets(packet);
-        if (extraPackets != null) {
-            extraPackets.removeIf(extraPacket -> filterExtraPackets(extraPacket, player));
-        }
+    /**
+     * The packet to send to {@code player} instead of {@code packet}: the same packet, a filtered copy, or null to
+     * send nothing. Never changes {@code packet}: chunk packets are shared between players (chunk packet cache,
+     * shared chunk frames), so hiding spawners for one player must not hide them for everyone (Shrek fix: Sakura
+     * removed them from the shared packet in place).
+     */
+    public static @Nullable Packet<?> filterOrModifyPacket(final Packet<?> packet, final ServerPlayer player) {
+        return filterOrModifyPacket(packet, player.visibilitySettings);
+    }
+
+    public static @Nullable Packet<?> filterOrModifyPacket(final Packet<?> packet, final VisibilitySettings settings) {
 
         if (settings.isToggled(VisibilityTypes.SPAWNERS)) {
-            ClientboundLevelChunkPacketData chunkData = null;
-            if (packet instanceof final ClientboundLevelChunkWithLightPacket chunkPacket) {
-                chunkData = chunkPacket.chunkData();
-            } else if (packet instanceof final ClientboundLevelChunkPacketData chunkPacket) {
-                chunkData = chunkPacket;
+            if (packet instanceof final ClientboundLevelChunkWithLightPacket chunkPacket
+                && chunkPacket.chunkData().shrek$hasBlockEntities(FilterOrModifyPackets::isSpawner)) {
+                return new ClientboundLevelChunkWithLightPacket(
+                    chunkPacket.x(), chunkPacket.z(),
+                    chunkPacket.chunkData().shrek$withoutBlockEntities(FilterOrModifyPackets::isSpawner),
+                    chunkPacket.lightData()
+                );
             }
 
-            if (chunkData != null) {
-                chunkData.removeBlockEntitiesOfType(BlockEntityTypes.MOB_SPAWNER);
-            }
-
-            if (packet instanceof final ClientboundBlockEntityDataPacket bedPacket && bedPacket.getType() == BlockEntityTypes.MOB_SPAWNER) {
-                return true;
+            if (packet instanceof final ClientboundBlockEntityDataPacket bedPacket && isSpawner(bedPacket.getType())) {
+                return null;
             }
         }
 
-        if (packet instanceof final ClientboundBlockEventPacket bePacket && settings.isToggled(VisibilityTypes.PISTONS)) {
-            return bePacket.getBlock() instanceof PistonBaseBlock;
+        if (packet instanceof final ClientboundBlockEventPacket bePacket && settings.isToggled(VisibilityTypes.PISTONS)
+            && bePacket.getBlock() instanceof PistonBaseBlock) {
+            return null;
         }
 
-        return false;
+        return packet;
     }
 
-    private static boolean filterExtraPackets(final Packet<?> packet, final ServerPlayer player) {
-        final VisibilitySettings settings = player.visibilitySettings;
-        if (settings.isToggled(VisibilityTypes.SPAWNERS) && packet instanceof final ClientboundBlockEntityDataPacket bedPacket) {
-            return bedPacket.getType() == BlockEntityTypes.MOB_SPAWNER;
-        }
-
-        return false;
+    private static boolean isSpawner(final net.minecraft.world.level.block.entity.BlockEntityType<?> type) {
+        return type == BlockEntityTypes.MOB_SPAWNER;
     }
 
-    private static @Nullable List<Packet<?>> extraPackets(final Packet<?> packet) {
-        if (packet instanceof final ClientboundLevelChunkWithLightPacket chunkPacket) {
-            return chunkPacket.chunkData().getExtraPackets();
-        }
-        if (packet instanceof final ClientboundLevelChunkPacketData chunkData) {
-            return chunkData.getExtraPackets();
-        }
-        return null;
-    }
 }

@@ -1,0 +1,26 @@
+--- a/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java
++++ b/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java
+@@ -39,6 +_,7 @@
+         RegisteredListener[] listeners = handlers.getRegisteredListeners();
+         if (listeners.length == 0) return;
+         // Canvas end - skip event if no listeners
++        gg.shrekmc.parallel.RegionParallel.checkEventOutsidePhase(event); // Shrek - plugin code must not run in a parallel phase
+         if (event.isAsynchronous() && this.server.isPrimaryThread()) {
+             throw new IllegalStateException(event.getEventName() + " may only be triggered asynchronously.");
+         } else if (!event.isAsynchronous() && !this.server.isPrimaryThread() && !this.server.isStopping()) {
+@@ -51,6 +_,7 @@
+                 continue;
+             }
+ 
++            final long shrek$gate = gg.shrekmc.octopus.PluginGate.OBSERVE ? gg.shrekmc.octopus.PluginGate.enter() : 0L; // Shrek - octopus plugin gate (observe)
+             try {
+                 registration.callEvent(event);
+             } catch (AuthorNagException ex) {
+@@ -73,6 +_,7 @@
+                     this.callEvent(new ServerExceptionEvent(new ServerEventException(msg, ex, registration.getPlugin(), registration.getListener(), event)));
+                 }
+             }
++            if (shrek$gate != 0L) gg.shrekmc.octopus.PluginGate.listener(event, registration.getPlugin(), shrek$gate); // Shrek - octopus plugin gate (observe)
+         }
+     }
+ 

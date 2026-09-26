@@ -1,0 +1,34 @@
+--- a/net/minecraft/world/level/storage/PlayerDataStorage.java
++++ b/net/minecraft/world/level/storage/PlayerDataStorage.java
+@@ -35,6 +_,19 @@
+         try (ProblemReporter.ScopedCollector reporter = new ProblemReporter.ScopedCollector(player.problemPath(), LOGGER)) {
+             TagValueOutput output = TagValueOutput.createWithContext(reporter, player.registryAccess());
+             player.saveWithoutId(output);
++            // Shrek start - async player saves: snapshot here, compress and write on the IO thread
++            if (gg.shrekmc.ShrekServerConfig.io().asyncPlayerSaves) {
++                final Path playerDirPath = this.playerDir.toPath();
++                final CompoundTag snapshot = output.buildResult();
++                gg.shrekmc.io.AsyncFileWriter.INSTANCE.submit(
++                    playerDirPath.resolve(player.getStringUUID() + ".dat"),
++                    playerDirPath.resolve(player.getStringUUID() + ".dat_old"),
++                    snapshot,
++                    temporary -> NbtIo.writeCompressed(snapshot, temporary)
++                );
++                return;
++            }
++            // Shrek end - async player saves
+             Path playerDirPath = this.playerDir.toPath();
+             Path tmpFile = Files.createTempFile(playerDirPath, player.getStringUUID() + "-", ".dat");
+             CompoundTag dataToStore = output.buildResult();
+@@ -73,6 +_,11 @@
+             }
+         }
+         // Spigot end
++        // Shrek start - async player saves: a save still waiting to be written is newer than the file
++        if (gg.shrekmc.io.AsyncFileWriter.INSTANCE.pending(realFile.toPath()) instanceof CompoundTag pending) {
++            return Optional.of(pending.copy());
++        }
++        // Shrek end - async player saves
+         if (realFile.exists() && realFile.isFile()) {
+             try {
+                 // Spigot start

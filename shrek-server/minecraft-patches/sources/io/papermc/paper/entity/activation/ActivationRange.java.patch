@@ -1,9 +1,19 @@
 --- a/io/papermc/paper/entity/activation/ActivationRange.java
 +++ b/io/papermc/paper/entity/activation/ActivationRange.java
-@@ -137,6 +_,16 @@
+@@ -137,6 +_,26 @@
          worldData.wakeupInactiveRemainingMonsters = Math.min(worldData.wakeupInactiveRemainingMonsters + 1, world.spigotConfig.wakeUpInactiveMonsters);
          worldData.wakeupInactiveRemainingFlying = Math.min(worldData.wakeupInactiveRemainingFlying + 1, world.spigotConfig.wakeUpInactiveFlying);
          // Folia end - region threading
++        // Shrek start - entity activation check frequency (from ShreddedPaper)
++        final int checkFrequency = Math.max(1, gg.shrekmc.ShrekServerConfig.ticking().entityActivationCheckFrequency);
++        final long currentTick = io.papermc.paper.threadedregions.RegionizedServer.getCurrentTick();
++        if (checkFrequency > 1 && currentTick % checkFrequency != 0) {
++            for (final Player player : world.getLocalPlayers()) {
++                player.activatedTick = currentTick;
++            }
++            return;
++        }
++        // Shrek end - entity activation check frequency (from ShreddedPaper)
 +        final gg.shrekmc.ShrekWorldConfig.Entities.BrainActivation brainActivation = world.shrekConfig().entities.brainActivation;
 +        if (brainActivation.enabled) {
 +            final int furthestThink = Math.max(1, brainActivation.maxTickFreq);
@@ -61,7 +71,7 @@
              }
          }
      }
-@@ -188,7 +_,10 @@
+@@ -188,14 +_,18 @@
       *
       * @param entity
       */
@@ -70,6 +80,16 @@
 +        if (entity instanceof Mob) {
 +            me.samsuik.sakura.entity.BrainActivation.considerPlayer(entity, player);
 +        }
++        final long activeUntil = io.papermc.paper.threadedregions.RegionizedServer.getCurrentTick() + Math.max(1, gg.shrekmc.ShrekServerConfig.ticking().entityActivationCheckFrequency) - 1; // Shrek - entity activation check frequency - active until the next check
          if (io.papermc.paper.threadedregions.RegionizedServer.getCurrentTick() > entity.activatedTick) { // Folia - region threading
              if (entity.defaultActivationState) {
-                 entity.activatedTick = io.papermc.paper.threadedregions.RegionizedServer.getCurrentTick(); // Folia - region threading
+-                entity.activatedTick = io.papermc.paper.threadedregions.RegionizedServer.getCurrentTick(); // Folia - region threading
++                entity.activatedTick = activeUntil; // Folia - region threading // Shrek - entity activation check frequency
+                 return;
+             }
+             if (bbByType[entity.activationType.ordinal()].intersects(entity.getBoundingBox())) { // Folia - region threading
+-                entity.activatedTick = io.papermc.paper.threadedregions.RegionizedServer.getCurrentTick(); // Folia - region threading
++                entity.activatedTick = activeUntil; // Folia - region threading // Shrek - entity activation check frequency
+             }
+         }
+     }

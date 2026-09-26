@@ -14,6 +14,8 @@ public final class PlayerVisibilitySettings implements VisibilitySettings {
     // Shrek - region threading: settings can be read and written by different region threads
     // concurrently (tracker checks run on the entity's region, commands on the player's).
     private final Map<VisibilityType, VisibilityState> visibilityStates = new ConcurrentHashMap<>();
+    // Shrek - cheap per-packet check: ConcurrentHashMap#isEmpty sums its counters on every call
+    private volatile boolean modified;
 
     @Override
     public VisibilityState get(final VisibilityType type) {
@@ -24,10 +26,13 @@ public final class PlayerVisibilitySettings implements VisibilitySettings {
 
     @Override
     public VisibilityState set(final VisibilityType type, final VisibilityState state) {
-        if (type.isDefault(state)) {
-            this.visibilityStates.remove(type);
-        } else {
-            this.visibilityStates.put(type, state);
+        synchronized (this.visibilityStates) {
+            if (type.isDefault(state)) {
+                this.visibilityStates.remove(type);
+            } else {
+                this.visibilityStates.put(type, state);
+            }
+            this.modified = !this.visibilityStates.isEmpty();
         }
         return state;
     }
@@ -46,7 +51,7 @@ public final class PlayerVisibilitySettings implements VisibilitySettings {
 
     @Override
     public boolean playerModified() {
-        return !this.visibilityStates.isEmpty();
+        return this.modified;
     }
 
     public void loadData(final ValueInput input) {

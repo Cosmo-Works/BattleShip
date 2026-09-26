@@ -1,5 +1,14 @@
 --- a/net/minecraft/world/level/chunk/ChunkAccess.java
 +++ b/net/minecraft/world/level/chunk/ChunkAccess.java
+@@ -56,7 +_,7 @@
+ import org.jspecify.annotations.Nullable;
+ import org.slf4j.Logger;
+ 
+-public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeResolver, ca.spottedleaf.moonrise.patches.starlight.chunk.StarlightChunk { // Paper - rewrite chunk system
++public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeResolver, ca.spottedleaf.moonrise.patches.starlight.chunk.StarlightChunk, gg.shrekmc.chunk.ChunkPacketCache.Holder<net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket> { // Paper - rewrite chunk system // Shrek - chunk packet cache
+     public static final int NO_FILLED_SECTION = -1;
+     private static final Logger LOGGER = LogUtils.getLogger();
+     private static final LongSet EMPTY_REFERENCE_SET = new LongOpenHashSet();
 @@ -394,6 +_,17 @@
      private final int minSection;
      private final int maxSection;
@@ -18,3 +27,40 @@
  
      public ChunkAccess(
          final ChunkPos chunkPos,
+@@ -606,7 +_,35 @@
+ 
+     public void markUnsaved() {
+         this.unsaved = true;
+-    }
++        this.shrek$invalidatePacket(); // Shrek - chunk packet cache
++    }
++
++    // Shrek start - chunk packet cache
++    private volatile int shrek$packetVersion;
++    private volatile gg.shrekmc.chunk.ChunkPacketCache.@Nullable Entry<net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket> shrek$packetEntry;
++
++    @Override
++    public final int shrek$packetVersion() {
++        return this.shrek$packetVersion;
++    }
++
++    @Override
++    public final gg.shrekmc.chunk.ChunkPacketCache.@Nullable Entry<net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket> shrek$packetEntry() {
++        return this.shrek$packetEntry;
++    }
++
++    @Override
++    public final void shrek$packetEntry(final gg.shrekmc.chunk.ChunkPacketCache.@Nullable Entry<net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket> entry) {
++        this.shrek$packetEntry = entry;
++    }
++
++    public final void shrek$invalidatePacket() {
++        this.shrek$packetVersion++;
++        if (this.shrek$packetEntry != null) {
++            this.shrek$packetEntry = null;
++        }
++    }
++    // Shrek end - chunk packet cache
+ 
+     public boolean tryMarkSaved() {
+         if (this.unsaved) {

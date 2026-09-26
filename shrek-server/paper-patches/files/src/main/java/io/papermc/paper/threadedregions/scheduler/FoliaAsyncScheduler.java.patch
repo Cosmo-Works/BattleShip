@@ -1,0 +1,16 @@
+--- a/src/main/java/io/papermc/paper/threadedregions/scheduler/FoliaAsyncScheduler.java
++++ b/src/main/java/io/papermc/paper/threadedregions/scheduler/FoliaAsyncScheduler.java
+@@ -212,11 +_,13 @@
+                 return;
+             }
+ 
++            final long shrek$gate = gg.shrekmc.octopus.PluginGate.OBSERVE ? gg.shrekmc.octopus.PluginGate.enter() : 0L; // Shrek - octopus plugin gate (observe)
+             try {
+                 this.run.accept(this);
+             } catch (final Throwable throwable) {
+                 this.plugin.getLogger().log(Level.WARNING, "Async task for " + this.plugin.getDescription().getFullName() + " generated an exception", throwable);
+             } finally {
++                if (shrek$gate != 0L) gg.shrekmc.octopus.PluginGate.task(gg.shrekmc.octopus.PluginGate.Scheduler.ASYNC, this.plugin, shrek$gate); // Shrek - octopus plugin gate (observe)
+                 boolean removeFromTasks = false;
+                 synchronized (this) {
+                     if (!repeating) {

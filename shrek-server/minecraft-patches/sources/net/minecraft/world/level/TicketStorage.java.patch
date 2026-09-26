@@ -1,0 +1,26 @@
+--- a/net/minecraft/world/level/TicketStorage.java
++++ b/net/minecraft/world/level/TicketStorage.java
+@@ -155,9 +_,7 @@
+ 
+     public boolean shouldKeepDimensionActive() {
+         // Paper start - rewrite chunk system
+-        final ca.spottedleaf.concurrentutil.map.concurrent.longs.ConcurrentChainedLong2LongHashTable ticketCounters = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel)this.chunkMap.level).moonrise$getChunkTaskScheduler().chunkHolderManager
+-            .getTicketCounters(ca.spottedleaf.moonrise.patches.chunk_system.ticket.ChunkSystemTicketType.COUNTER_TYPE_KEEP_DIMENSION_ACTIVE);
+-        return ticketCounters != null && !ticketCounters.isEmpty();
++        return ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel)this.chunkMap.level).moonrise$getChunkTaskScheduler().chunkHolderManager.shrek$hasKeepDimensionActiveTickets(); // Shrek - count keep-dimension-active tickets as one number
+         // Paper end - rewrite chunk system
+     }
+ 
+@@ -258,6 +_,12 @@
+     }
+ 
+     public void purgeStaleTickets(final ChunkMap chunkMap) {
++        // Shrek start - purge stale tickets frequency (from ShreddedPaper)
++        final int frequency = gg.shrekmc.ShrekServerConfig.ticking().purgeStaleTicketsFrequency;
++        if (frequency > 1 && io.papermc.paper.threadedregions.RegionizedServer.getCurrentTick() % frequency != 0) {
++            return;
++        }
++        // Shrek end - purge stale tickets frequency (from ShreddedPaper)
+         ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel)chunkMap.level).moonrise$getChunkTaskScheduler().chunkHolderManager.tick(); // Paper - rewrite chunk system
+         this.setDirty();
+     }

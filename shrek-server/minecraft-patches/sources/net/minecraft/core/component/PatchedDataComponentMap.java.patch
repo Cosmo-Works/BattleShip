@@ -12,3 +12,20 @@
      public PatchedDataComponentMap(final DataComponentMap prototype) {
          this(prototype, Reference2ObjectMaps.emptyMap(), true);
      }
+@@ -133,7 +_,16 @@
+         }
+     }
+ 
++    // Shrek start - skip unchanged slots
++    private int shrek$modCount;
++
++    public final int shrek$modCount() {
++        return this.shrek$modCount;
++    }
++    // Shrek end - skip unchanged slots
++
+     private void ensureMapOwnership() {
++        this.shrek$modCount++; // Shrek - skip unchanged slots - every change starts here
+         if (this.copyOnWrite) {
+             this.patch = new Reference2ObjectArrayMap<>(this.patch);
+             this.copyOnWrite = false;

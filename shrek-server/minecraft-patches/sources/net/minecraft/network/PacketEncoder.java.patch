@@ -1,0 +1,37 @@
+--- a/net/minecraft/network/PacketEncoder.java
++++ b/net/minecraft/network/PacketEncoder.java
+@@ -17,6 +_,34 @@
+         this.protocolInfo = protocolInfo;
+     }
+ 
++    // Shrek start - shared frames: frames are PLAY bytes
++    public boolean shrek$isPlay() {
++        return this.protocolInfo.id() == ConnectionProtocol.PLAY;
++    }
++    // Shrek end - shared frames: frames are PLAY bytes
++
++    // Shrek start - skip PacketEvents for packet types no plugin listens to
++    @Override
++    @SuppressWarnings("unchecked")
++    public void write(final ChannelHandlerContext ctx, final Object msg, final io.netty.channel.ChannelPromise promise) throws Exception {
++        if (msg instanceof Packet<?> packet && gg.shrekmc.network.PacketEventsBypass.bypass(ctx, packet)) {
++            final ByteBuf buf = ctx.alloc().ioBuffer();
++            try {
++                this.encode(ctx, (Packet<T>) packet, buf);
++            } catch (final io.netty.handler.codec.EncoderException e) {
++                buf.release();
++                throw e;
++            } catch (final Throwable t) {
++                buf.release();
++                throw new io.netty.handler.codec.EncoderException(t);
++            }
++            ctx.write(new gg.shrekmc.network.PacketEventsBypass.Encoded(buf), promise);
++            return;
++        }
++        super.write(ctx, msg, promise);
++    }
++    // Shrek end - skip PacketEvents for packet types no plugin listens to
++
+     static final ThreadLocal<java.util.Locale> ADVENTURE_LOCALE = ThreadLocal.withInitial(() -> null); // Paper - adventure; set player's locale
+     @Override
+     protected void encode(final ChannelHandlerContext ctx, final Packet<T> packet, final ByteBuf output) throws Exception {

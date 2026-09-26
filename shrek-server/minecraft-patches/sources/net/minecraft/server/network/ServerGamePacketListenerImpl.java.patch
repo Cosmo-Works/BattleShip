@@ -1,5 +1,108 @@
 --- a/net/minecraft/server/network/ServerGamePacketListenerImpl.java
 +++ b/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+@@ -1606,6 +_,36 @@
+         }
+     }
+ 
++    // Shrek start - collapse redundant move packets
++    public boolean shrek$skipRedundantMove(final ServerboundMovePlayerPacket packet) {
++        if (containsInvalidValues(packet.getX(0.0), packet.getY(0.0), packet.getZ(0.0), packet.getYRot(0.0F), packet.getXRot(0.0F))
++            || this.player.wonGame || this.player.isImmobile() || this.tickCount == 0 || !this.hasClientLoaded()
++            || this.awaitingPositionFromClient != null || this.player.isPassenger() || this.player.isSleeping()) {
++            return false;
++        }
++        this.awaitingTeleportTime = this.tickCount;
++        final float targetYRot = Mth.wrapDegrees(packet.getYRot(this.player.getYRot()));
++        final float targetXRot = Mth.wrapDegrees(packet.getXRot(this.player.getXRot()));
++        final double targetX = clampHorizontal(this.player.getX());
++        final double targetY = clampVertical(this.player.getY());
++        final double targetZ = clampHorizontal(this.player.getZ());
++        double movedDist = Mth.square(targetX - this.firstGoodX) + Mth.square(targetY - this.firstGoodY) + Mth.square(targetZ - this.firstGoodZ);
++        movedDist = Math.max(movedDist, Mth.square(targetX - this.player.getX()) + Mth.square(targetY - this.player.getY()) + Mth.square(targetZ - this.player.getZ()) - 1);
++        movedDist = Math.max(movedDist, Mth.square(targetX - this.lastGoodX) + Mth.square(targetY - this.lastGoodY) + Mth.square(targetZ - this.lastGoodZ) - 1);
++        this.receivedMovePacketCount++;
++        final int currTick = (int) (Util.getMillis() / 50);
++        this.allowedPlayerTicks += currTick - this.lastTick;
++        this.allowedPlayerTicks = Math.max(this.allowedPlayerTicks, 1);
++        this.lastTick = currTick;
++        if (this.player.getYRot() != targetYRot | this.player.getXRot() != targetXRot | movedDist > 0) {
++            this.allowedPlayerTicks -= 1;
++        } else {
++            this.allowedPlayerTicks = 20;
++        }
++        return true;
++    }
++    // Shrek end - collapse redundant move packets
++
+     private void handlePlayerPositionChange(
+         final double requestedX,
+         final double requestedY,
+@@ -1798,6 +_,41 @@
+                     // Reset to old location first
+                     this.player.absSnapTo(startX, startY, startZ, startYRot, startXRot);
+ 
++                    // Shrek start - skip PlayerMoveEvent construction when nothing listens
++                    if (gg.shrekmc.ShrekServerConfig.movement().skipUnlistenedMoveEvents
++                        && PlayerMoveEvent.getHandlerList().getRegisteredListeners().length == 0) {
++                        if (!this.hasMoved) {
++                            this.lastPosX = startX;
++                            this.lastPosY = startY;
++                            this.lastPosZ = startZ;
++                            this.lastYRot = startYRot;
++                            this.lastXRot = startXRot;
++                            this.hasMoved = true;
++                        }
++                        final double delta = Mth.square(this.lastPosX - targetX) + Mth.square(this.lastPosY - targetY) + Mth.square(this.lastPosZ - targetZ);
++                        final float deltaAngle = Math.abs(Mth.wrapDegrees(this.lastYRot - targetYRot)) + Math.abs(this.lastXRot - targetXRot);
++                        if ((delta > 1.0F / 256 || deltaAngle > 10.0F) && !this.player.isImmobile()) {
++                            final double fromX = this.lastPosX;
++                            final double fromY = this.lastPosY;
++                            final double fromZ = this.lastPosZ;
++                            final float fromYaw = this.lastYRot;
++                            final float fromPitch = this.lastXRot;
++                            this.lastPosX = targetX;
++                            this.lastPosY = targetY;
++                            this.lastPosZ = targetZ;
++                            this.lastYRot = targetYRot;
++                            this.lastXRot = targetXRot;
++                            if (this.justTeleported && !(Double.doubleToLongBits(fromX) == Double.doubleToLongBits(this.player.getX())
++                                && Double.doubleToLongBits(fromY) == Double.doubleToLongBits(this.player.getY())
++                                && Double.doubleToLongBits(fromZ) == Double.doubleToLongBits(this.player.getZ())
++                                && Float.floatToIntBits(fromYaw) == Float.floatToIntBits(this.player.getBukkitYaw())
++                                && Float.floatToIntBits(fromPitch) == Float.floatToIntBits(this.player.getXRot()))) {
++                                this.justTeleported = false;
++                                return;
++                            }
++                        }
++                    } else {
++                    // Shrek end - skip PlayerMoveEvent construction when nothing listens
+                     org.bukkit.entity.Player player = this.getCraftPlayer();
+                     if (!this.hasMoved) {
+                         this.lastPosX = startX;
+@@ -1878,6 +_,7 @@
+                             return;
+                         }
+                     }
++                    } // Shrek - skip PlayerMoveEvent construction when nothing listens
+                     // Paper end
+                     this.player.absSnapTo(targetX, targetY, targetZ, targetYRot, targetXRot);
+                     boolean isAutoSpinAttack = this.player.isAutoSpinAttack();
+@@ -2870,6 +_,7 @@
+         if (this.player.isImmobile()) return; // CraftBukkit
+         this.player.resetLastActionTime();
+         // CraftBukkit start - Raytrace to look for 'rogue armswings'
++        if (org.bukkit.event.player.PlayerInteractEvent.getHandlerList().getRegisteredListeners().length != 0) { // Shrek - the ray trace only decides which PlayerInteractEvent to fire
+         Location origin = CraftLocation.toBukkit(this.player.getEyePosition(), this.player.level(), this.player.getYRot(), this.player.getXRot());
+         double maxRange = Math.max(this.player.blockInteractionRange(), this.player.entityInteractionRange()); // todo flawed
+         // SPIGOT-5607: Only call interact event if no block or entity is being clicked. Use bukkit ray trace method, because it handles blocks and entities at the same time
+@@ -2888,6 +_,7 @@
+                 CraftEventFactory.callPlayerInteractEvent(this.player, Action.LEFT_CLICK_AIR, this.player.getInventory().getSelectedItem(), InteractionHand.MAIN_HAND);
+             }
+         } // Paper end - Call interact event
++        } // Shrek - the ray trace only decides which PlayerInteractEvent to fire
+ 
+         // Arm swing animation
+         io.papermc.paper.event.player.PlayerArmSwingEvent event = new io.papermc.paper.event.player.PlayerArmSwingEvent(this.getCraftPlayer(), org.bukkit.inventory.EquipmentSlot.HAND); // Paper - Add PlayerArmSwingEvent
 @@ -3580,6 +_,7 @@
  
                          event.setCancelled(cancelled);
