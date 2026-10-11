@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/level/levelgen/Heightmap.java
 +++ b/net/minecraft/world/level/levelgen/Heightmap.java
-@@ -125,6 +_,7 @@
+@@ -141,6 +_,7 @@
      }
  
      public void setRawData(final ChunkAccess chunk, final Heightmap.Types type, final long[] data) {

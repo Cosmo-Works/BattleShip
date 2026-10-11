@@ -24,10 +24,10 @@
 +        return refresh;
 +    }
 +    // Shrek end - load chunks on movement
- 
-     public ChunkAccess(
-         final ChunkPos chunkPos,
-@@ -606,7 +_,35 @@
+     // Paper start - getblock optimisations - cache world height/sections
+     private final int minY;
+     private final int height;
+@@ -622,7 +_,35 @@
  
      public void markUnsaved() {
          this.unsaved = true;

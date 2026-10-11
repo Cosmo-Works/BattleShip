@@ -1,6 +1,6 @@
 --- a/net/minecraft/server/level/ServerChunkCache.java
 +++ b/net/minecraft/server/level/ServerChunkCache.java
-@@ -479,18 +_,28 @@
+@@ -492,18 +_,28 @@
  
      @Override
      public void tick(final BooleanSupplier haveTime, final boolean tickChunks) {
@@ -29,7 +29,7 @@
          this.clearCache();
      }
  
-@@ -520,7 +_,6 @@
+@@ -533,7 +_,6 @@
          final io.papermc.paper.threadedregions.RegionizedWorldData regionizedWorldData = this.level.getCurrentWorldData(); // Folia - region threading
          int chunkCount = this.distanceManager.getNaturalSpawnChunkCount();
          // Paper start - Optional per player mob spawns
@@ -37,7 +37,7 @@
          if ((this.spawnFriendlies || this.spawnEnemies) && this.level.paperConfig().entities.spawning.perPlayerMobSpawns) { // don't count mobs when animals and monsters are disabled
              // re-set mob counts
              for (ServerPlayer player : this.level.getLocalPlayers()) { // Folia - region threading
-@@ -536,15 +_,13 @@
+@@ -549,15 +_,13 @@
                  }
                  // Paper end - per player mob spawning backoff
              }
@@ -55,7 +55,7 @@
          if (doMobSpawning && (this.spawnEnemies || this.spawnFriendlies)) { // Paper
              // Paper start - PlayerNaturallySpawnCreaturesEvent
              for (ServerPlayer player : this.level.getLocalPlayers()) { // Folia - region threading
-@@ -553,8 +_,19 @@
+@@ -566,8 +_,19 @@
                  player.playerNaturallySpawnedEvent = new com.destroystokyo.paper.event.entity.PlayerNaturallySpawnCreaturesEvent(player.getBukkitEntity(), (byte) chunkRange);
                  player.playerNaturallySpawnedEvent.callEvent();
                  regionizedWorldData.getCanvasWorldData().natureSpawnChunkMap.addPlayer(player); // Canvas - optimize collect spawning chunks
@@ -75,7 +75,7 @@
              boolean spawnPersistent = this.level.ticksPerSpawnCategory.getLong(org.bukkit.entity.SpawnCategory.ANIMAL) != 0L && this.level.getRedstoneGameTime() % this.level.ticksPerSpawnCategory.getLong(org.bukkit.entity.SpawnCategory.ANIMAL) == 0L; // CraftBukkit // Folia - region threading
              spawningCategories = NaturalSpawner.getFilteredSpawningCategories(spawnCookie, this.spawnFriendlies, this.spawnEnemies, spawnPersistent, this.level); // CraftBukkit
          } else {
-@@ -587,6 +_,18 @@
+@@ -600,6 +_,18 @@
              this.level.tickCustomSpawners(this.spawnEnemies);
          }
      }

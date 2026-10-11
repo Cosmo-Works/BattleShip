@@ -9,7 +9,7 @@
      private final java.util.concurrent.atomic.AtomicBoolean disconnectionHandled = new java.util.concurrent.atomic.AtomicBoolean(false); // Folia - region threading - may be called concurrently during configuration stage
      private int receivedPackets;
      private int sentPackets;
-@@ -336,6 +_,21 @@
+@@ -349,6 +_,21 @@
      }
  
      private static void syncAfterConfigurationChange(final ChannelFuture future) {
@@ -31,7 +31,7 @@
          try {
              future.syncUninterruptibly();
          } catch (Exception e) {
-@@ -378,7 +_,23 @@
+@@ -391,7 +_,23 @@
          }
  
          boolean isLoginProtocol = protocol.id() == ConnectionProtocol.LOGIN;
@@ -56,7 +56,7 @@
      }
  
      public void setListenerForServerboundHandshake(final PacketListener packetListener) {
-@@ -438,6 +_,28 @@
+@@ -451,6 +_,28 @@
          }
  
          packet.onPacketDispatch(this.getPlayer());
@@ -85,7 +85,7 @@
          if (false && connected && (InnerUtil.canSendImmediate(this, packet) // Folia - region threading - connection fixes
              || (io.papermc.paper.util.MCUtil.isMainThread() && packet.isReady() && this.pendingActions.isEmpty()
              && (packet.getExtraPackets() == null || packet.getExtraPackets().isEmpty())))) {
-@@ -447,7 +_,7 @@
+@@ -460,7 +_,7 @@
              final java.util.List<Packet<?>> extraPackets = InnerUtil.buildExtraPackets(packet);
              final boolean hasExtraPackets = extraPackets != null && !extraPackets.isEmpty();
              if (!hasExtraPackets) {
@@ -94,7 +94,7 @@
              } else {
                  final java.util.List<PacketSendAction> actions = new java.util.ArrayList<>(1 + extraPackets.size());
                  actions.add(new PacketSendAction(packet, null, false)); // Delay the future listener until the end of the extra packets
-@@ -517,33 +_,190 @@
+@@ -530,33 +_,190 @@
      }
      // Paper end - Add netty task scheduling helper
  
@@ -292,7 +292,7 @@
  
          // Paper start - Optimize network
          if (packet.hasFinishListener()) {
-@@ -569,6 +_,7 @@
+@@ -582,6 +_,7 @@
  
      private void flush() {
          if (this.channel.eventLoop().inEventLoop()) {
@@ -300,7 +300,7 @@
              this.channel.flush();
          } else {
              this.channel.eventLoop().execute(() -> this.channel.flush());
-@@ -729,8 +_,15 @@
+@@ -743,8 +_,15 @@
          }
  
          if (this.isConnected()) {
@@ -316,7 +316,7 @@
          }
          this.becomeActive = true; // Folia - region threading
      }
-@@ -1087,7 +_,11 @@
+@@ -1102,7 +_,11 @@
          private final Packet<?> packet;
  
          private PacketSendAction(final Packet<?> packet, @Nullable final ChannelFutureListener channelFutureListener, final boolean flush) {

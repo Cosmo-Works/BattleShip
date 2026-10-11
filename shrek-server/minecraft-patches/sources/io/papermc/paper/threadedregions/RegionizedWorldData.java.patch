@@ -1,7 +1,7 @@
 --- a/io/papermc/paper/threadedregions/RegionizedWorldData.java
 +++ b/io/papermc/paper/threadedregions/RegionizedWorldData.java
-@@ -163,6 +_,14 @@
-             into.phantomSpawnerNextTick = Math.max(from.phantomSpawnerNextTick, into.phantomSpawnerNextTick);
+@@ -178,6 +_,14 @@
+ 
              // chunkHoldersToBroadcast
              into.chunkHoldersToBroadcast.addAll(from.chunkHoldersToBroadcast);
 +            // Shrek start - per-region tick scheduler and block state watchers
@@ -12,10 +12,10 @@
 +            into.shrekDurableBlockManager.mergeFrom(from.shrekDurableBlockManager);
 +            // Shrek end - per-region tick scheduler and block state watchers
 +            into.shrekPathCache.clear(); // Shrek - faster pathfinding: section versions are per region
-         }
+             // Canvas start - region threading
  
-         @Override
-@@ -342,6 +_,15 @@
+             // debug subscribers
+@@ -365,6 +_,15 @@
                      into.chunkHoldersToBroadcast.add(chunkHolder);
                  }
              }
@@ -31,7 +31,7 @@
          }
      };
  
-@@ -461,11 +_,24 @@
+@@ -484,11 +_,24 @@
      public int wakeupInactiveRemainingVillagers;
      // Paper end
      public int currentPrimedTnt = 0; // Spigot
@@ -56,18 +56,18 @@
      public final List<LevelChunk> temporaryChunkTickList = new it.unimi.dsi.fastutil.objects.ObjectArrayList<>(); // Canvas - optimized collection
      public final Set<ChunkHolder> chunkHoldersToBroadcast = new ReferenceLinkedOpenHashSet<>();
  
-@@ -506,6 +_,10 @@
-         this.wireHandler = new alternate.current.wire.WireHandler(world);
-         this.turbo = new io.papermc.paper.redstone.RedstoneWireTurbo((RedstoneWireBlock)Blocks.REDSTONE_WIRE);
+@@ -548,6 +_,10 @@
+         this.wireHandler = new WireHandler(world);
+         this.turbo = new RedstoneWireTurbo((RedstoneWireBlock)Blocks.REDSTONE_WIRE);
          this.regionData = regionData;
 +        this.shrekBlockStateChangeTracker = new me.samsuik.sakura.tracking.block_change.BlockStateChangeTracker(world); // Shrek - per-region block state watchers
 +        this.shrekDurableBlockManager = new me.samsuik.sakura.explosion.DurableBlockManager(world); // Shrek - explosion durable blocks
 +        this.shrekDispenseRelocationHandler = new me.samsuik.sakura.mechanics.sake.DispenseRelocationHandler(world); // Shrek - dispenser relocation
 +        me.samsuik.sakura.scheduler.ScheduleSakuraTasks.schedule(this.shrekTickScheduler); // Shrek - per-region tick scheduler
- 
-         // tasks may be drained before the region ticks, so we must set up the tick data early just in case
-         this.updateTickData();
-@@ -723,6 +_,29 @@
+         // Canvas start - region threading
+         this.debugSubscribers = new ServerDebugSubscribers(MinecraftServer.getServer());
+         this.debugSynchronizers = new LevelDebugSynchronizers(world);
+@@ -770,6 +_,29 @@
              }
          } finally {
              iterator.finishedIterating();

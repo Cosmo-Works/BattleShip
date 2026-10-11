@@ -253,7 +253,7 @@
          }
  
          return false;
-@@ -460,7 +_,7 @@
+@@ -465,7 +_,7 @@
      // Paper end - Perf: Optimize Hoppers
  
      private static boolean ejectItems(final Level level, final BlockPos blockPos, final HopperBlockEntity self) {
@@ -262,7 +262,7 @@
          if (container == null) {
              return false;
          }
-@@ -521,7 +_,7 @@
+@@ -526,7 +_,7 @@
          final io.papermc.paper.threadedregions.RegionizedWorldData worldData = io.papermc.paper.threadedregions.TickRegionScheduler.getCurrentRegionizedWorldData(); // Folia - region threading
          BlockPos blockPos = BlockPos.containing(hopper.getLevelX(), hopper.getLevelY() + 1.0, hopper.getLevelZ());
          BlockState blockState = level.getBlockState(blockPos);
@@ -271,7 +271,7 @@
          if (container != null) {
              Direction direction = Direction.DOWN;
              worldData.skipPullModeEventFire = worldData.skipHopperEvents; // Paper - Perf: Optimize Hoppers // Folia - region threading
-@@ -804,7 +_,7 @@
+@@ -809,7 +_,7 @@
  
      @Override
      protected void setItems(final NonNullList<ItemStack> items) {

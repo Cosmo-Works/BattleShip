@@ -1,6 +1,6 @@
 --- a/net/minecraft/server/MinecraftServer.java
 +++ b/net/minecraft/server/MinecraftServer.java
-@@ -980,6 +_,7 @@
+@@ -977,6 +_,7 @@
              this.isSaving = true;
              this.getPlayerList().saveAll(); // Paper - Incremental chunk and player saving; diff on change
              boolean result = this.saveAllChunks(silent, flush, force);
@@ -8,9 +8,9 @@
              this.warnOnLowDiskSpace();
              return result;
          } finally {
-@@ -1604,8 +_,19 @@
+@@ -1606,9 +_,20 @@
          this.server.spark.tickStart(); // Paper - spark
-         // Folia start - region threading
+         // Folia & Canvas start - region threading
          new com.destroystokyo.paper.event.server.ServerTickStartEvent((int)region.getCurrentTick()).callEvent(); // Paper - Server Tick Events
 +        // Shrek start - suspend flushing for the whole region tick
 +        final List<ServerPlayer> shrek$earlySuspended = region != null && gg.shrekmc.ShrekServerConfig.network().suspendFlushingWholeTick
@@ -22,34 +22,35 @@
 +        final long shrek$tickStart = gg.shrekmc.debug.RegionPhaseTiming.beginTick(); // Shrek - region phase timing
 +        try { // Shrek - region phase timing
          if (region != null) {
+             // drain tasks
 +            long shrek$phase = gg.shrekmc.debug.RegionPhaseTiming.start(gg.shrekmc.debug.RegionPhaseTiming.Phase.REGION_TASKS); // Shrek - region phase timing
              region.getTaskQueueData().drainTasks();
 +            gg.shrekmc.debug.RegionPhaseTiming.end(gg.shrekmc.debug.RegionPhaseTiming.Phase.REGION_TASKS, shrek$phase); // Shrek - region phase timing
+ 
              // run all player packets
-             for (final ServerPlayer player : new java.util.ArrayList<>(region.world.getCurrentWorldData().getLocalPlayers())) {
-                 PacketProcessor packetProcessor = player.getBukkitEntity().packetProcessor;
-@@ -1618,7 +_,10 @@
-                 while (ca.spottedleaf.moonrise.common.util.TickThread.isTickThreadFor(player) && packetProcessor.executeSinglePacket());
+             for (final ServerPlayer player : new java.util.ArrayList<>(regionizedWorldData.getLocalPlayers())) {
+@@ -1625,7 +_,10 @@
              }
-             // Canvas end - region threading
+ 
+             // tick the region scheduler
 +            shrek$phase = gg.shrekmc.debug.RegionPhaseTiming.start(gg.shrekmc.debug.RegionPhaseTiming.Phase.PLUGIN_REGION_TASKS); // Shrek - region phase timing
              ((io.papermc.paper.threadedregions.scheduler.FoliaRegionScheduler)org.bukkit.Bukkit.getRegionScheduler()).tick();
 +            gg.shrekmc.debug.RegionPhaseTiming.end(gg.shrekmc.debug.RegionPhaseTiming.Phase.PLUGIN_REGION_TASKS, shrek$phase); // Shrek - region phase timing
 +            shrek$phase = gg.shrekmc.debug.RegionPhaseTiming.start(gg.shrekmc.debug.RegionPhaseTiming.Phase.ENTITY_SCHEDULERS); // Shrek - region phase timing
+ 
              // now run all the entity schedulers
-             for (io.papermc.paper.threadedregions.EntityScheduler scheduler : region.world.getCurrentWorldData().entitySchedulerTickList.getAllSchedulers()) {
-                 net.minecraft.world.entity.Entity handle = scheduler.entity.getHandleRaw();
-@@ -1628,6 +_,7 @@
+             for (final io.papermc.paper.threadedregions.EntityScheduler scheduler : regionizedWorldData.entitySchedulerTickList.getAllSchedulers()) {
+@@ -1636,6 +_,7 @@
  
                  scheduler.executeTick();
              }
 +            gg.shrekmc.debug.RegionPhaseTiming.end(gg.shrekmc.debug.RegionPhaseTiming.Phase.ENTITY_SCHEDULERS, shrek$phase); // Shrek - region phase timing
+ 
              // fix passenger desync
-             for (final net.minecraft.world.entity.Entity entity : region.world.getCurrentWorldData().getLocalEntitiesCopy()) {
-                 entity.fixPassengerDesync();
-@@ -1635,6 +_,11 @@
-         }
-         // Canvas start - region threading
+             for (final net.minecraft.world.entity.Entity entity : regionizedWorldData.getLocalEntitiesCopy()) {
+@@ -1645,6 +_,11 @@
+ 
+         // consume unload ticket
          if (region.world.canvas$unloadTicket.isPresent()) {
 +            // Shrek start - suspend flushing for the whole region tick
 +            for (final ServerPlayer player : shrek$earlySuspended) {
@@ -59,15 +60,15 @@
              region.getRegionSchedulingHandle().markNonSchedulable();
              return;
          }
-@@ -1650,6 +_,7 @@
+@@ -1657,6 +_,7 @@
              region.world.fillReportDetails(crashReport);
              throw new ReportedException(crashReport);
          }
 +        } finally { gg.shrekmc.debug.RegionPhaseTiming.endTick(shrek$tickStart); } // Shrek - region phase timing
-         // Canvas end - region threading
+         // Folia & Canvas end - region threading
          if (false && nano - this.lastServerStatus >= STATUS_EXPIRE_TIME_NANOS) { // Folia - region threading
              this.lastServerStatus = nano;
-@@ -1854,11 +_,14 @@
+@@ -1860,11 +_,14 @@
              }
  
              regionizedWorldData.explosionDensityCache.clear(); // Paper - Optimize explosions // Folia - region threading
@@ -80,9 +81,9 @@
          regionizedWorldData.tickConnections();
 +        gg.shrekmc.debug.RegionPhaseTiming.end(gg.shrekmc.debug.RegionPhaseTiming.Phase.CONNECTIONS, shrek$phase); // Shrek - region phase timing
          // this.playerList.tick(); // moved to global tick
-         // debug subscribers and the game test framework are not safe for region threading
-         /* this.debugSubscribers.tick();
-@@ -1872,6 +_,14 @@
+         regionizedWorldData.debugSubscribers.tick();
+         // the game test framework is not safe for region threading
+@@ -1878,6 +_,14 @@
          } */
          // Folia & Canvas end - region threading
  
@@ -97,7 +98,7 @@
          // Folia start - region threading
          for (final ServerPlayer player : suspendedFlushes) {
              if (!ca.spottedleaf.moonrise.common.util.TickThread.isTickThreadFor(player)) {
-@@ -1880,6 +_,7 @@
+@@ -1886,6 +_,7 @@
          // Folia end - region threading
              player.connection.resumeFlushing();
          }

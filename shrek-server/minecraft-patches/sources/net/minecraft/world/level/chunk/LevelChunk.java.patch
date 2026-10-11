@@ -33,8 +33,8 @@
      private static final Logger LOGGER = LogUtils.getLogger();
      private static final TickingBlockEntity NULL_TICKER = new TickingBlockEntity() {
          @Override
-@@ -151,6 +_,13 @@
-         return this.getBlockStateFinal(x, y, z);
+@@ -156,6 +_,13 @@
+         return this.getFluidState(x, y, z);
      }
      // Paper end - get block chunk optimisation
 +    // Shrek start - per-region block state watchers
@@ -47,7 +47,7 @@
  
      public LevelChunk(final Level level, final ChunkPos pos) {
          this(level, pos, UpgradeData.EMPTY, new LevelChunkTicks<>(), new LevelChunkTicks<>(), 0L, null, null, null);
-@@ -189,6 +_,7 @@
+@@ -194,6 +_,7 @@
          this.defaultBlockState = empty ? VOID_AIR_BLOCKSTATE : AIR_BLOCKSTATE;
          // Paper end - get block chunk optimisation
          this.lightningTick = new java.util.Random().nextInt(100000) << 1; // Pufferfish - initialize lightning tick
@@ -55,7 +55,7 @@
      }
  
      public LevelChunk(final ServerLevel level, final ProtoChunk protoChunk, final LevelChunk.@Nullable PostLoadProcessor postLoad) {
-@@ -397,6 +_,7 @@
+@@ -402,6 +_,7 @@
          if (oldState == state) {
              return null;
          }
@@ -63,7 +63,7 @@
  
          Block newBlock = state.getBlock();
          // Canvas start - optimize heightmap
-@@ -447,6 +_,7 @@
+@@ -452,6 +_,7 @@
              return null;
          }
  
@@ -71,7 +71,7 @@
          if (!this.level.isClientSide() && (flags & Block.UPDATE_SKIP_ON_PLACE) == 0 && (!this.level.getCurrentWorldData().captureBlockStates || newBlock instanceof net.minecraft.world.level.block.BaseEntityBlock)) { // CraftBukkit - Don't place while processing the BlockPlaceEvent, unless it's a BlockContainer. Prevents blocks such as TNT from activating when cancelled. // Folia - region threading
              state.onPlace(this.level, pos, oldState, movedByPiston);
          }
-@@ -547,6 +_,7 @@
+@@ -552,6 +_,7 @@
  
      @Override
      public void setBlockEntity(final BlockEntity blockEntity) {
@@ -79,7 +79,7 @@
          BlockPos pos = blockEntity.getBlockPos();
          BlockState blockState = this.getBlockState(pos);
          if (!blockState.hasBlockEntity()) {
-@@ -601,6 +_,7 @@
+@@ -606,6 +_,7 @@
  
      @Override
      public void removeBlockEntity(final BlockPos pos) {
@@ -87,7 +87,7 @@
          if (this.isInLevel()) {
              BlockEntity removeThis = this.canvas$removeFromBuckets(pos.getX(), pos.getY(), pos.getZ()); // Canvas - optimize block entity fetching
              // CraftBukkit start - SPIGOT-5561: Also remove from pending map
-@@ -928,6 +_,7 @@
+@@ -933,6 +_,7 @@
      }
  
      public void clearAllBlockEntities() {
@@ -95,7 +95,7 @@
          this.canvas$iterateOverBlockEntities(BlockEntity::setRemoved); // Canvas - optimize block entity fetching
          this.canvas$removeAll(); // Canvas - optimize block entity fetching
          this.tickersInLevel.values().forEach(ticker -> ticker.rebind(NULL_TICKER));
-@@ -1120,6 +_,13 @@
+@@ -1125,6 +_,13 @@
              return this.blockEntity.typeHolder().getRegisteredName();
          }
  
@@ -109,7 +109,7 @@
          @Override
          public String toString() {
              return "Level ticker for " + this.getType() + "@" + this.getPos();
-@@ -1174,6 +_,13 @@
+@@ -1179,6 +_,13 @@
          public String getType() {
              return this.ticker.getType();
          }

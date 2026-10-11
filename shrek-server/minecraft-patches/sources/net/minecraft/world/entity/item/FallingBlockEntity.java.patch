@@ -197,7 +197,7 @@
 @@ -146,7 +_,7 @@
  
      @Override
-     protected double getDefaultGravity() {
+     public double getDefaultGravity() {
 -        return 0.04;
 +        return this.shrek$target().before(me.samsuik.sakura.mechanics.MechanicVersion.v1_14) ? 0.04f : 0.04; // Shrek - cannon mechanics: pre-1.14 used float gravity
      }

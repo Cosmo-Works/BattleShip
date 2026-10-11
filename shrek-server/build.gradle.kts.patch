@@ -34,8 +34,7 @@
 +    activeFork = shrek
  
      updatingMinecraft {
--        oldForkCommit = "4a0ed14a386f20d8f7992103dc71130bc2641209"
-+        // oldForkCommit = "4a0ed14a386f20d8f7992103dc71130bc2641209"
+         // oldForkCommit = "4a0ed14a386f20d8f7992103dc71130bc2641209"
 
 @@ -110,10 +_,14 @@ sourceSets {
      main {
@@ -59,9 +58,9 @@
 -    implementation(projects.canvasApi)
 +    implementation(projects.shrekApi)
 +    implementation("com.github.luben:zstd-jni:1.5.7-4") // Shrek - Linear region format
-     implementation("ca.spottedleaf:leafpile:1.2.2")
-     implementation("org.jline:jline-terminal-ffm:3.29.0") // use ffm on java 22+
-     implementation("org.jline:jline-terminal-jni:3.29.0") // fall back to jni on java 21
+     implementation(platform("ca.spottedleaf.leafpile:bom:1.2.4"))
+     implementation("ca.spottedleaf.leafpile:common")
+     implementation("ca.spottedleaf.leafpile:concurrentutil")
 @@ -215,15 +_,15 @@ tasks.jar {
          )
          attributes(

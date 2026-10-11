@@ -91,7 +91,7 @@
      }
  
      @Override
-@@ -420,14 +_,23 @@
+@@ -427,14 +_,23 @@
              this.contactDamages.clear();
              this.knockbackModifier = SulfurCubeArchetype.DEFAULT_KNOCKBACK_MODIFIERS;
              this.soundSettings = SulfurCubeArchetype.DEFAULT_SOUND_SETTINGS;
@@ -117,7 +117,7 @@
                  }
  
                  if (archetype.contactDamage().isPresent()) {
-@@ -899,6 +_,7 @@
+@@ -906,6 +_,7 @@
      @Override
      public void knockback(final double power, double xd, double zd, final DamageSource source, final float damage, final boolean comesFromEffect, @Nullable Entity attacker, io.papermc.paper.event.entity.EntityKnockbackEvent.Cause eventCause) { // Paper - knockback events
          if (source.getEntity() != null && this.hasBodyItem()) {

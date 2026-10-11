@@ -1,6 +1,6 @@
 --- a/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/ChunkHolderManager.java
 +++ b/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/ChunkHolderManager.java
-@@ -752,8 +_,22 @@
+@@ -765,8 +_,22 @@
          }
      }
  
@@ -23,7 +23,7 @@
              this.ticketCounters.computeIfAbsent(counterType, (final long counterId) -> {
                  return new ConcurrentChainedLong2LongHashTable();
              }).addTo(pos, 1L, 1L);
-@@ -762,6 +_,7 @@
+@@ -775,6 +_,7 @@
  
      private void removeTicketCounter(final TicketType type, final long pos) {
          for (final long counterType : ((ChunkSystemTicketType<?>)(Object)type).moonrise$getCounterTypes()) {
@@ -31,7 +31,7 @@
              this.ticketCounters.get(counterType).decFrom(pos, 1L, 0L);
          }
      }
-@@ -907,9 +_,12 @@
+@@ -935,9 +_,12 @@
          if (removeDelay == NO_TIMEOUT_MARKER) {
              return false;
          }
@@ -46,7 +46,7 @@
      }
  
      public void tick() {
-@@ -1541,10 +_,54 @@
+@@ -1588,6 +_,31 @@
      }
  
      public void performTicketUpdates(final Collection<TicketOperation<?, ?>> operations) {
@@ -67,7 +67,7 @@
 +            final ReentrantAreaLock.Node ticketLock = this.ticketLockArea.lock(minX, minZ, maxX, maxZ);
 +            try {
 +                for (final TicketOperation<?, ?> operation : operations) {
-+                    this.shrek$processTicketOpLocked(operation);
++                    this.processTicketOp(operation, false);
 +                }
 +            } finally {
 +                this.ticketLockArea.unlock(ticketLock);
@@ -75,29 +75,6 @@
 +            return;
 +        }
 +        // Shrek end - batch ticket updates
-         for (final TicketOperation<?, ?> operation : operations) {
-             this.processTicketOp(operation);
-         }
-     }
-+
-+    // Shrek start - batch ticket updates
-+    private <T, V> void shrek$processTicketOpLocked(final TicketOperation<T, V> operation) {
-+        final long chunk = operation.chunkCoord;
-+        switch (operation.op) {
-+            case ADD -> this.addTicketAtLevel(operation.ticketType, chunk, operation.ticketLevel, operation.identifier, false);
-+            case REMOVE -> this.removeTicketAtLevel(operation.ticketType, chunk, operation.ticketLevel, operation.identifier, false);
-+            case ADD_IF_REMOVED -> {
-+                if (this.removeTicketAtLevel(operation.ticketType2, chunk, operation.ticketLevel2, operation.identifier2, false)) {
-+                    this.addTicketAtLevel(operation.ticketType, chunk, operation.ticketLevel, operation.identifier, false);
-+                }
-+            }
-+            case ADD_AND_REMOVE -> {
-+                this.addTicketAtLevel(operation.ticketType, chunk, operation.ticketLevel, operation.identifier, false);
-+                this.removeTicketAtLevel(operation.ticketType2, chunk, operation.ticketLevel2, operation.identifier2, false);
-+            }
-+        }
-+    }
-+    // Shrek end - batch ticket updates
+         final Long2ObjectOpenHashMap<List<TicketOperation<?, ?>>> operationsBySection = new Long2ObjectOpenHashMap<>();
+         final int sectionShift = this.ticketLockArea.coordinateShift;
  
-     private final ThreadLocal<Boolean> BLOCK_TICKET_UPDATES = ThreadLocal.withInitial(() -> {
-         return Boolean.FALSE;

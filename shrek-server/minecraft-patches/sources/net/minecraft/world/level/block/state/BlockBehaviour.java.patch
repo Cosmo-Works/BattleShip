@@ -28,10 +28,10 @@
 +        public final boolean isSpecialBlock() {
 +            return this.specialBlock;
 +        }
+         private boolean isSpecialCollidingBlock;
          // Canvas start - optimize path type cache
          // inspired by Cache-block-state-tags patch from Leaf
-         public byte pathType; // 8bit, better this enum, as it only has 25 values
-@@ -581,6 +_,7 @@
+@@ -601,6 +_,7 @@
              this.spawnTerrainParticles = properties.spawnTerrainParticles;
              this.instrument = properties.instrument;
              this.replaceable = properties.replaceable;

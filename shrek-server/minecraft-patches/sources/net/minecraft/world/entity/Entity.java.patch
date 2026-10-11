@@ -302,7 +302,7 @@
 -                    && !ca.spottedleaf.moonrise.common.util.TickThread.isTickThreadFor(this.level(), pos, movement, 0)) {
 +                if (this.leavesThisRegion(pos, movement, newPosition)) {
 +                    this.unmergeForRegionTransfer(); // Shrek - cannon region transfer
-                     throw new io.canvasmc.canvas.threadedregions.entities.EntityMoveOutOfRegionException(this, moverType, movement);
+                     throw new io.canvasmc.canvas.threadedregions.world.entities.EntityMoveOutOfRegionException(this, moverType, movement);
                  }
                  // Canvas end - region threading
 -                this.addMovementThisTick(new Entity.Movement(pos, newPosition, delta));
@@ -747,7 +747,7 @@
          // CraftBukkit end
      }
  
-@@ -5985,7 +_,7 @@
+@@ -6024,7 +_,7 @@
      }
  
      public boolean isPushedByFluid() {
@@ -756,7 +756,7 @@
      }
  
      public static double getViewScale() {
-@@ -6846,6 +_,12 @@
+@@ -6885,6 +_,12 @@
              this.stopRiding();
          }
  
@@ -769,7 +769,7 @@
          if (this.removalReason != Entity.RemovalReason.UNLOADED_TO_CHUNK) { this.getPassengers().forEach(Entity::stopRiding); } // Paper - rewrite chunk system
          this.levelCallback.onRemove(reason);
          this.onRemoval(reason);
-@@ -6892,13 +_,14 @@
+@@ -6931,13 +_,14 @@
      @Override
      public boolean shouldBeSaved() {
          return (this.removalReason == null || this.removalReason.shouldSave())
@@ -785,7 +785,7 @@
      }
  
      public boolean mayInteract(final ServerLevel level, final BlockPos pos) {
-@@ -7053,7 +_,7 @@
+@@ -7092,7 +_,7 @@
          void accept(Entity target, double x, double y, double z);
      }
  

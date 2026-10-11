@@ -1,6 +1,6 @@
 --- a/net/minecraft/server/network/ServerGamePacketListenerImpl.java
 +++ b/net/minecraft/server/network/ServerGamePacketListenerImpl.java
-@@ -1606,6 +_,36 @@
+@@ -1618,6 +_,36 @@
          }
      }
  
@@ -37,7 +37,7 @@
      private void handlePlayerPositionChange(
          final double requestedX,
          final double requestedY,
-@@ -1798,6 +_,41 @@
+@@ -1810,6 +_,41 @@
                      // Reset to old location first
                      this.player.absSnapTo(startX, startY, startZ, startYRot, startXRot);
  
@@ -79,7 +79,7 @@
                      org.bukkit.entity.Player player = this.getCraftPlayer();
                      if (!this.hasMoved) {
                          this.lastPosX = startX;
-@@ -1878,6 +_,7 @@
+@@ -1890,6 +_,7 @@
                              return;
                          }
                      }
@@ -87,7 +87,7 @@
                      // Paper end
                      this.player.absSnapTo(targetX, targetY, targetZ, targetYRot, targetXRot);
                      boolean isAutoSpinAttack = this.player.isAutoSpinAttack();
-@@ -2870,6 +_,7 @@
+@@ -2882,6 +_,7 @@
          if (this.player.isImmobile()) return; // CraftBukkit
          this.player.resetLastActionTime();
          // CraftBukkit start - Raytrace to look for 'rogue armswings'
@@ -95,7 +95,7 @@
          Location origin = CraftLocation.toBukkit(this.player.getEyePosition(), this.player.level(), this.player.getYRot(), this.player.getXRot());
          double maxRange = Math.max(this.player.blockInteractionRange(), this.player.entityInteractionRange()); // todo flawed
          // SPIGOT-5607: Only call interact event if no block or entity is being clicked. Use bukkit ray trace method, because it handles blocks and entities at the same time
-@@ -2888,6 +_,7 @@
+@@ -2900,6 +_,7 @@
                  CraftEventFactory.callPlayerInteractEvent(this.player, Action.LEFT_CLICK_AIR, this.player.getInventory().getSelectedItem(), InteractionHand.MAIN_HAND);
              }
          } // Paper end - Call interact event
@@ -103,7 +103,7 @@
  
          // Arm swing animation
          io.papermc.paper.event.player.PlayerArmSwingEvent event = new io.papermc.paper.event.player.PlayerArmSwingEvent(this.getCraftPlayer(), org.bukkit.inventory.EquipmentSlot.HAND); // Paper - Add PlayerArmSwingEvent
-@@ -3580,6 +_,7 @@
+@@ -3592,6 +_,7 @@
  
                          event.setCancelled(cancelled);
                          net.minecraft.world.inventory.AbstractContainerMenu oldContainer = this.player.containerMenu; // SPIGOT-1224

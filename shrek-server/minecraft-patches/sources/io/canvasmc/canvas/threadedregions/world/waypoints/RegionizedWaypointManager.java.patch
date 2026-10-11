@@ -1,5 +1,5 @@
---- a/io/canvasmc/canvas/threadedregions/waypoints/RegionizedWaypointManager.java
-+++ b/io/canvasmc/canvas/threadedregions/waypoints/RegionizedWaypointManager.java
+--- a/io/canvasmc/canvas/threadedregions/world/waypoints/RegionizedWaypointManager.java
++++ b/io/canvasmc/canvas/threadedregions/world/waypoints/RegionizedWaypointManager.java
 @@ -105,6 +_,15 @@
  
      @Override

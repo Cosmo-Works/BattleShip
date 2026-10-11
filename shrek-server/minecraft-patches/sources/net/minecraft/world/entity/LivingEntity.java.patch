@@ -254,7 +254,7 @@
 @@ -3110,7 +_,7 @@
  
      @Override
-     protected double getDefaultGravity() {
+     public double getDefaultGravity() {
 -        return this.getAttributeValue(Attributes.GRAVITY);
 +        return this.gravityWatcher.getValue(); // Shrek - cache attribute and equipment changes
      }
@@ -366,7 +366,7 @@
                      break;
                  }
  
-@@ -5034,7 +_,7 @@
+@@ -5038,7 +_,7 @@
  
      @Override
      public boolean isTransmittingWaypoint() {

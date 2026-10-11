@@ -1,6 +1,6 @@
 --- a/net/minecraft/server/level/ChunkMap.java
 +++ b/net/minecraft/server/level/ChunkMap.java
-@@ -1065,6 +_,16 @@
+@@ -1099,6 +_,16 @@
          final ca.spottedleaf.moonrise.common.misc.NearbyPlayers nearbyPlayers = this.level.moonrise$getNearbyPlayers();
          worldData.iteratingTrackerEntities = true;
          // Folia end - region threading
@@ -17,7 +17,7 @@
          try {
              final ca.spottedleaf.moonrise.common.list.ReferenceList<net.minecraft.world.entity.Entity> trackerEntities = worldData.trackerEntities; // Folia - region threading
              final Entity[] trackerEntitiesRaw = trackerEntities.getRawDataUnchecked();
-@@ -1074,7 +_,11 @@
+@@ -1108,7 +_,11 @@
                  if (tracker == null) {
                      continue;
                  }
@@ -30,7 +30,7 @@
                  if (((ca.spottedleaf.moonrise.patches.entity_tracker.EntityTrackerTrackedEntity)tracker).moonrise$hasPlayers()
                      || ((ca.spottedleaf.moonrise.patches.chunk_system.entity.ChunkSystemEntity)entity).moonrise$getChunkStatus().isOrAfter(FullChunkStatus.ENTITY_TICKING)) {
                      tracker.serverEntity.sendChanges();
-@@ -1230,14 +_,39 @@
+@@ -1264,14 +_,39 @@
              this.lastChunkUpdate = currChunkUpdate;
              this.lastTrackedChunk = chunk;
  
@@ -71,7 +71,7 @@
                  // need to purge any players possible not in the chunk list
                  for (final ServerPlayerConnection conn : new java.util.ArrayList<>(this.seenBy)) {
                      final ServerPlayer player = conn.getPlayer();
-@@ -1288,12 +_,34 @@
+@@ -1322,12 +_,34 @@
              return !this.seenBy.isEmpty();
          }
          // Paper end - optimise entity tracker
@@ -106,7 +106,7 @@
          }
  
          @Override
-@@ -1308,9 +_,12 @@
+@@ -1342,9 +_,12 @@
  
          @Override
          public void sendToTrackingPlayers(final Packet<? super ClientGamePacketListener> packet) {
@@ -119,7 +119,7 @@
          }
  
          @Override
-@@ -1349,6 +_,17 @@
+@@ -1383,6 +_,17 @@
          public void updatePlayer(final ServerPlayer player) {
              org.spigotmc.AsyncCatcher.catchOp("player tracker update"); // Spigot
              if (player != this.entity) {
@@ -137,7 +137,7 @@
                  // Paper start - remove allocation of Vec3 here
                  // Vec3 deltaToPlayer = player.position().subtract(this.entity.position());
                  double deltaToPlayerX = player.getX() - this.entity.getX();
-@@ -1371,6 +_,7 @@
+@@ -1405,6 +_,7 @@
                      && this.entity.broadcastToPlayer(player)
                      && ChunkMap.this.isChunkTracked(player, this.entity.chunkPosition().x(), this.entity.chunkPosition().z());
                  // Paper end - Configurable entity tracking range by Y
@@ -145,7 +145,7 @@
                  // Folia start - region threading
                  if (visibleToPlayer && (this.entity instanceof ServerPlayer thisEntity) && thisEntity.broadcastedDeath) {
                      visibleToPlayer = false;
-@@ -1381,6 +_,13 @@
+@@ -1415,6 +_,13 @@
                      visibleToPlayer = false;
                  }
                  // CraftBukkit end
@@ -159,7 +159,7 @@
                  if (visibleToPlayer) {
                      if (this.seenBy.add(player.connection)) {
                          // Paper start - entity tracking events
-@@ -1400,6 +_,70 @@
+@@ -1434,6 +_,70 @@
                  }
              }
          }
