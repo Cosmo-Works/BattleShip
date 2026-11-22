@@ -58,6 +58,7 @@ jobs:
         run: |
           version=$(cat version.txt)
           n=$GITHUB_RUN_NUMBER
+          sha=$(sha256sum battleship-*.jar | cut -d" " -f1)
           gh release create "build-$n" battleship-*.jar --target "$GITHUB_SHA" --latest \
             --title "Battleship $version build $n" \
-            --notes "Build $n of Battleship for Minecraft $version (${GITHUB_SHA::8}). Needs Java 25: java -jar battleship-$version-$n.jar"
+            --notes "Build $n of Battleship for Minecraft $version (${GITHUB_SHA::8}). Needs Java 25: java -jar battleship-$version-$n.jar SHA-256: $sha"
