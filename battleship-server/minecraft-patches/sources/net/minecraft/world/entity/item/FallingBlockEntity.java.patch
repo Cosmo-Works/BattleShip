@@ -18,11 +18,11 @@
  
      public FallingBlockEntity(final EntityType<? extends FallingBlockEntity> type, final Level level) {
          super(type, level);
-+        this.dropItem = level.battleshipConfig().cannons.sand.dropItems; // Battleship - cannon mechanics
++        this.dropItem = level.sakuraConfig().cannons.sand.dropItems; // Battleship - cannon mechanics
 +        this.cannonEntity = true; // Battleship - cannon entity identity
 +        this.heightParity = level.localConfig().at(this.blockPosition()).heightParity; // Battleship - cannon entity identity
 +        this.sakuraEntityController = new me.samsuik.sakura.entity.SakuraEntityController(this); // Battleship - cannon entity merge
-+        this.loadChunks = level.battleshipConfig().cannons.loadChunks; // Battleship - load chunks on movement
++        this.loadChunks = level.sakuraConfig().cannons.loadChunks; // Battleship - load chunks on movement
 +        this.battleship$applyHeightLimit(); // Battleship - cannon mechanics
      }
  
@@ -33,7 +33,7 @@
  
 +    // Battleship start - cannon mechanics
 +    private static me.samsuik.sakura.mechanics.MinecraftMechanicsTarget battleship$target(final Level level) {
-+        final me.samsuik.sakura.mechanics.MinecraftMechanicsTarget target = level.battleshipConfig().mechanics.parsedTarget.valueSafe();
++        final me.samsuik.sakura.mechanics.MinecraftMechanicsTarget target = level.sakuraConfig().cannons.mechanics.mechanicsTarget;
 +        return target != null ? target : me.samsuik.sakura.mechanics.MinecraftMechanicsTarget.latest();
 +    }
 +
@@ -51,7 +51,7 @@
 +    }
 +
 +    private void battleship$applyHeightLimit() {
-+        this.heightLimit = this.level().battleshipConfig().mechanics.heightLimitOr(
++        this.heightLimit = this.level().sakuraConfig().cannons.mechanics.heightLimit.or(
 +            this.level().paperConfig().fixes.fallingBlockHeightNerf.or(Integer.MIN_VALUE)
 +        );
 +    }
@@ -83,13 +83,13 @@
 +    }
 +
 +    private boolean battleship$canReplaceBlock(final BlockState state) {
-+        return this.level().battleshipConfig().cannons.sand.replaceBlocksWithoutCollision
++        return this.level().sakuraConfig().cannons.sand.replaceBlocksWithoutCollision
 +            && state.moonrise$emptyCollisionShape()
 +            && this.getBlockStateOn().is(this.blockState.getBlock());
 +    }
 +
 +    private boolean battleship$isFallingBlockInBounds(final ServerLevel level, final BlockPos pos) {
-+        final dev.cosmoworks.battleship.BattleshipWorldConfig.Cannons.Sand sand = level.battleshipConfig().cannons.sand;
++        final me.samsuik.sakura.configuration.WorldConfiguration.Cannons.Sand sand = level.sakuraConfig().cannons.sand;
 +        // Prevent stacking one block below build limit
 +        if (!sand.canStackAtWorldHeight && pos.getY() >= level.getMaxY() - 1) {
 +            return false;
@@ -110,7 +110,7 @@
 +    }
 +
 +    private boolean canSolidifyInWater() {
-+        return this.level().battleshipConfig().cannons.sand.concreteSolidifyInWater
++        return this.level().sakuraConfig().cannons.sand.concreteSolidifyInWater
 +            && this.blockState.getBlock() instanceof ConcretePowderBlock;
 +    }
 +
@@ -211,10 +211,10 @@
 -                boolean isConcrete = this.blockState.getBlock() instanceof ConcretePowderBlock;
 +                // Battleship start - cannon mechanics
 +                final me.samsuik.sakura.mechanics.MinecraftMechanicsTarget battleship$mechanicsTarget = this.battleship$target();
-+                final boolean battleship$floatingPointFix = serverLevel.battleshipConfig().cannons.sand.floatingPointFix || battleship$mechanicsTarget.before(me.samsuik.sakura.mechanics.MechanicVersion.v1_17);
++                final boolean battleship$floatingPointFix = serverLevel.sakuraConfig().cannons.mechanics.floatingPointFix || battleship$mechanicsTarget.before(me.samsuik.sakura.mechanics.MechanicVersion.v1_17);
 +                BlockPos pos = battleship$floatingPointFix ? this.battleship$patchedBlockPosition() : this.blockPosition();
 +                // Battleship end - cannon mechanics
-+                boolean isConcrete = serverLevel.battleshipConfig().cannons.sand.concreteSolidifyInWater && this.blockState.getBlock() instanceof ConcretePowderBlock; // Battleship - cannon mechanics: configure concrete solidifying in water
++                boolean isConcrete = serverLevel.sakuraConfig().cannons.sand.concreteSolidifyInWater && this.blockState.getBlock() instanceof ConcretePowderBlock; // Battleship - cannon mechanics: configure concrete solidifying in water
                  boolean isStuckInWater = isConcrete && this.level().getFluidState(pos).is(FluidTags.WATER);
                  double moveVec = this.getDeltaMovement().lengthSqr();
                  if (isConcrete && moveVec > 1.0) {
@@ -223,7 +223,7 @@
                  }
  
 -                if (!this.onGround() && !isStuckInWater) {
-+                if (!this.onGround() && !isStuckInWater || serverLevel.battleshipConfig().cannons.sand.despawnInsideMovingPistons && this.autoExpire && this.time > 600) { // Battleship - allow falling blocks to despawn inside moving pistons
++                if (!this.onGround() && !isStuckInWater || serverLevel.sakuraConfig().cannons.sand.despawnInsideMovingPistons && this.autoExpire && this.time > 600) { // Battleship - allow falling blocks to despawn inside moving pistons
                      if ((this.time > 100 && this.autoExpire) && (pos.getY() <= this.level().getMinY() || pos.getY() > this.level().getMaxY()) || (this.time > 600 && this.autoExpire)) { // Paper - Expand FallingBlock API
                          if (this.dropItem && serverLevel.getGameRules().get(GameRules.ENTITY_DROPS)) {
                              this.spawnAtLocation(serverLevel, block);

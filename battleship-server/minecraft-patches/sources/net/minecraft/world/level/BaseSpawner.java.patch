@@ -1,8 +1,15 @@
 --- a/net/minecraft/world/level/BaseSpawner.java
 +++ b/net/minecraft/world/level/BaseSpawner.java
-@@ -70,57 +_,27 @@
+@@ -69,58 +_,34 @@
+     // this is instantiated on the region that we are being placed at, so we are technically
      // able to fetch the current region and pull the Canvas config from there
  
++    // Sakura's global config is not loaded in unit tests; they get the vanilla value
++    private static int battleship$spawnerDefault(final java.util.function.ToIntFunction<me.samsuik.sakura.configuration.GlobalConfiguration.Environment.MobSpawnerDefaults> option, final int vanilla) {
++        final me.samsuik.sakura.configuration.GlobalConfiguration config = me.samsuik.sakura.configuration.GlobalConfiguration.get();
++        return config == null ? vanilla : option.applyAsInt(config.environment.mobSpawnerDefaults);
++    }
++
      private int getMinSpawnDelayDefault() {
 -        final io.papermc.paper.threadedregions.RegionizedWorldData worldData = io.papermc.paper.threadedregions.TickRegionScheduler.getCurrentRegionizedWorldData();
 -        if (worldData == null) {
@@ -10,7 +17,7 @@
 -            return 200;
 -        }
 -        return worldData.world.canvasConfig().blocks.spawner.minSpawnDelay;
-+        return dev.cosmoworks.battleship.BattleshipServerConfig.mobSpawnerDefaults().minSpawnDelay;
++        return battleship$spawnerDefault(defaults -> defaults.minSpawnDelay, 200);
      }
  
      private int getMaxSpawnDelayDefault() {
@@ -20,7 +27,7 @@
 -            return 800;
 -        }
 -        return worldData.world.canvasConfig().blocks.spawner.maxSpawnDelay;
-+        return dev.cosmoworks.battleship.BattleshipServerConfig.mobSpawnerDefaults().maxSpawnDelay;
++        return battleship$spawnerDefault(defaults -> defaults.maxSpawnDelay, 800);
      }
  
      private int getSpawnCountDefault() {
@@ -30,7 +37,7 @@
 -            return 4;
 -        }
 -        return worldData.world.canvasConfig().blocks.spawner.spawnCount;
-+        return dev.cosmoworks.battleship.BattleshipServerConfig.mobSpawnerDefaults().spawnCount;
++        return battleship$spawnerDefault(defaults -> defaults.spawnCount, 4);
      }
  
      private int getMaxNearbyEntitiesDefault() {
@@ -40,7 +47,7 @@
 -            return 6;
 -        }
 -        return worldData.world.canvasConfig().blocks.spawner.maxNearbyEntities;
-+        return dev.cosmoworks.battleship.BattleshipServerConfig.mobSpawnerDefaults().maxNearbyEntities;
++        return battleship$spawnerDefault(defaults -> defaults.maxNearbyEntities, 6);
      }
  
      private int getRequiredPlayerRangeDefault() {
@@ -50,7 +57,7 @@
 -            return 16;
 -        }
 -        return worldData.world.canvasConfig().blocks.spawner.requiredPlayerRange;
-+        return dev.cosmoworks.battleship.BattleshipServerConfig.mobSpawnerDefaults().requiredPlayerRange;
++        return battleship$spawnerDefault(defaults -> defaults.requiredPlayerRange, 16);
      }
  
      private int getSpawnRangeDefault() {
@@ -60,7 +67,7 @@
 -            return 4;
 -        }
 -        return worldData.world.canvasConfig().blocks.spawner.spawnRange;
-+        return dev.cosmoworks.battleship.BattleshipServerConfig.mobSpawnerDefaults().spawnRange;
++        return battleship$spawnerDefault(defaults -> defaults.spawnRange, 4);
      }
      // Canvas end - spawner configs
  
@@ -81,7 +88,7 @@
          if (tickDelay == -1) { return; } // If disabled
          // Paper end - Configurable mob spawner tick rate
 -        if (this.isNearPlayer(level, pos) && level.isSpawnerBlockEnabled()) {
-+        if ((!level.battleshipConfig().environment.mobSpawner.requireNearbyPlayer || this.isNearPlayer(level, pos)) && level.isSpawnerBlockEnabled()) {
++        if ((!level.sakuraConfig().environment.mobSpawner.requireNearbyPlayer || this.isNearPlayer(level, pos)) && level.isSpawnerBlockEnabled()) {
              if (this.spawnDelay < -tickDelay) { // Paper - Configurable mob spawner tick rate
                  this.delay(level, pos);
              }
@@ -102,7 +109,7 @@
                                      continue;
                                  }
 -                            } else if (!SpawnPlacements.checkSpawnRules(entityType.get(), level, EntitySpawnReason.SPAWNER, spawnBlockPos, level.getRandom())) {
-+                            } else if (level.battleshipConfig().environment.mobSpawner.checkSpawnConditions && !SpawnPlacements.checkSpawnRules(entityType.get(), level, EntitySpawnReason.SPAWNER, spawnBlockPos, level.getRandom())) {
++                            } else if (level.sakuraConfig().environment.mobSpawner.checkSpawnConditions && !SpawnPlacements.checkSpawnRules(entityType.get(), level, EntitySpawnReason.SPAWNER, spawnBlockPos, level.getRandom())) {
                                  continue;
                              }
  
@@ -111,7 +118,7 @@
                              }
  
 -                            int nearBy = level.canvasConfig().blocks.spawner.disableMaxNearbyEntitiesCheck ? Integer.MIN_VALUE : level.getEntities( // Canvas - spawner configs
-+                            int nearBy = level.canvasConfig().blocks.spawner.disableMaxNearbyEntitiesCheck || level.battleshipConfig().environment.mobSpawner.ignoreEntityLimit ? Integer.MIN_VALUE : level.getEntities( // Canvas - spawner configs
++                            int nearBy = level.canvasConfig().blocks.spawner.disableMaxNearbyEntitiesCheck || level.sakuraConfig().environment.mobSpawner.ignoreEntityLimit ? Integer.MIN_VALUE : level.getEntities( // Canvas - spawner configs
                                      EntityTypeTest.forExactClass(entity.getClass()),
                                      new AABB(pos.getX(), pos.getY(), pos.getZ(), pos.getX() + 1, pos.getY() + 1, pos.getZ() + 1).inflate(this.spawnRange),
                                      EntitySelector.NO_SPECTATORS
@@ -121,7 +128,7 @@
                              if (entity instanceof Mob mob) {
 -                                if (nextSpawnData.getCustomSpawnRules().isEmpty() && !mob.checkSpawnRules(level, EntitySpawnReason.SPAWNER)
 -                                    || !mob.checkSpawnObstruction(level)) {
-+                                if (level.battleshipConfig().environment.mobSpawner.checkSpawnConditions && (nextSpawnData.getCustomSpawnRules().isEmpty() && !mob.checkSpawnRules(level, EntitySpawnReason.SPAWNER)
++                                if (level.sakuraConfig().environment.mobSpawner.checkSpawnConditions && (nextSpawnData.getCustomSpawnRules().isEmpty() && !mob.checkSpawnRules(level, EntitySpawnReason.SPAWNER)
 +                                    || !mob.checkSpawnObstruction(level))) {
                                      continue;
                                  }

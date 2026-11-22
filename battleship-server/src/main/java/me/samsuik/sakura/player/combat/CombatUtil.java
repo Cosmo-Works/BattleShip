@@ -31,7 +31,7 @@ import org.jspecify.annotations.NullMarked;
 public final class CombatUtil {
     public static boolean overrideBlockingAndHalveDamage(final ItemStack stack, final LivingEntity entity) {
         return stack.is(Items.SHIELD) && !DataComponentHelper.itemHasComponent(stack, DataComponents.BLOCKS_ATTACKS)
-            && entity.level().battleshipConfig().players.combat.shieldDamageReduction;
+            && entity.level().sakuraConfig().players.combat.shieldDamageReduction;
     }
 
     public static double getEffectAttackDamage(final MobEffectInstance effect) {
@@ -47,14 +47,14 @@ public final class CombatUtil {
         final double baseAttack = getItemAttackDamage(stack);
         double modifiedDamage = 0.0;
 
-        if (baseAttack != 0.0 && level.battleshipConfig().players.combat.legacyCombatMechanics) {
+        if (baseAttack != 0.0 && level.sakuraConfig().players.combat.legacyCombatMechanics) {
             final OptionalDouble legacyAttack = LegacyDamageMapping.itemAttackDamage(stack.getItem());
             if (legacyAttack.isPresent()) {
                 modifiedDamage = legacyAttack.getAsDouble() - baseAttack;
             }
         }
 
-        final Double attackOverride = level.battleshipConfig().players.combat.attackDamageFor(stack.getItem());
+        final Double attackOverride = level.sakuraConfig().players.combat.itemAttackDamageOverride.get(stack.getItem());
         if (attackOverride != null) {
             modifiedDamage = attackOverride - baseAttack - 1;
         }

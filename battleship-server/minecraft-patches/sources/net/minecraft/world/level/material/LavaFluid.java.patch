@@ -28,7 +28,7 @@
      }
  
      private static boolean isFastLava(final LevelReader level) {
-+        if (level instanceof final Level gameLevel && gameLevel.battleshipConfig().environment.disableFastNetherLava) {
++        if (level instanceof final Level gameLevel && gameLevel.sakuraConfig().environment.disableFastNetherLava) {
 +            return false;
 +        }
          return level.environmentAttributes().getDimensionValue(EnvironmentAttributes.FAST_LAVA);

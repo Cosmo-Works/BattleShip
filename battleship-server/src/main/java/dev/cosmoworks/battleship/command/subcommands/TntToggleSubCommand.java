@@ -2,7 +2,6 @@ package dev.cosmoworks.battleship.command.subcommands;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import dev.cosmoworks.battleship.BattleshipServerConfig;
 import dev.cosmoworks.battleship.command.SubCommand;
 import java.util.Locale;
 import me.samsuik.sakura.player.visibility.VisibilityState;
@@ -34,7 +33,7 @@ public class TntToggleSubCommand implements SubCommand {
 
             final VisibilityType type = VisibilityTypes.TNT;
             final VisibilityState state = player.visibilitySettings.toggle(type);
-            player.getBukkitEntity().sendMessage(BattleshipServerConfig.fpsSettingChange("TNT", visibilityLabel(state)));
+            player.getBukkitEntity().sendMessage(me.samsuik.sakura.configuration.GlobalConfiguration.get().messages.fpsSettingChangeComponent("TNT", visibilityLabel(state)));
             return Command.SINGLE_SUCCESS;
         });
     }

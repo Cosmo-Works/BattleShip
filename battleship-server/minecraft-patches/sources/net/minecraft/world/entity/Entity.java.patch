@@ -63,7 +63,7 @@
 +    }
 +
 +    private int fullBlockCollisionFlags() {
-+        if (!this.cannonEntity || !this.level.battleshipConfig().cannons.collideWithNonFullBlocks) {
++        if (!this.cannonEntity || !this.level.sakuraConfig().cannons.collideWithNonFullBlocks) {
 +            return 0;
 +        }
 +        if (this.getDeltaMovement().horizontalDistanceSqr() <= 64.0 * 64.0) {

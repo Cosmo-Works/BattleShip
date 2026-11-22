@@ -33,6 +33,7 @@ public class ReloadSubCommand implements SubCommand {
 
             BattleshipServerConfig.reload();
             BattleshipWorldConfig.reload();
+            MinecraftServer.getServer().sakuraConfigurations.reloadConfigs(MinecraftServer.getServer());
             for (final ServerLevel level : MinecraftServer.getServer().getAllLevels()) {
                 level.reloadBattleshipConfig();
                 level.localConfig().clearCache();

@@ -1,6 +1,6 @@
 package me.samsuik.sakura.player.item;
 
-import dev.cosmoworks.battleship.BattleshipServerConfig;
+import me.samsuik.sakura.configuration.GlobalConfiguration;
 import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.component.PatchedDataComponentMap;
@@ -31,7 +31,7 @@ public final class MilkBucketItem extends Item {
     }
 
     private static boolean stackableMilkBuckets() {
-        final BattleshipServerConfig config = BattleshipServerConfig.get();
+        final GlobalConfiguration config = GlobalConfiguration.get();
         return config != null && config.players.stackableMilkBuckets;
     }
 }

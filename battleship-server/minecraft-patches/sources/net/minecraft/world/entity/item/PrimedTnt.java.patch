@@ -20,7 +20,7 @@
          this.blocksBuilding = true;
 +        this.cannonEntity = true; // Battleship - cannon entity identity
 +        this.sakuraEntityController = new me.samsuik.sakura.entity.SakuraEntityController(this); // Battleship - cannon entity merge
-+        this.loadChunks = level.battleshipConfig().cannons.loadChunks; // Battleship - load chunks on movement
++        this.loadChunks = level.sakuraConfig().cannons.loadChunks; // Battleship - load chunks on movement
 +        this.battleship$applyHeightLimit(); // Battleship - cannon mechanics
      }
  
@@ -39,7 +39,7 @@
  
 +    // Battleship start - cannon mechanics
 +    private me.samsuik.sakura.mechanics.MinecraftMechanicsTarget battleship$target() {
-+        final me.samsuik.sakura.mechanics.MinecraftMechanicsTarget target = this.level().battleshipConfig().mechanics.parsedTarget.valueSafe();
++        final me.samsuik.sakura.mechanics.MinecraftMechanicsTarget target = this.level().sakuraConfig().cannons.mechanics.mechanicsTarget;
 +        return target != null ? target : me.samsuik.sakura.mechanics.MinecraftMechanicsTarget.latest();
 +    }
 +
@@ -70,7 +70,7 @@
 +        final me.samsuik.sakura.configuration.local.CachedLocalConfiguration config = this.level().localConfig().at(this.blockPosition());
 +        this.heightLimit = config.heightLimit != Integer.MIN_VALUE
 +            ? config.heightLimit
-+            : this.level().battleshipConfig().mechanics.heightLimitOr(
++            : this.level().sakuraConfig().cannons.mechanics.heightLimit.or(
 +                this.level().paperConfig().fixes.tntEntityHeightNerf.or(Integer.MIN_VALUE)
 +            );
 +    }
@@ -209,7 +209,7 @@
 -        // Paper start - Option to prevent TNT from moving in water
 -        if (!this.isRemoved() && this.wasTouchingWater && this.level().paperConfig().fixes.preventTntFromMovingInWater) {
 +        // Battleship start - configure force position updates
-+        if (this.level().battleshipConfig().cannons.tnt.forcePositionUpdates) {
++        if (this.level().sakuraConfig().cannons.tnt.forcePositionUpdates) {
 +            this.forcePositionUpdateInWater();
 +        }
 +    }

@@ -42,7 +42,7 @@ public final class BlockFormation {
     }
 
     public static MinecraftMechanicsTarget target(final Level level) {
-        if (level.battleshipConfig().environment.blockGeneration.legacyBlockFormation) {
+        if (level.sakuraConfig().environment.blockGeneration.legacyBlockFormation) {
             return MinecraftMechanicsTarget.legacy();
         }
         return level.mechanicsTarget();

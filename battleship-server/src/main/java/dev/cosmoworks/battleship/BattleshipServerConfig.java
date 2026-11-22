@@ -11,13 +11,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.event.HoverEvent;
-import net.kyori.adventure.text.minimessage.MiniMessage;
-import net.kyori.adventure.text.minimessage.tag.Tag;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
-import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
-import org.bukkit.Material;
 import org.jspecify.annotations.NullMarked;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,7 +57,6 @@ public class BattleshipServerConfig extends Part {
                 public void onFinishLoad(final BattleshipServerConfig instance) {
                     Validator.validateObject(instance);
                     instance.linearFormat.resolveFormat();
-                    instance.players.parseBucketStackSize();
                     INSTANCE = instance;
                     dev.cosmoworks.battleship.octopus.PluginGate.configure(instance.octopus.gate.observe); // Battleship - octopus plugin gate
                     LOGGER.info("Loaded Battleship server configuration from {}", BASE_FILE);
@@ -160,125 +152,8 @@ public class BattleshipServerConfig extends Part {
         }
     }
 
-    {
-        option("messages").docs("Chat messages shown by Battleship tools.");
-    }
-
-    public Messages messages = new Messages();
-
-    public static class Messages extends Part {
-
-        {
-            option("durableBlockInteraction")
-                .docs(
-                    "Shown when a potato is used on a durable block.",
-                    "MiniMessage. Placeholders: <remaining>, <durability>. Brace placeholders still work."
-                )
-                .greedyString();
-            option("fpsSettingChange")
-                .docs(
-                    "Shown when TNT or sand visibility is toggled from a command.",
-                    "MiniMessage. Placeholders: <state>, <name>."
-                )
-                .greedyString();
-            option("mechanicInformation")
-                .docs(
-                    "Shown by /sakura mechanic. MiniMessage.",
-                    "The <information> tag wraps hover text for the mechanic dump."
-                )
-                .greedyString();
-            option("tpsShowEntityAndChunkCount")
-                .docs("Show entity and chunk counts on TPS graph hover text.");
-        }
-
-        public String durableBlockInteraction = "<dark_gray>(<light_purple>S</light_purple>) <white>This block has <gray><remaining></gray> of <gray><durability>";
-        public String fpsSettingChange = "<dark_gray>(<light_purple>S</light_purple>) <gray><state> <yellow><name>";
-        public String mechanicInformation = "<dark_gray>(<light_purple>S</light_purple>) <white>To view mechanic information: <dark_gray><information><<yellow>hover here</yellow>></information>";
-        public boolean tpsShowEntityAndChunkCount = true;
-
-        public Component durableBlockInteractionComponent(final int remaining, final int durability) {
-            return MiniMessage.miniMessage().deserialize(
-                withMiniMessagePlaceholders(this.durableBlockInteraction),
-                Placeholder.unparsed("remaining", Integer.toString(remaining)),
-                Placeholder.unparsed("durability", Integer.toString(durability))
-            );
-        }
-
-        public Component fpsSettingChangeComponent(final String name, final String state) {
-            return MiniMessage.miniMessage().deserialize(
-                withMiniMessagePlaceholders(this.fpsSettingChange),
-                Placeholder.unparsed("name", name),
-                Placeholder.unparsed("state", state)
-            );
-        }
-
-        public Component mechanicInformationComponent(final Component hoverComponent) {
-            return MiniMessage.miniMessage().deserialize(
-                this.mechanicInformation,
-                TagResolver.resolver("information", Tag.styling(HoverEvent.showText(hoverComponent)))
-            );
-        }
-
-        private static String withMiniMessagePlaceholders(final String template) {
-            return template
-                .replace("{remaining}", "<remaining>")
-                .replace("{durability}", "<durability>")
-                .replace("{state}", "<state>")
-                .replace("{name}", "<name>");
-        }
-    }
-
-    {
-        option("fps").docs("Client FPS settings GUI.");
-    }
-
-    public Fps fps = new Fps();
-
-    public static class Fps extends Part {
-
-        {
-            option("material")
-                .docs("Background pane material for the FPS settings inventory.")
-                .word();
-        }
-
-        public String material = "PINK_STAINED_GLASS_PANE";
-    }
-
-    public static Component durableBlockInteraction(final int remaining, final int durability) {
-        return messages().durableBlockInteractionComponent(remaining, durability);
-    }
-
-    public static Component fpsSettingChange(final String name, final String state) {
-        return messages().fpsSettingChangeComponent(name, state);
-    }
-
-    public static Component mechanicInformation(final Component hoverComponent) {
-        return messages().mechanicInformationComponent(hoverComponent);
-    }
-
-    public static boolean tpsShowEntityAndChunkCount() {
-        return messages().tpsShowEntityAndChunkCount;
-    }
-
-    private static Messages messages() {
-        final BattleshipServerConfig config = INSTANCE;
-        return config == null ? new Messages() : config.messages;
-    }
-
     public static BattleshipServerConfig get() {
         return INSTANCE;
-    }
-
-    public static Material fpsMaterial() {
-        final BattleshipServerConfig config = INSTANCE;
-        final String name = config == null ? "PINK_STAINED_GLASS_PANE" : config.fps.material;
-        try {
-            return Material.valueOf(name.trim().toUpperCase(Locale.ENGLISH));
-        } catch (final IllegalArgumentException ignored) {
-            LOGGER.warn("Invalid FPS GUI material \"{}\", falling back to PINK_STAINED_GLASS_PANE", name);
-            return Material.PINK_STAINED_GLASS_PANE;
-        }
     }
 
     {
@@ -290,12 +165,6 @@ public class BattleshipServerConfig extends Part {
     public static class Environment extends Part {
 
         {
-            option("calculateBiomeNoiseOncePerChunkSection")
-                .docs(
-                    "Fill a whole chunk section with one biome sample.",
-                    "Intended for plot worlds. Changes chunk generation."
-                );
-            option("mobSpawnerDefaults").docs("Default NBT for newly created spawners. Overrides Canvas spawner defaults.");
             option("skipUnusedSpawnState")
                 .docs(
                     "Do not count every mob for natural spawning in ticks where no player can naturally spawn mobs",
@@ -304,105 +173,12 @@ public class BattleshipServerConfig extends Part {
                 );
         }
 
-        public boolean calculateBiomeNoiseOncePerChunkSection = false;
         public boolean skipUnusedSpawnState = true;
-        public MobSpawnerDefaults mobSpawnerDefaults = new MobSpawnerDefaults();
-
-        public static class MobSpawnerDefaults extends Part {
-
-            {
-                option("minSpawnDelay").docs("Minimum ticks between spawns.");
-                option("maxSpawnDelay").docs("Maximum ticks between spawns.");
-                option("spawnCount").docs("Mobs per spawn attempt.");
-                option("maxNearbyEntities").docs("Nearby-entity cap.");
-                option("requiredPlayerRange").docs("Player range required to tick.");
-                option("spawnRange").docs("Spawn box radius.");
-            }
-
-            public int minSpawnDelay = 200;
-            public int maxSpawnDelay = 800;
-            public int spawnCount = 4;
-            public int maxNearbyEntities = 6;
-            public int requiredPlayerRange = 16;
-            public int spawnRange = 4;
-        }
-    }
-
-    public static boolean calculateBiomeNoiseOncePerChunkSection() {
-        final BattleshipServerConfig config = INSTANCE;
-        return config != null && config.environment.calculateBiomeNoiseOncePerChunkSection;
     }
 
     public static boolean skipUnusedSpawnState() {
         final BattleshipServerConfig config = INSTANCE;
         return config == null || config.environment.skipUnusedSpawnState;
-    }
-
-    public static Environment.MobSpawnerDefaults mobSpawnerDefaults() {
-        final BattleshipServerConfig config = INSTANCE;
-        return config == null ? new Environment.MobSpawnerDefaults() : config.environment.mobSpawnerDefaults;
-    }
-
-    {
-        option("players").docs("Server-wide player item behaviour: swords, spears, and bucket stacks.");
-    }
-
-    public Players players = new Players();
-
-    public static class Players extends Part {
-
-        {
-            option("combat").docs("Sword blocking and spear reach.");
-            option("bucketStackSize")
-                .docs("Max stack size for buckets. \"default\" is vanilla.")
-                .word();
-            option("stackableMilkBuckets")
-                .docs("Show milk buckets stacked on the client when bucket-stack-size is set.");
-            option("stackablePowderedSnowBuckets")
-                .docs("Show powdered snow buckets stacked on the client when bucket-stack-size is set.");
-        }
-
-        public Combat combat = new Combat();
-        public String bucketStackSize = "default";
-        public boolean stackableMilkBuckets = false;
-        public boolean stackablePowderedSnowBuckets = false;
-        public final CanonicalReference<Integer> parsedBucketStackSize = new CanonicalReference<>();
-
-        public static class Combat extends Part {
-
-            {
-                option("blockWithSwords")
-                    .docs("Swords can block like 1.8. Sent to the client as a BLOCKS_ATTACKS component.");
-                option("spearsHaveExtraAttackRange")
-                    .docs("When false, spears use a shorter attack range.");
-            }
-
-            public boolean blockWithSwords = false;
-            public boolean spearsHaveExtraAttackRange = true;
-        }
-
-        public int bucketStackSizeOrDefault() {
-            final Integer parsed = this.parsedBucketStackSize.valueSafe();
-            return parsed == null ? -1 : parsed;
-        }
-
-        private void parseBucketStackSize() {
-            final String trimmed = this.bucketStackSize.trim().toLowerCase(Locale.ENGLISH);
-            if (trimmed.isEmpty() || trimmed.equals("default") || trimmed.equals("vanilla")) {
-                this.parsedBucketStackSize.setValue(-1);
-                return;
-            }
-            try {
-                final int value = Integer.parseInt(trimmed);
-                if (value > 0 && value <= net.minecraft.world.item.Item.ABSOLUTE_MAX_STACK_SIZE) {
-                    this.parsedBucketStackSize.setValue(value);
-                    return;
-                }
-            } catch (final NumberFormatException ignored) {
-            }
-            LOGGER.warn("Invalid bucket stack size \"{}\", falling back to default", this.bucketStackSize);
-            this.parsedBucketStackSize.setValue(-1);
-        }
     }
 
     {

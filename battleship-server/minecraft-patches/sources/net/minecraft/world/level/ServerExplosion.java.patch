@@ -207,7 +207,7 @@
 +        if (blockState.isAir()) {
 +            return this.vanillaBlockResistance(blockState, fluidState, pos);
 +        }
-+        if (this.level.battleshipConfig().cannons.explosion.protectsFromExplosions(pos.getY())) {
++        if (this.level.sakuraConfig().cannons.explosion.protectBlocksAboveY.test(val -> pos.getY() >= val)) {
 +            return Optional.of(Blocks.BARRIER.getExplosionResistance());
 +        }
 +
@@ -230,17 +230,17 @@
 +    }
 +
 +    private boolean destroysWaterlogged(final BlockState blockState, final FluidState fluidState) {
-+        return this.level.battleshipConfig().cannons.explosion.destroyWaterloggedBlocks
++        return this.level.sakuraConfig().cannons.explosion.destroyWaterloggedBlocks
 +            && !fluidState.isEmpty()
 +            && !blockState.liquid();
 +    }
 +
 +    private boolean destroysLava(final BlockState blockState) {
-+        return this.level.battleshipConfig().cannons.explosion.explodeLava && blockState.is(Blocks.LAVA);
++        return this.level.sakuraConfig().cannons.explosion.explodeLava && blockState.is(Blocks.LAVA);
 +    }
 +
 +    private boolean protectsScaffolding(final BlockState blockState) {
-+        return this.level.battleshipConfig().cannons.explosion.protectScaffoldingFromCreepers
++        return this.level.sakuraConfig().cannons.explosion.protectScaffoldingFromCreepers
 +            && blockState.is(Blocks.SCAFFOLDING)
 +            && this.source instanceof net.minecraft.world.entity.monster.Creeper;
 +    }
@@ -338,12 +338,12 @@
 +        }
 +
 +        if (this.source != null
-+            && this.level.battleshipConfig().cannons.explosion.optimiseProtectedRegions
++            && this.level.sakuraConfig().cannons.explosion.optimiseProtectedRegions
 +            && !new me.samsuik.sakura.explosion.ProtectionPluginProbeEvent(this.source.getBukkitEntity()).callEvent()) {
 +            return ret;
 +        }
 +
-+        if (!this.level.battleshipConfig().cannons.explosion.breakBlocksWhenOutsideTheWorldBorder
++        if (!this.level.sakuraConfig().cannons.explosion.breakBlocksWhenOutsideTheWorldBorder
 +            && !this.level.getWorldBorder().isWithinBounds(center)) {
 +            return ret;
 +        }
@@ -492,7 +492,7 @@
          for (int i1 = targetBlocks.size() - 1; i1 >= 0; i1--) {
              org.bukkit.block.Block bblock = org.bukkit.craftbukkit.block.CraftBlock.at(this.level, targetBlocks.get(i1));
              if (!bblock.getType().isAir()) {
-@@ -660,11 +_,25 @@
+@@ -660,11 +_,27 @@
                  }
              }
              // CraftBukkit end
@@ -506,13 +506,15 @@
          }
  
 +        // Battleship start - configure explosions dropping items
-+        if (!this.level.battleshipConfig().cannons.explosion.explosionsDropItems) {
++        if (!this.level.sakuraConfig().cannons.explosion.explosionsDropItems) {
 +            stacks.clear();
 +        }
 +        // Battleship end - configure explosions dropping items
 +
++        final java.util.Set<net.minecraft.world.item.Item> explosionItemDrops = this.level.sakuraConfig().entity.items.explosionItemDrops.items;
++        final boolean whitelist = this.level.sakuraConfig().entity.items.explosionItemDrops.whitelist;
          for (ServerExplosion.StackCollector stack : stacks) {
-+            if (!this.level.battleshipConfig().entities.items.explosionItemDrops.dropsFromExplosions(stack.stack.getItem())) {
++            if (explosionItemDrops.contains(stack.stack.getItem()) != whitelist) {
 +                continue;
 +            }
              Block.popResource(this.level, stack.pos, stack.stack);

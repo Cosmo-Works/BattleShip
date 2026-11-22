@@ -1,6 +1,6 @@
 package me.samsuik.sakura.player.item;
 
-import dev.cosmoworks.battleship.BattleshipServerConfig;
+import me.samsuik.sakura.configuration.GlobalConfiguration;
 import java.util.List;
 import java.util.Optional;
 import net.minecraft.core.component.DataComponentMap;
@@ -41,7 +41,7 @@ public final class BlockableSwordItem extends io.canvasmc.canvas.world.item.Swor
     }
 
     private static boolean canBlockWithSwords(final DataComponentMap componentMap) {
-        final BattleshipServerConfig config = BattleshipServerConfig.get();
+        final GlobalConfiguration config = GlobalConfiguration.get();
         if (config == null || !config.players.combat.blockWithSwords) {
             return false;
         }

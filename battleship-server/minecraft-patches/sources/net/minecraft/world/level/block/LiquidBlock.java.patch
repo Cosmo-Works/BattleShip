@@ -4,7 +4,7 @@
  
              for (Direction direction : POSSIBLE_FLOW_DIRECTIONS) {
                  BlockPos neighbourPos = pos.relative(direction.getOpposite());
-+                if (level.battleshipConfig().environment.disableFluidsFlowingThroughTheWorldBorder && !level.getWorldBorder().isWithinBounds(neighbourPos)) {
++                if (level.sakuraConfig().environment.disableFluidsFlowingThroughTheWorldBorder && !level.getWorldBorder().isWithinBounds(neighbourPos)) {
 +                    continue;
 +                }
                  if (level.getFluidState(neighbourPos).is(FluidTags.WATER)) {

@@ -53,7 +53,7 @@
          if (level instanceof ServerLevel) {
              this.registerGoals();
          }
-+        if (this.level().battleshipConfig().entities.disableMobAi) {
++        if (this.level().sakuraConfig().entity.disableMobAi) {
 +            this.aware = false;
 +        }
      }

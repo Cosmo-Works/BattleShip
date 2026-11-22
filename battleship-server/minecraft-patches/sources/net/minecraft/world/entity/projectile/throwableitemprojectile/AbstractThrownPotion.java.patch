@@ -15,15 +15,15 @@
 +        super.shoot(x, y, z, speed, divergence);
 +
 +        final net.minecraft.world.phys.Vec3 movement = this.getDeltaMovement();
-+        final double moveX = movement.x * this.level().battleshipConfig().entities.thrownPotion.horizontalSpeed;
-+        final double moveY = movement.y * this.level().battleshipConfig().entities.thrownPotion.verticalSpeed;
-+        final double moveZ = movement.z * this.level().battleshipConfig().entities.thrownPotion.horizontalSpeed;
++        final double moveX = movement.x * this.level().sakuraConfig().entity.thrownPotion.horizontalSpeed;
++        final double moveY = movement.y * this.level().sakuraConfig().entity.thrownPotion.verticalSpeed;
++        final double moveZ = movement.z * this.level().sakuraConfig().entity.thrownPotion.horizontalSpeed;
 +        this.setDeltaMovement(moveX, moveY, moveZ);
 +    }
 +
 +    @Override
 +    protected final boolean breakInsideOwner() {
-+        return this.level().battleshipConfig().entities.thrownPotion.allowBreakingInsideEntities && this.tickCount >= 5;
++        return this.level().sakuraConfig().entity.thrownPotion.allowBreakingInsideEntities && this.tickCount >= 5;
 +    }
 +
      public AbstractThrownPotion(final EntityType<? extends AbstractThrownPotion> type, final Level level) {

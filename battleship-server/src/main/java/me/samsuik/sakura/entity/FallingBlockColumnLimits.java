@@ -15,7 +15,7 @@ public final class FallingBlockColumnLimits {
     private final Long2ObjectOpenHashMap<Column> columns = new Long2ObjectOpenHashMap<>();
 
     public void limitInstantFalling(final Level level, final BlockPos pos) {
-        final int limit = parsedLimit(level.battleshipConfig().cannons.restrictions.parsedInstantBlockFallingLimit.valueSafe());
+        final int limit = level.sakuraConfig().cannons.restrictions.instantBlockFallingLimit.or(-1);
         if (limit <= 1) {
             return;
         }
@@ -33,10 +33,6 @@ public final class FallingBlockColumnLimits {
 
     private int count(final BlockPos pos) {
         return this.columns.computeIfAbsent(ChunkPos.pack(pos.getX(), pos.getZ()), key -> new Column()).count(pos);
-    }
-
-    private static int parsedLimit(final Integer value) {
-        return value != null ? value : -1;
     }
 
     private static final class Column {

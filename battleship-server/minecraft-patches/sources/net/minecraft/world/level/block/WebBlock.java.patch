@@ -11,7 +11,7 @@
 +        final net.minecraft.world.phys.shapes.CollisionContext context
 +    ) {
 +        if (blockGetter instanceof final Level gameLevel
-+            && gameLevel.battleshipConfig().players.collideWithCobwebs
++            && gameLevel.sakuraConfig().players.collideWithCobwebs
 +            && context instanceof net.minecraft.world.phys.shapes.EntityCollisionContext entityContext
 +            && entityContext.getEntity() instanceof net.minecraft.world.entity.player.Player) {
 +            final BlockPos blockPosAbove = pos.above();

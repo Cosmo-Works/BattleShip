@@ -21,7 +21,7 @@
 +        final AttributeInstance attackSpeed = this.getAttribute(Attributes.ATTACK_SPEED);
 +        if (attackSpeed != null) {
 +            attackSpeed.removeModifier(LEGACY_ATTACK_SPEED_MODIFIER);
-+            if (this.level().battleshipConfig().players.combat.legacyCombatMechanics) {
++            if (this.level().sakuraConfig().players.combat.legacyCombatMechanics) {
 +                attackSpeed.addTransientModifier(LEGACY_ATTACK_SPEED_MODIFIER);
 +            }
 +        }
@@ -32,7 +32,7 @@
 +        final java.util.List<AttributeModifier> attackModifiers = new java.util.ArrayList<>();
 +        final ItemStack heldItem = this.lastEquipmentItems.get(EquipmentSlot.MAINHAND);
 +        double modifiedDamage = me.samsuik.sakura.player.combat.CombatUtil.getModifiedItemAttackDamage(this.level(), heldItem);
-+        if (this.level().battleshipConfig().players.combat.oldPotionEffects) {
++        if (this.level().sakuraConfig().players.combat.oldPotionEffects) {
 +            final MobEffectInstance strength = this.getEffect(MobEffects.STRENGTH);
 +            if (strength != null) {
 +                modifiedDamage -= me.samsuik.sakura.player.combat.CombatUtil.getEffectAttackDamage(strength);
@@ -103,7 +103,7 @@
          // Paper end - Check distance in entity interactions
  
 -        this.knockback(0.4F, xd, zd, source, damage, source.getDirectEntity(), source.getDirectEntity() == null ? io.papermc.paper.event.entity.EntityKnockbackEvent.Cause.DAMAGE : io.papermc.paper.event.entity.EntityKnockbackEvent.Cause.ENTITY_ATTACK); // CraftBukkit // Paper - knockback events
-+        this.knockback((float) this.level().battleshipConfig().players.knockback.baseKnockback, xd, zd, source, damage, source.getDirectEntity(), source.getDirectEntity() == null ? io.papermc.paper.event.entity.EntityKnockbackEvent.Cause.DAMAGE : io.papermc.paper.event.entity.EntityKnockbackEvent.Cause.ENTITY_ATTACK);
++        this.knockback((float) this.level().sakuraConfig().players.knockback.baseKnockback, xd, zd, source, damage, source.getDirectEntity(), source.getDirectEntity() == null ? io.papermc.paper.event.entity.EntityKnockbackEvent.Cause.DAMAGE : io.papermc.paper.event.entity.EntityKnockbackEvent.Cause.ENTITY_ATTACK);
          if (!blocked) {
              this.indicateDamage(xd, zd);
          }
@@ -124,7 +124,7 @@
          if (!fullyBlocked) {
 -            defender.knockback(0.5, defender.getX() - this.getX(), defender.getZ() - this.getZ(), source, damage, this, io.papermc.paper.event.entity.EntityKnockbackEvent.Cause.SHIELD_BLOCK); // CraftBukkit // Paper - fix attacker & knockback events
          }
-+        defender.knockback((float) this.level().battleshipConfig().players.knockback.shieldHitKnockback, defender.getX() - this.getX(), defender.getZ() - this.getZ(), source, damage, this, io.papermc.paper.event.entity.EntityKnockbackEvent.Cause.SHIELD_BLOCK);
++        defender.knockback((float) this.level().sakuraConfig().players.knockback.shieldHitKnockback, defender.getX() - this.getX(), defender.getZ() - this.getZ(), source, damage, this, io.papermc.paper.event.entity.EntityKnockbackEvent.Cause.SHIELD_BLOCK);
      }
  
      private boolean checkTotemDeathProtection(final DamageSource killingDamage) {
@@ -132,7 +132,7 @@
                  }
  
                  this.postDeathEventTasks.clear(); // Paper
-+                if (this.level().battleshipConfig().entities.instantDeathAnimation && !(this instanceof Player)) {
++                if (this.level().sakuraConfig().entity.instantDeathAnimation && !(this instanceof Player)) {
 +                    this.deathTime = 20;
 +                    return;
 +                }
@@ -144,7 +144,7 @@
  
      public void knockback(double power, double xd, double zd, final DamageSource source, final float damage, final boolean comesFromEffect, @Nullable Entity attacker, io.papermc.paper.event.entity.EntityKnockbackEvent.Cause eventCause) { // Paper - knockback events
 -        power *= 1.0 - this.getAttributeValue(Attributes.KNOCKBACK_RESISTANCE);
-+        power *= 1.0 - this.getAttributeValue(Attributes.KNOCKBACK_RESISTANCE) * this.level().battleshipConfig().players.knockback.knockbackResistanceModifier;
++        power *= 1.0 - this.getAttributeValue(Attributes.KNOCKBACK_RESISTANCE) * this.level().sakuraConfig().players.knockback.knockbackResistanceModifier;
          if (true || !(power <= 0.0)) { // CraftBukkit - Call event even when force is 0
              // this.needsSync = true; // Paper - moved down
              Vec3 deltaMovement = this.getDeltaMovement();
@@ -152,9 +152,9 @@
              }
  
              Vec3 deltaVector = new Vec3(xd, 0.0, zd).normalize().scale(power);
-+            double velocityY = deltaMovement.y / 2.0D + this.level().battleshipConfig().players.knockback.knockbackVerticalOr(power);
-+            if (!this.level().battleshipConfig().players.knockback.verticalKnockbackRequireGround || this.onGround()) {
-+                velocityY = Math.min(this.level().battleshipConfig().players.knockback.knockbackVerticalLimit, velocityY);
++            double velocityY = deltaMovement.y / 2.0D + this.level().sakuraConfig().players.knockback.knockbackVertical.or(power);
++            if (!this.level().sakuraConfig().players.knockback.verticalKnockbackRequireGround || this.onGround()) {
++                velocityY = Math.min(this.level().sakuraConfig().players.knockback.knockbackVerticalLimit, velocityY);
 +            } else {
 +                velocityY = deltaMovement.y;
 +            }
@@ -193,7 +193,7 @@
      protected float getDamageAfterArmorAbsorb(final DamageSource damageSource, float damage) {
          if (!damageSource.is(DamageTypeTags.BYPASSES_ARMOR)) {
              // this.hurtArmor(damageSource, damage); // CraftBukkit - actuallyHurt(DamageSource, float, EntityDamageEvent) for damage handling
-+            if (this.level().battleshipConfig().players.combat.legacyCombatMechanics) {
++            if (this.level().sakuraConfig().players.combat.legacyCombatMechanics) {
 +                return damage * (1.0f - (this.getArmorValue() / 25.0f));
 +            }
              damage = CombatRules.getDamageAfterAbsorb(
@@ -203,7 +203,7 @@
                  armorDamage += (float)event.getDamage(DamageModifier.BLOCKING);
                  armorDamage += (float)event.getDamage(DamageModifier.FREEZING);
                  armorDamage += (float)event.getDamage(DamageModifier.HARD_HAT);
-+                final int maxArmourDamage = this.level().battleshipConfig().players.combat.maxArmourDamageOrDisabled();
++                final int maxArmourDamage = this.level().sakuraConfig().players.combat.maxArmourDamage.or(-1);
 +                if (maxArmourDamage >= 0) {
 +                    armorDamage = Math.min(armorDamage, maxArmourDamage);
 +                }
@@ -311,7 +311,7 @@
          }
          // Paper end - Add EntityMoveEvent
 -        if (this.level() instanceof ServerLevel serverLevel && this.isSensitiveToWater() && this.isInWaterOrRain()) {
-+        if (this.level() instanceof ServerLevel serverLevel && this.level().battleshipConfig().entities.waterSensitivity && this.isSensitiveToWater() && this.isInWaterOrRain()) {
++        if (this.level() instanceof ServerLevel serverLevel && this.level().sakuraConfig().entity.waterSensitivity && this.isSensitiveToWater() && this.isInWaterOrRain()) {
              this.hurtServer(serverLevel, this.damageSources().drown(), 1.0F);
          }
      }
@@ -321,7 +321,7 @@
          int maxCramming = ((ServerLevel) this.level()).getGameRules().get(GameRules.MAX_ENTITY_CRAMMING);
 -        if (maxCramming <= 0 && this.level().paperConfig().collisions.maxEntityCollisions <= 0) {
 +        int maxEntityCollisions = this.level().paperConfig().collisions.maxEntityCollisions;
-+        if (this instanceof final Mob mob && !mob.aware && !this.level().battleshipConfig().entities.nerfedMobsCanPushEntities) {
++        if (this instanceof final Mob mob && !mob.aware && !this.level().sakuraConfig().entity.nerfedMobsCanPushEntities) {
 +            maxEntityCollisions = 0;
 +        }
 +        if (maxCramming <= 0 && maxEntityCollisions <= 0) {

@@ -246,7 +246,7 @@
              }
 +
 +            // Battleship start - optimise hopper ticking
-+            if (level.battleshipConfig().technical.optimiseIdleHopperTicking) {
++            if (level.sakuraConfig().technical.optimiseIdleHopperTicking) {
 +                entity.waitForChange(fullState);
 +            }
 +            // Battleship end - optimise hopper ticking

@@ -1,6 +1,6 @@
 package me.samsuik.sakura.player.item;
 
-import dev.cosmoworks.battleship.BattleshipServerConfig;
+import me.samsuik.sakura.configuration.GlobalConfiguration;
 import java.util.function.Consumer;
 import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.core.component.DataComponentType;
@@ -11,11 +11,11 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class DataComponentHelper {
     public static int bucketMaxStackSize() {
-        final BattleshipServerConfig config = BattleshipServerConfig.get();
+        final GlobalConfiguration config = GlobalConfiguration.get();
         if (config == null) {
             return -1;
         }
-        return config.players.bucketStackSizeOrDefault();
+        return clampBucketStackSize(config.players.bucketStackSize.or(-1));
     }
 
     public static boolean itemHasComponent(final ItemStack stack, final DataComponentType<?> component) {

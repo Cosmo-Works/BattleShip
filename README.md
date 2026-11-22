@@ -29,10 +29,47 @@ large player counts.
 
 ### Configuration and commands
 
-- `battleship-server.yml` holds the server-wide switches, `battleship-worlds.yml` the per-world settings
-  (mechanics, redstone, cannons, entities, chunks)
+- Sakura's options are in Sakura's own files, with Sakura's option names and defaults:
+  `config/sakura-global.yml` (messages, FPS menu, sword/spear/bucket options, spawner defaults),
+  `config/sakura-world-defaults.yml` (cannons, mechanics, explosions, combat, knockback, entities,
+  environment, technical) and a `sakura-world.yml` in each world folder to override the defaults
+- Battleship's own options are in `config/battleship-server.yml` (server-wide) and
+  `config/battleship-worlds.yml` (per world, with a `battleship-patch.yml` in each world folder)
 - `/sakura` has subcommands for cannon testing and inspection: tick freeze and `fps`, TNT and sand
-  visibility toggles, mechanics and config inspection, region and TPS overview, reload
+  visibility toggles, mechanics and config inspection, region and TPS overview. `/sakura reload`
+  reloads both Sakura's and Battleship's files
+
+#### Options that moved to Sakura's files
+
+Older versions kept these in Battleship's files. They are not migrated: copy your values over by hand.
+
+| Old path in `battleship-worlds.yml` | New path in `sakura-world-defaults.yml` / `sakura-world.yml` |
+|---|---|
+| `mechanics.mechanics-target` | `cannons.mechanics.mechanics-target` (`mechanic-version` + `server-type`) |
+| `mechanics.height-limit` | `cannons.mechanics.height-limit` |
+| `redstone.cache` | `technical.redstone.redstone-cache` |
+| `cannons.tnt.spread` | `cannons.mechanics.tnt-spread` |
+| `cannons.tnt.flows-in-water` | `cannons.mechanics.tnt-flows-in-water` |
+| `cannons.sand.floating-point-fix` | `cannons.mechanics.floating-point-fix` |
+| `cannons.sand.height-parity` | `cannons.mechanics.height-parity` |
+| `cannons.explosion.broken-paper-explosion-behaviour` | `cannons.mechanics.broken-paper-explosion-behaviour` |
+| `players.fishing-hooks-apply-knockback` | `players.knockback.projectiles.fishing-hooks-apply-knockback` |
+| `entities.<option>` (see below) | `entity.<option>` |
+| every other moved option | same path |
+
+Moved with the same path: `cannons.merge-level`, `cannons.load-chunks`, `cannons.collide-with-non-full-blocks`,
+`cannons.tnt-and-sand-affected-by-bubble-columns`, `cannons.restrictions.*`, `cannons.tnt.force-position-updates`,
+`cannons.sand.*` except `force-position-updates`, `cannons.explosion.*` except `protection-blocks`, `players.*`,
+`environment.*` and `technical.*`. Moved from `entities` to `entity`: `chunk-travel-limit`,
+`insert-items-into-hoppers-on-death`, `disable-mob-ai`, `water-sensitivity`, `instant-death-animation`,
+`iron-golems-take-falldamage`, `nerfed-mobs-can-push-entities`, `items.*`, `thrown-potion.*`, `ender-pearl.*`.
+
+From `battleship-server.yml` to `sakura-global.yml`, same paths: `messages.fps-setting-change`,
+`messages.mechanic-information`, `messages.tps-show-entity-and-chunk-count`, `fps.material`,
+`environment.calculate-biome-noise-once-per-chunk-section`, `environment.mob-spawner-defaults.*`, `players.*`.
+`messages.durable-block-interaction` is gone (it was never used).
+
+`cannons.sand.despawn-inside-moving-pistons` now defaults to `true` (Sakura's default; it was `false`).
 
 ### API
 

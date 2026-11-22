@@ -83,7 +83,7 @@ public abstract class SpecialisedExplosion<E extends Entity & SakuraEntity> exte
         final boolean fire,
         final Explosion.BlockInteraction blockInteraction
     ) {
-        if (level.battleshipConfig().cannons.explosion.batchExplosions) {
+        if (level.sakuraConfig().cannons.explosion.batchExplosions) {
             if (source instanceof final PrimedTnt tnt) {
                 return new TntExplosion(level, tnt, damageSource, damageCalculator, center, radius, fire, blockInteraction);
             }
@@ -204,7 +204,7 @@ public abstract class SpecialisedExplosion<E extends Entity & SakuraEntity> exte
     }
 
     protected void nextExplosion(final List<BlockPos> blocksToExplode, final boolean destroyedBlocks) {
-        if (this.level().battleshipConfig().cannons.explosion.reuseBlockCacheAcrossExplosions && !blocksToExplode.isEmpty() && !destroyedBlocks) {
+        if (this.level().sakuraConfig().cannons.explosion.reuseBlockCacheAcrossExplosions && !blocksToExplode.isEmpty() && !destroyedBlocks) {
             this.markBlocksInCacheAsExplodable(blocksToExplode);
         } else {
             super.blockCache.clear();
@@ -213,7 +213,7 @@ public abstract class SpecialisedExplosion<E extends Entity & SakuraEntity> exte
         Arrays.fill(this.directMappedBlockCache, null);
 
         if (this.swinging >= ALL_DIRECTIONS) {
-            if (!destroyedBlocks && this.level().battleshipConfig().cannons.explosion.avoidRedundantBlockSearches) {
+            if (!destroyedBlocks && this.level().sakuraConfig().cannons.explosion.avoidRedundantBlockSearches) {
                 this.swinging++;
             } else {
                 this.swinging = ALL_DIRECTIONS;
@@ -424,7 +424,7 @@ public abstract class SpecialisedExplosion<E extends Entity & SakuraEntity> exte
         final Entity entity,
         final @Nullable KnownObstruction obstruction
     ) {
-        if (!level.battleshipConfig().cannons.explosion.reduceExposureRaycasts
+        if (!level.sakuraConfig().cannons.explosion.reduceExposureRaycasts
             || obstruction != null
             || this.useSlowerRaycasts
             || entity.getBbHeight() != 0.98f

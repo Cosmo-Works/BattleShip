@@ -3,11 +3,8 @@ package me.samsuik.sakura.configuration.local;
 import io.papermc.paper.configuration.WorldConfiguration;
 import java.util.HashMap;
 import java.util.Map;
-import me.samsuik.sakura.entity.TntSpread;
-import me.samsuik.sakura.entity.merge.MergeLevel;
 import me.samsuik.sakura.explosion.durable.DurableMaterial;
 import me.samsuik.sakura.explosion.durable.DurableMaterialsContainer;
-import me.samsuik.sakura.mechanics.MinecraftMechanicsTarget;
 import me.samsuik.sakura.redstone.RedstoneConfiguration;
 import me.samsuik.sakura.redstone.RedstoneImplementation;
 import net.minecraft.world.level.Level;
@@ -43,35 +40,11 @@ public final class ConfigurationHelpers {
         final WorldConfiguration.Misc.RedstoneImplementation paperImpl = parsed != null
             ? parsed
             : level.paperConfig().misc.redstoneImplementation;
-        return new RedstoneConfiguration(fromPaperImpl(paperImpl), level.battleshipConfig().redstone.cache);
+        return new RedstoneConfiguration(fromPaperImpl(paperImpl), level.sakuraConfig().technical.redstone.redstoneCache);
     }
 
     private static RedstoneImplementation fromPaperImpl(final WorldConfiguration.Misc.RedstoneImplementation paper) {
         return RedstoneImplementation.values()[paper.ordinal()];
-    }
-
-    public static TntSpread tntSpread(final Level level) {
-        final TntSpread spread = level.battleshipConfig().cannons.tnt.parsedSpread.valueSafe();
-        return spread != null ? spread : TntSpread.ALL;
-    }
-
-    public static MergeLevel mergeLevel(final Level level) {
-        final MergeLevel mergeLevel = level.battleshipConfig().cannons.parsedMergeLevel.valueSafe();
-        return mergeLevel != null ? mergeLevel : MergeLevel.LENIENT;
-    }
-
-    public static MinecraftMechanicsTarget mechanicsTarget(final Level level) {
-        return level.mechanicsTarget();
-    }
-
-    public static int heightLimit(final Level level) {
-        final Integer parsed = level.battleshipConfig().mechanics.parsedHeightLimit.valueSafe();
-        return parsed != null ? parsed : Integer.MIN_VALUE;
-    }
-
-    public static Map<Block, DurableMaterial> durableMaterials(final Level level) {
-        final Map<Block, DurableMaterial> materials = level.battleshipConfig().cannons.explosion.parsedDurableMaterials.valueSafe();
-        return materials != null ? materials : Map.of();
     }
 
     private ConfigurationHelpers() {

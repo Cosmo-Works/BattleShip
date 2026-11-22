@@ -90,12 +90,11 @@ public final class DurableBlockManager {
     }
 
     private static long expirationFrom(final Level level) {
-        if (level.battleshipConfig() == null) {
+        if (level.sakuraConfig() == null) {
             return DEFAULT_EXPIRATION_SECONDS;
         }
 
-        final Long parsed = level.battleshipConfig().cannons.explosion.parsedExpirationSeconds.valueSafe();
-        return parsed != null ? parsed : DEFAULT_EXPIRATION_SECONDS;
+        return level.sakuraConfig().cannons.explosion.durableMaterialsExpiration.seconds();
     }
 
     private static final class DurableBlock {

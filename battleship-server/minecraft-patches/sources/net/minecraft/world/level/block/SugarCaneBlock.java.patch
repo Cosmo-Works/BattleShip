@@ -5,7 +5,7 @@
      @Override
      protected void randomTick(final BlockState state, final ServerLevel level, final BlockPos pos, final RandomSource random) {
 +        BlockState agedState = state;
-+        if (level.battleshipConfig().environment.crops.useRandomChanceToGrow) {
++        if (level.sakuraConfig().environment.crops.useRandomChanceToGrow) {
 +            final int modifier = level.spigotConfig.caneModifier;
 +            if (random.nextFloat() >= modifier / (100.0f * 16)) {
 +                return;

@@ -11,7 +11,7 @@
      }
  
 +    private static int explosionBlockFlags(final Level level, final BlockState state) {
-+        return level.battleshipConfig().cannons.explosion.explodeLava && state.is(Blocks.LAVA)
++        return level.sakuraConfig().cannons.explosion.explodeLava && state.is(Blocks.LAVA)
 +            ? Block.UPDATE_CLIENTS
 +            : Block.UPDATE_ALL;
 +    }

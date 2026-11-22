@@ -1,6 +1,6 @@
 package me.samsuik.sakura.tps;
 
-import dev.cosmoworks.battleship.BattleshipServerConfig;
+import me.samsuik.sakura.configuration.GlobalConfiguration;
 import me.samsuik.sakura.tps.graph.GraphComponents;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
@@ -36,7 +36,7 @@ public record ServerTickInformation(
             .append(Component.text("%.1f".formatted(this.averageTick), colour))
             .append(Component.text("/"))
             .append(Component.text(this.longestTick, colour)));
-        if (BattleshipServerConfig.tpsShowEntityAndChunkCount()) {
+        if (GlobalConfiguration.get().messages.tpsShowEntityAndChunkCount) {
             builder.appendNewline();
             builder.append(Component.text("Entities: " + this.entities));
             builder.appendNewline();

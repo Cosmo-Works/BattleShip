@@ -16,7 +16,7 @@ public final class CannonMovementLimits {
     }
 
     public static void limitLeftShooting(final Entity entity) {
-        final int threshold = parsedLimit(entity.level().battleshipConfig().cannons.restrictions.parsedLeftShootingThreshold.valueSafe());
+        final int threshold = entity.level().sakuraConfig().cannons.restrictions.leftShootingThreshold.or(-1);
         if (threshold <= 0 || !sameWorldAsOrigin(entity)) {
             return;
         }
@@ -45,7 +45,7 @@ public final class CannonMovementLimits {
         final boolean xAdjust,
         final List<VoxelShape> shapes
     ) {
-        final int adjustDistance = parsedLimit(entity.level().battleshipConfig().cannons.restrictions.parsedMaxAdjustDistance.valueSafe());
+        final int adjustDistance = entity.level().sakuraConfig().cannons.restrictions.maxAdjustDistance.or(-1);
         if (adjustDistance <= 0 || Math.abs(dir) <= adjustDistance) {
             return;
         }
@@ -76,9 +76,5 @@ public final class CannonMovementLimits {
             maxZ = Math.floor(currentBox.maxZ) + adjustDistance + 1;
         }
         return Shapes.box(minX, Double.NEGATIVE_INFINITY, minZ, maxX, Double.POSITIVE_INFINITY, maxZ);
-    }
-
-    private static int parsedLimit(final Integer value) {
-        return value != null ? value : -1;
     }
 }

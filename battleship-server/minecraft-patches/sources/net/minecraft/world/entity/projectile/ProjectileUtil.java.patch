@@ -23,7 +23,7 @@
 -        HitResult entityHit = getEntityHitResult(level, source, from, to, source.getBoundingBox().expandTowards(delta).inflate(1.0), matching, entityMargin);
 +        final AABB collisionBox = source.getBoundingBox().expandTowards(delta).inflate(1.0);
 +        final HitResult entityHit;
-+        if (level.battleshipConfig().entities.thrownPotion.allowBreakingInsideEntities
++        if (level.sakuraConfig().entity.thrownPotion.allowBreakingInsideEntities
 +            && source instanceof net.minecraft.world.entity.projectile.throwableitemprojectile.AbstractThrownPotion) {
 +            entityHit = getEntityHitResult(source, from, to, collisionBox, matching, entityMargin);
 +        } else {

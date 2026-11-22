@@ -14,14 +14,14 @@
  
 +    @Override
 +    protected final ClipContext.Block getClipType() {
-+        return this.level().battleshipConfig().entities.enderPearl.useOutlineForCollision
++        return this.level().sakuraConfig().entity.enderPearl.useOutlineForCollision
 +            ? ClipContext.Block.OUTLINE
 +            : super.getClipType();
 +    }
 +
 +    @Override
 +    public boolean isInWater() {
-+        return super.isInWater() && this.level().battleshipConfig().entities.enderPearl.slowedDownByWater;
++        return super.isInWater() && this.level().sakuraConfig().entity.enderPearl.slowedDownByWater;
 +    }
 +
 +    @Override
@@ -32,7 +32,7 @@
 +        final float velocity,
 +        final float inaccuracy
 +    ) {
-+        final float randomness = this.level().battleshipConfig().entities.enderPearl.randomSpreadWhenThrown
++        final float randomness = this.level().sakuraConfig().entity.enderPearl.randomSpreadWhenThrown
 +            ? inaccuracy
 +            : 0.0f;
 +        return super.getMovementToShoot(x, y, z, velocity, randomness);
@@ -48,7 +48,7 @@
 +                Vec3 teleportPos = to;
 +                if (entity instanceof final ServerPlayer player
 +                    && entity.level() == checkWorld
-+                    && checkWorld.battleshipConfig().entities.enderPearl.preventTeleportingInsideBlocks
++                    && checkWorld.sakuraConfig().entity.enderPearl.preventTeleportingInsideBlocks
 +                    && player.insideAnyCollisionAt(checkWorld, teleportPos)) {
 +                    teleportPos = Vec3.atBottomCenterOf(BlockPos.containing(teleportPos.subtract(0, 1, 0)));
 +                    if (player.insideAnyCollisionAt(checkWorld, teleportPos)) {

@@ -5,7 +5,7 @@
  
          Runnable dropAll = () -> {
 +            // Battleship start - mobs insert items into hoppers on death
-+            if (level.battleshipConfig().entities.insertItemsIntoHoppersOnDeath) {
++            if (level.sakuraConfig().entity.insertItemsIntoHoppersOnDeath) {
 +                me.samsuik.sakura.container.InsertItemsIntoHoppers.onMobDeath(level, victim, drops);
 +            }
 +            // Battleship end - mobs insert items into hoppers on death

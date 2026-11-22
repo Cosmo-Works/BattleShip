@@ -1,6 +1,6 @@
 package me.samsuik.sakura.player.item;
 
-import dev.cosmoworks.battleship.BattleshipServerConfig;
+import me.samsuik.sakura.configuration.GlobalConfiguration;
 import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.component.PatchedDataComponentMap;
@@ -18,7 +18,7 @@ public final class SpearItem extends Item {
 
     @Override
     public DataComponentMap modifyBaseComponents(final DataComponentMap components) {
-        final BattleshipServerConfig config = BattleshipServerConfig.get();
+        final GlobalConfiguration config = GlobalConfiguration.get();
         if (config != null && !config.players.combat.spearsHaveExtraAttackRange) {
             return DataComponentHelper.modify(components, builder -> builder.set(DataComponents.ATTACK_RANGE, REDUCED_ATTACK_RANGE));
         }
@@ -27,7 +27,7 @@ public final class SpearItem extends Item {
 
     @Override
     public void modifyComponentsSentToClient(final PatchedDataComponentMap components) {
-        final BattleshipServerConfig config = BattleshipServerConfig.get();
+        final GlobalConfiguration config = GlobalConfiguration.get();
         if (config != null && !config.players.combat.spearsHaveExtraAttackRange) {
             components.sakura$patchComponent(DataComponents.ATTACK_RANGE, REDUCED_ATTACK_RANGE);
         }

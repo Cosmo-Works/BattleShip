@@ -6,7 +6,7 @@
  
 +    @Override
 +    protected final boolean isFallDamageImmune() {
-+        return !this.level().battleshipConfig().entities.ironGolemsTakeFalldamage && super.isFallDamageImmune();
++        return !this.level().sakuraConfig().entity.ironGolemsTakeFalldamage && super.isFallDamageImmune();
 +    }
 +
      public IronGolem(final EntityType<? extends IronGolem> type, final Level level) {

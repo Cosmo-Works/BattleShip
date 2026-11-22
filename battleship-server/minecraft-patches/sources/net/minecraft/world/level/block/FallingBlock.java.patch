@@ -14,7 +14,7 @@
 +        final net.minecraft.world.level.redstone.Orientation wireOrientation,
 +        final boolean notify
 +    ) {
-+        final me.samsuik.sakura.mechanics.MinecraftMechanicsTarget battleship$target = level.battleshipConfig().mechanics.parsedTarget.valueSafe();
++        final me.samsuik.sakura.mechanics.MinecraftMechanicsTarget battleship$target = level.sakuraConfig().cannons.mechanics.mechanicsTarget;
 +        if (battleship$target != null && battleship$target.before(me.samsuik.sakura.mechanics.MechanicVersion.v1_18_2)) {
 +            level.scheduleTick(pos, this, this.getDelayAfterPlace());
 +        }

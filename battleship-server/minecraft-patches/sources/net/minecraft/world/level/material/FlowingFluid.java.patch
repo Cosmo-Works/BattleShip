@@ -5,7 +5,7 @@
  
      protected void spread(final ServerLevel level, final BlockPos pos, final BlockState state, final FluidState fluidState) {
 -        if (!fluidState.isEmpty()) {
-+        if (!fluidState.isEmpty() && (!level.battleshipConfig().environment.disableFluidsFlowingThroughTheWorldBorder || level.getWorldBorder().isWithinBounds(pos))) {
++        if (!fluidState.isEmpty() && (!level.sakuraConfig().environment.disableFluidsFlowingThroughTheWorldBorder || level.getWorldBorder().isWithinBounds(pos))) {
              BlockPos belowPos = pos.below();
              BlockState belowState = level.getBlockState(belowPos);
              FluidState belowFluid = belowState.getFluidState();
@@ -19,7 +19,7 @@
                  BlockPos neighborPos = pos.relative(spread);
                  final BlockState neighborState = level.getBlockStateIfLoaded(neighborPos); // Paper - Prevent chunk loading from fluid flowing
                  if (neighborState == null) continue; // Paper - Prevent chunk loading from fluid flowing
-+                if (level.battleshipConfig().environment.disableFluidsFlowingThroughTheWorldBorder && !level.getWorldBorder().isWithinBounds(neighborPos)) {
++                if (level.sakuraConfig().environment.disableFluidsFlowingThroughTheWorldBorder && !level.getWorldBorder().isWithinBounds(neighborPos)) {
 +                    continue;
 +                }
                  // CraftBukkit start
@@ -141,7 +141,7 @@
      public static boolean canHoldSpecificFluid(final BlockGetter level, final BlockPos pos, final BlockState state, final Fluid newFluid) {
 +        // Battleship start - configure fluids breaking redstone components
 +        if (level instanceof final Level gameLevel
-+            && !gameLevel.battleshipConfig().technical.redstone.fluidsBreakRedstone
++            && !gameLevel.sakuraConfig().technical.redstone.fluidsBreakRedstone
 +            && (state.isSignalSource() || state.getBlock() instanceof net.minecraft.world.level.block.CarpetBlock)) {
 +            return false;
 +        }

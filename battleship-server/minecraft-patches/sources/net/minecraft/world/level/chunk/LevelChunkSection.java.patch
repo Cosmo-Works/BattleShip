@@ -66,7 +66,7 @@
                      newBiomes.set(
                          (y << 4) | (z << 2) | x,
 -                        biomeResolver.getNoiseBiome(quartMinX + x, quartMinY + y, quartMinZ + z)
-+                        dev.cosmoworks.battleship.BattleshipServerConfig.calculateBiomeNoiseOncePerChunkSection() ? first : biomeResolver.getNoiseBiome(quartMinX + x, quartMinY + y, quartMinZ + z) // Battleship - calculate biome noise once per chunk section
++                        me.samsuik.sakura.configuration.GlobalConfiguration.get().environment.calculateBiomeNoiseOncePerChunkSection ? first : biomeResolver.getNoiseBiome(quartMinX + x, quartMinY + y, quartMinZ + z) // Battleship - calculate biome noise once per chunk section
                      );
                  }
              }

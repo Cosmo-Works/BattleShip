@@ -54,6 +54,6 @@ public final class LegacyGoldenAppleItem extends Item {
 
     private static boolean isItemConsumableOrDisabled(final ItemStack stack, final Level level) {
         return DataComponentHelper.itemHasComponent(stack, DataComponents.CONSUMABLE)
-            || !level.battleshipConfig().players.combat.oldEnchantedGoldenApple;
+            || !level.sakuraConfig().players.combat.oldEnchantedGoldenApple;
     }
 }

@@ -40,7 +40,7 @@
          this.accelerationPower = 0.0;
 +        this.cannonEntity = true; // Battleship - cannon entity identity
 +        this.sakuraEntityController = new me.samsuik.sakura.entity.SakuraEntityController(this); // Battleship - cannon entity merge
-+        this.loadChunks = level.battleshipConfig().cannons.loadChunks; // Battleship - load chunks on movement
++        this.loadChunks = level.sakuraConfig().cannons.loadChunks; // Battleship - load chunks on movement
      }
  
      public AbstractWindCharge(
@@ -50,7 +50,7 @@
          this.accelerationPower = 0.0;
 +        this.cannonEntity = true; // Battleship - cannon entity identity
 +        this.sakuraEntityController = new me.samsuik.sakura.entity.SakuraEntityController(this); // Battleship - cannon entity merge
-+        this.loadChunks = level.battleshipConfig().cannons.loadChunks; // Battleship - load chunks on movement
++        this.loadChunks = level.sakuraConfig().cannons.loadChunks; // Battleship - load chunks on movement
      }
  
      protected AbstractWindCharge(
@@ -60,7 +60,7 @@
          this.accelerationPower = 0.0;
 +        this.cannonEntity = true; // Battleship - cannon entity identity
 +        this.sakuraEntityController = new me.samsuik.sakura.entity.SakuraEntityController(this); // Battleship - cannon entity merge
-+        this.loadChunks = level.battleshipConfig().cannons.loadChunks; // Battleship - load chunks on movement
++        this.loadChunks = level.sakuraConfig().cannons.loadChunks; // Battleship - load chunks on movement
      }
  
      @Override

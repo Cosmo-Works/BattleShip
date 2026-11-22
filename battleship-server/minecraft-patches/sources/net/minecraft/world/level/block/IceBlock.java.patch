@@ -5,7 +5,7 @@
          // Paper end - Improve Block#breakNaturally API
          if (!EnchantmentHelper.hasTag(destroyedWith, EnchantmentTags.PREVENTS_ICE_MELTING)) {
 -            if (level.environmentAttributes().getValue(EnvironmentAttributes.WATER_EVAPORATES, pos)) {
-+            if (!level.battleshipConfig().environment.allowWaterInTheNether && level.environmentAttributes().getValue(EnvironmentAttributes.WATER_EVAPORATES, pos)) {
++            if (!level.sakuraConfig().environment.allowWaterInTheNether && level.environmentAttributes().getValue(EnvironmentAttributes.WATER_EVAPORATES, pos)) {
                  level.removeBlock(pos, false);
                  return;
              }
@@ -14,7 +14,7 @@
              return;
          }
 -        if (waterEvaporates) {
-+        if (!level.battleshipConfig().environment.allowWaterInTheNether && waterEvaporates) {
++        if (!level.sakuraConfig().environment.allowWaterInTheNether && waterEvaporates) {
              // Paper end - call BlockFadeEvent
              level.removeBlock(pos, false);
          } else {

@@ -2,7 +2,6 @@ package dev.cosmoworks.battleship.command.subcommands;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import dev.cosmoworks.battleship.BattleshipServerConfig;
 import dev.cosmoworks.battleship.command.SubCommand;
 import me.samsuik.sakura.configuration.local.CachedLocalConfiguration;
 import net.kyori.adventure.text.minimessage.MiniMessage;
@@ -68,7 +67,7 @@ public class MechanicSubCommand implements SubCommand {
             return 0;
         }
 
-        player.getBukkitEntity().sendMessage(BattleshipServerConfig.mechanicInformation(this.mechanicDump(player)));
+        player.getBukkitEntity().sendMessage(me.samsuik.sakura.configuration.GlobalConfiguration.get().messages.mechanicInformationComponent(this.mechanicDump(player)));
         return Command.SINGLE_SUCCESS;
     }
 

@@ -33,7 +33,7 @@
 +        if (source.level().paperConfig().misc.disableRelativeProjectileVelocity) {
 +            relativeVelocity = false;
 +        }
-+        if (source.level().battleshipConfig().entities.thrownPotion.disableRelativePotionVelocity
++        if (source.level().sakuraConfig().entity.thrownPotion.disableRelativePotionVelocity
 +            && this instanceof net.minecraft.world.entity.projectile.throwableitemprojectile.AbstractThrownPotion) {
 +            relativeVelocity = false;
 +        }

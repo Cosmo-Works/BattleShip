@@ -1,7 +1,7 @@
 // Ported from Sakura (https://github.com/Samsuik/Sakura), licensed under the MIT License.
 package me.samsuik.sakura.player.visibility;
 
-import dev.cosmoworks.battleship.BattleshipServerConfig;
+import me.samsuik.sakura.configuration.GlobalConfiguration;
 import it.unimi.dsi.fastutil.ints.IntArrayFIFOQueue;
 import me.samsuik.sakura.player.gui.FeatureGui;
 import me.samsuik.sakura.player.gui.FeatureGuiInventory;
@@ -34,7 +34,7 @@ public final class VisibilityGui extends FeatureGui {
             final int ry = y - 2;
 
             if (Math.sqrt(rx * rx + ry * ry) <= 3.25) {
-                inventory.setItem(slot, itemWithBlankName(BattleshipServerConfig.fpsMaterial()));
+                inventory.setItem(slot, itemWithBlankName(GlobalConfiguration.get().fps.material));
             } else if (x % 8 == 0) {
                 inventory.setItem(slot, itemWithBlankName(Material.BLACK_STAINED_GLASS_PANE));
             } else {

@@ -6,7 +6,7 @@
          if (shouldBeOn != state.getValue(ENABLED)) {
 +            // Battleship start - optimise hopper ticking
 +            final BlockEntity blockEntity = level.getBlockEntity(pos);
-+            if (blockEntity instanceof HopperBlockEntity hopper && level.battleshipConfig().technical.optimiseIdleHopperTicking) {
++            if (blockEntity instanceof HopperBlockEntity hopper && level.sakuraConfig().technical.optimiseIdleHopperTicking) {
 +                hopper.sakura$setActive(shouldBeOn);
 +            }
 +            // Battleship end - optimise hopper ticking

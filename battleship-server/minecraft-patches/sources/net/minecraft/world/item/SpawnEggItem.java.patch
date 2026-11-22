@@ -4,7 +4,7 @@
          final boolean tryMoveDown,
          final boolean movedUp
      ) {
-+        if (level.battleshipConfig().players.preventPlacingSpawnEggsInsideBlocks
++        if (level.sakuraConfig().players.preventPlacingSpawnEggsInsideBlocks
 +            && !level.noCollision(type.getSpawnAABB(spawnPos.getX() + 0.5, spawnPos.getY(), spawnPos.getZ() + 0.5))) {
 +            return InteractionResult.PASS;
 +        }

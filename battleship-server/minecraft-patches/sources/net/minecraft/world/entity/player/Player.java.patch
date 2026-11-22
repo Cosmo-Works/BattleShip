@@ -10,7 +10,7 @@
 +    @Override
 +    public net.minecraft.world.entity.EntityDimensions getDefaultDimensions(final Pose pose) {
 +        final net.minecraft.world.entity.EntityDimensions dimensions = super.getDefaultDimensions(pose);
-+        if (!this.level().battleshipConfig().players.posesShrinkCollisionBox && dimensions.height() != Avatar.STANDING_DIMENSIONS.height()) {
++        if (!this.level().sakuraConfig().players.posesShrinkCollisionBox && dimensions.height() != Avatar.STANDING_DIMENSIONS.height()) {
 +            return STANDING_DIMENSIONS;
 +        }
 +        return dimensions;
@@ -21,7 +21,7 @@
 +    }
 +
 +    public final boolean insideAnyCollisionAt(final Level level, final Vec3 position) {
-+        final Pose pose = this.getVehicle() != null || !this.level().battleshipConfig().players.posesShrinkCollisionBox
++        final Pose pose = this.getVehicle() != null || !this.level().sakuraConfig().players.posesShrinkCollisionBox
 +            ? Pose.STANDING
 +            : Pose.SWIMMING;
 +        return this.insideAnyCollisionAt(level, position, pose);
@@ -50,7 +50,7 @@
      public boolean isInvulnerableTo(final ServerLevel level, final DamageSource source) {
          if (super.isInvulnerableTo(level, source)) {
              return true;
-+        } else if (!this.level().battleshipConfig().cannons.explosion.explosionsHurtPlayers && source.is(DamageTypeTags.IS_EXPLOSION)) { // Battleship - allow disabling explosions hurting players
++        } else if (!this.level().sakuraConfig().cannons.explosion.explosionsHurtPlayers && source.is(DamageTypeTags.IS_EXPLOSION)) { // Battleship - allow disabling explosions hurting players
 +            return true;
          } else if (source.is(DamageTypeTags.IS_DROWNING)) {
              return !level.getGameRules().get(GameRules.DROWNING_DAMAGE);
@@ -59,7 +59,7 @@
              }
          }
  
-+        final double maxDamage = this.level().battleshipConfig().players.combat.maxDamageOrDisabled();
++        final double maxDamage = this.level().sakuraConfig().players.combat.maxDamage.or(-1.0);
 +        if (damage > 0.0 && maxDamage >= 0.0) {
 +            damage = Math.min(damage, (float) maxDamage);
 +        }
@@ -76,12 +76,12 @@
              ItemStack attackingItemStack = this.getWeaponItem();
              DamageSource damageSource = this.createAttackSource(attackingItemStack); final DamageSource dmgSourceFinal = damageSource; // Paper - damage events
              float attackStrengthScale = this.getAttackStrengthScale(0.5F);
-+            if (this.level().battleshipConfig().players.combat.legacyCombatMechanics) {
++            if (this.level().sakuraConfig().players.combat.legacyCombatMechanics) {
 +                attackStrengthScale = 1.0f;
 +            }
              float magicBoost = attackStrengthScale * (this.getEnchantedDamage(entity, baseDamage, damageSource) - baseDamage);
 -            baseDamage *= this.baseDamageScaleFactor();
-+            if (!this.level().battleshipConfig().players.combat.legacyCombatMechanics) {
++            if (!this.level().sakuraConfig().players.combat.legacyCombatMechanics) {
 +                baseDamage *= this.baseDamageScaleFactor();
 +            } else if (magicBoost != 0.0) {
 +                magicBoost += me.samsuik.sakura.player.combat.CombatUtil.calculateLegacySharpnessDamage(this, attackingItemStack, damageSource);
@@ -93,7 +93,7 @@
                      boolean fullStrengthAttack = attackStrengthScale > 0.9F;
                      boolean knockbackAttack;
 -                    if (this.isSprinting() && fullStrengthAttack) {
-+                    if (this.isSprinting() && (!this.level().battleshipConfig().players.knockback.sprinting.requireFullAttack || fullStrengthAttack)) {
++                    if (this.isSprinting() && (!this.level().sakuraConfig().players.knockback.sprinting.requireFullAttack || fullStrengthAttack)) {
                          this.playServerSideSound(SoundEvents.PLAYER_ATTACK_KNOCKBACK);
                          knockbackAttack = true;
                      } else {
@@ -103,7 +103,7 @@
                      if (wasHurt) {
 -                        this.causeExtraKnockback(
 -                            entity, this.getKnockback(entity, damageSource) + (knockbackAttack ? 0.5F : 0.0F), oldMovement, damageSource, totalDamage, true
-+                        final float extraKnockbackToApply = this.level().battleshipConfig().players.combat.legacyCombatMechanics ? 1.0f : 0.5f;
++                        final float extraKnockbackToApply = this.level().sakuraConfig().players.combat.legacyCombatMechanics ? 1.0f : 0.5f;
 +                        this.sakura$causeExtraKnockback(
 +                            entity,
 +                            this.getKnockback(entity, damageSource) + (knockbackAttack ? extraKnockbackToApply : 0.0F),
@@ -114,7 +114,7 @@
 +                            !knockbackAttack
                          );
 -                        if (sweepAttack && !this.level().canvasConfig().combat.disableSweepingEdge) { // Canvas - combat configs
-+                        if (sweepAttack && !this.level().canvasConfig().combat.disableSweepingEdge && this.level().battleshipConfig().players.combat.allowSweepAttacks) {
++                        if (sweepAttack && !this.level().canvasConfig().combat.disableSweepingEdge && this.level().sakuraConfig().players.combat.allowSweepAttacks) {
                              this.doSweepAttack(entity, baseDamage, damageSource, attackStrengthScale);
                          }
  
@@ -122,7 +122,7 @@
      }
  
      private void playServerSideSound(final SoundEvent sound) {
-+        if (this.level().battleshipConfig().players.combat.oldSoundsAndParticleEffects) {
++        if (this.level().sakuraConfig().players.combat.oldSoundsAndParticleEffects) {
 +            return;
 +        }
          sendSoundEffect(this, this.getX(), this.getY(), this.getZ(), sound, this.getSoundSource(), 1.0F, 1.0F); // Paper - send while respecting visibility
@@ -133,7 +133,7 @@
              && !this.isPassenger()
              && entity instanceof LivingEntity
 -            && !this.isSprinting();
-+            && (this.level().battleshipConfig().players.combat.legacyCombatMechanics || !this.isSprinting());
++            && (this.level().sakuraConfig().players.combat.legacyCombatMechanics || !this.isSprinting());
      }
  
      private boolean isSweepAttack(final boolean fullStrengthAttack, final boolean criticalAttack, final boolean knockbackAttack) {
@@ -142,7 +142,7 @@
              float actualDamage = oldLivingEntityHealth - livingEntity.getHealth();
              this.awardStat(Stats.DAMAGE_DEALT, Math.round(actualDamage * 10.0F));
 -            if (!level().canvasConfig().visuals.particles.disableNewCombatParticles && this.level() instanceof ServerLevel && actualDamage > 2.0F) { // Canvas - particles config
-+            if (!this.level().battleshipConfig().players.combat.oldSoundsAndParticleEffects && !level().canvasConfig().visuals.particles.disableNewCombatParticles && this.level() instanceof ServerLevel && actualDamage > 2.0F) {
++            if (!this.level().sakuraConfig().players.combat.oldSoundsAndParticleEffects && !level().canvasConfig().visuals.particles.disableNewCombatParticles && this.level() instanceof ServerLevel && actualDamage > 2.0F) {
                  int count = (int)(actualDamage * 0.5);
                  ((ServerLevel)this.level())
                      .sendParticles(ParticleTypes.DAMAGE_INDICATOR, entity.getX(), entity.getY(0.5), entity.getZ(), count, 0.1, 0.0, 0.1, 0.2);
@@ -168,8 +168,8 @@
 +            final long sinceLastKnockback = millis - this.lastSprintKnockback;
 +            if (!bypassKnockbackDelay) {
 +                double knockbackToApply = 0.0;
-+                if (sinceLastKnockback >= this.level().battleshipConfig().players.knockback.knockbackDelayMillis()) {
-+                    knockbackToApply = this.level().battleshipConfig().players.knockback.sprinting.extraKnockback * 2.0;
++                if (sinceLastKnockback >= this.level().sakuraConfig().players.knockback.sprinting.knockbackDelay.or(0)) {
++                    knockbackToApply = this.level().sakuraConfig().players.knockback.sprinting.extraKnockback * 2.0;
 +                    this.lastSprintKnockback = millis;
 +                }
 +                knockbackAmount = (knockbackAmount - 1.0f) + (float) knockbackToApply;
@@ -184,7 +184,7 @@
                          // Paper end - Only apply knockback if the event is not canceled
                          nearby.knockback(
 -                            0.4F, Mth.sin(this.getYRot() * Mth.DEG_TO_RAD), -Mth.cos(this.getYRot() * Mth.DEG_TO_RAD), damageSource, enchantedDamage, this, io.papermc.paper.event.entity.EntityKnockbackEvent.Cause.SWEEP_ATTACK // Paper - knockback events
-+                            (float) this.level().battleshipConfig().players.knockback.sweepingEdgeKnockback,
++                            (float) this.level().sakuraConfig().players.knockback.sweepingEdgeKnockback,
 +                            Mth.sin(this.getYRot() * Mth.DEG_TO_RAD),
 +                            -Mth.cos(this.getYRot() * Mth.DEG_TO_RAD),
 +                            damageSource,
