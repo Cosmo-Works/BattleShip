@@ -83,4 +83,20 @@ subprojects {
             events(TestLogEvent.STANDARD_OUT)
         }
     }
+
+    // The API is published for plugin authors as dev.cosmoworks.battleship:battleship-api:<mcVersion>-SNAPSHOT.
+    extensions.configure<PublishingExtension> {
+        repositories {
+            maven("https://repo.cosmoworks.dev/") {
+                name = "cosmoworks"
+                credentials {
+                    username = "publish"
+                    password = providers.environmentVariable("MAVEN_PUBLISH_TOKEN").orNull
+                }
+            }
+        }
+        publications.withType<MavenPublication>().configureEach {
+            version = "${providers.gradleProperty("mcVersion").get()}-SNAPSHOT"
+        }
+    }
 }

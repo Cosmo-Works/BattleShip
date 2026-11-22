@@ -30,6 +30,14 @@ jobs:
           ./gradlew --console=plain applyAllPatches
       - name: Build
         run: ./gradlew --console=plain createPaperclipJar
+      - name: Publish the API to repo.cosmoworks.dev
+        # Not on pull requests, and skipped until the MAVEN_PUBLISH_TOKEN secret is set.
+        if: github.event_name != 'pull_request'
+        env:
+          MAVEN_PUBLISH_TOKEN: ${{ secrets.MAVEN_PUBLISH_TOKEN }}
+        run: |
+          if [ -z "$MAVEN_PUBLISH_TOKEN" ]; then echo "No publish token, skipping."; exit 0; fi
+          ./gradlew --console=plain :battleship-api:publishMavenPublicationToCosmoworksRepository
       - name: Name the server jar
         run: |
           version=$(sed -n 's/^mcVersion *= *//p' gradle.properties)
