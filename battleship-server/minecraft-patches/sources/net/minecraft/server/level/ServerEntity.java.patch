@@ -1,6 +1,6 @@
 --- a/net/minecraft/server/level/ServerEntity.java
 +++ b/net/minecraft/server/level/ServerEntity.java
-@@ -116,6 +_,11 @@
+@@ -120,6 +_,11 @@
          }
          // Paper end - optimise collisions
          this.entity.updateDataBeforeSync();
@@ -12,7 +12,7 @@
          List<Entity> passengers = this.entity.getPassengers();
          if (!passengers.equals(this.lastPassengers)) {
              this.synchronizer.sendToTrackingPlayers(new ClientboundSetPassengersPacket(this.entity));
-@@ -154,7 +_,7 @@
+@@ -157,7 +_,7 @@
              this.entity.syncPosition = false;
          }
  
@@ -21,21 +21,25 @@
              byte yRotn = Mth.packDegrees(this.entity.getYRot());
              byte xRotn = Mth.packDegrees(this.entity.getXRot());
              boolean shouldSendRotation = Math.abs(yRotn - this.lastSentYRot) >= 1 || Math.abs(xRotn - this.lastSentXRot) >= 1;
-@@ -378,6 +_,7 @@
+@@ -381,6 +_,7 @@
      }
  
      public void removePairing(final ServerPlayer player) {
 +        dev.cosmoworks.battleship.spawn.BattleshipSpawnCrowd.onPairing(player, this.entity, false); // Battleship - spawn crowd - count tracked players
-         this.entity.stopSeenByPlayer(player);
-         player.connection.send(new ClientboundRemoveEntitiesPacket(this.entity.getId()));
-     }
-@@ -386,9 +_,19 @@
+         // Paper start - Rework map holder tracking
+         if (this.mapFrameViewers.remove(player)) {
+             this.removeFrameMapViewer(player, this.viewedMapId);
+@@ -394,6 +_,8 @@
          List<Packet<? super ClientGamePacketListener>> packets = new ArrayList<>();
          this.sendPairingData(player, packets::add);
          player.connection.send(new ClientboundBundlePacket(packets));
 +        this.battleship$syncEquipmentAfterPairing(); // Battleship - entity packets only after the spawn
 +        dev.cosmoworks.battleship.spawn.BattleshipSpawnCrowd.onPairing(player, this.entity, true); // Battleship - spawn crowd - count tracked players
          this.entity.startSeenByPlayer(player);
+         // Paper start - Rework map holder tracking - send the framed map right away instead of at the next frame update
+         if (this.entity instanceof ItemFrame) {
+@@ -404,6 +_,14 @@
+         // Paper end - Rework map holder tracking
      }
  
 +    // Battleship start - entity packets only after the spawn
@@ -46,10 +50,10 @@
 +    }
 +    // Battleship end - entity packets only after the spawn
 +
-     public void sendPairingData(final ServerPlayer player, final Consumer<Packet<ClientGamePacketListener>> broadcast) {
-         this.entity.updateDataBeforeSync();
-         if (this.entity.isRemoved()) {
-@@ -401,7 +_,7 @@
+     // Paper start - Rework map holder tracking
+     // Players tracking a framed map are holders of that map until they stop tracking the frame or the frame's map changes
+     private void updateFrameMapViewers() {
+@@ -458,7 +_,7 @@
          Packet<ClientGamePacketListener> packet = this.entity.getAddEntityPacket(this);
          broadcast.accept(packet);
          if (this.trackedDataValues != null) {
@@ -58,7 +62,7 @@
          }
  
          if (this.entity instanceof LivingEntity livingEntity) {
-@@ -429,7 +_,7 @@
+@@ -486,7 +_,7 @@
              if (!slots.isEmpty()) {
                  broadcast.accept(new ClientboundSetEquipmentPacket(this.entity.getId(), slots, true)); // Paper - data sanitization
              }
@@ -67,7 +71,7 @@
          }
  
          if (!this.entity.getPassengers().isEmpty()) {
-@@ -470,7 +_,22 @@
+@@ -527,7 +_,22 @@
          List<SynchedEntityData.DataValue<?>> packedValues = entityData.packDirty();
          if (packedValues != null) {
              this.trackedDataValues = entityData.getNonDefaultValues();

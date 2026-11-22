@@ -25,7 +25,7 @@
  
      public ServerPlayer(final MinecraftServer server, final ServerLevel level, final GameProfile gameProfile, final ClientInformation clientInformation) {
          super(level, gameProfile);
-@@ -3119,12 +_,21 @@
+@@ -3131,12 +_,21 @@
  
      @Override
      public void crit(final Entity entity) {

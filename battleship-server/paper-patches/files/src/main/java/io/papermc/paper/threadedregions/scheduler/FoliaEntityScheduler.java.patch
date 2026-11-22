@@ -28,5 +28,5 @@
              } finally {
 +                if (battleship$gate != 0L) dev.cosmoworks.battleship.octopus.PluginGate.task(dev.cosmoworks.battleship.octopus.PluginGate.Scheduler.ENTITY, this.plugin, battleship$gate); // Battleship - octopus plugin gate (observe)
                  boolean reschedule = false;
-                  if (!repeating && !retired) {
+                 if (!repeating && !retired) {
                      this.setStateVolatile(STATE_FINISHED);

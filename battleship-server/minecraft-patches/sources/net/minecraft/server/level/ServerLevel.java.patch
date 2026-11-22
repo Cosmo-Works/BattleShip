@@ -48,7 +48,7 @@
              } // Paper - option to disable ticking
              regionizedWorldData.currentPrimedTnt = 0; // Spigot // Folia - region threading
          }
-@@ -1085,7 +_,14 @@
+@@ -1086,7 +_,14 @@
  
          final net.minecraft.util.RandomSource random = worldData.getCanvasWorldData().simpleUnsafeLocalRandom;
  
@@ -63,7 +63,7 @@
              final LevelChunkSection section = sections[sectionIndex];
              if (!section.isRandomlyTickingBlocks()) {
                  continue;
-@@ -1502,7 +_,13 @@
+@@ -1503,7 +_,13 @@
          ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread("Cannot tick an entity off-main"); // Paper
          entity.commonTick();
          final boolean isActive = io.papermc.paper.entity.activation.ActivationRange.checkIfActive(entity); // Paper - EAR 2
@@ -78,7 +78,7 @@
          entity.tick();
          // Folia start - region threading
          if (!ca.spottedleaf.moonrise.common.util.TickThread.isTickThreadFor(entity)) {
-@@ -1515,6 +_,8 @@
+@@ -1516,6 +_,8 @@
          }
          // Folia end - region threading
          } else {entity.inactiveTick();} // Paper - EAR 2
@@ -87,7 +87,7 @@
  
          for (Entity passenger : entity.getPassengers()) {
              this.tickPassenger(entity, passenger, isActive); // Paper - EAR 2
-@@ -2010,6 +_,9 @@
+@@ -2011,6 +_,9 @@
              try { // Paper - catch CME see below why
              for (java.util.Iterator<Mob> iterator = regionizedWorldData.getNavigatingMobs(); iterator.hasNext();) { // Folia - region threading
                  Mob navigatingMob = iterator.next(); // Folia - region threading
@@ -97,7 +97,7 @@
                  PathNavigation pathNavigation = navigatingMob.getNavigation();
                  if (pathNavigation.shouldRecomputePath(pos)) {
                      navigationsToUpdate.add(pathNavigation);
-@@ -2156,29 +_,100 @@
+@@ -2157,29 +_,100 @@
              case STANDARD -> Explosion.BlockInteraction.DESTROY; // CraftBukkit - handle custom explosion type
          };
          Vec3 center = new Vec3(x, y, z);
@@ -202,7 +202,7 @@
      }
  
      private Explosion.BlockInteraction getDestroyType(final GameRule<Boolean> gameRule) {
-@@ -3316,6 +_,7 @@
+@@ -3293,6 +_,7 @@
                  entity.originWorld = ServerLevel.this.getWorld().getUID();
              }
              // Paper end - Entity origin API

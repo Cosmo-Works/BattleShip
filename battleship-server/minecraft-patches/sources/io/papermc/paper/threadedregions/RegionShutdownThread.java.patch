@@ -1,6 +1,6 @@
 --- a/io/papermc/paper/threadedregions/RegionShutdownThread.java
 +++ b/io/papermc/paper/threadedregions/RegionShutdownThread.java
-@@ -349,6 +_,7 @@
+@@ -376,6 +_,7 @@
          // note: only save after world data and pending teleportations
          LOGGER.info("Saving all player data...");
          MinecraftServer.getServer().getPlayerList().saveAll();

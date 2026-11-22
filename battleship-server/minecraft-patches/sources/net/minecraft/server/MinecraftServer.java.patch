@@ -1,6 +1,6 @@
 --- a/net/minecraft/server/MinecraftServer.java
 +++ b/net/minecraft/server/MinecraftServer.java
-@@ -977,6 +_,7 @@
+@@ -980,6 +_,7 @@
              this.isSaving = true;
              this.getPlayerList().saveAll(); // Paper - Incremental chunk and player saving; diff on change
              boolean result = this.saveAllChunks(silent, flush, force);
@@ -8,7 +8,7 @@
              this.warnOnLowDiskSpace();
              return result;
          } finally {
-@@ -1606,9 +_,20 @@
+@@ -1610,9 +_,20 @@
          this.server.spark.tickStart(); // Paper - spark
          // Folia & Canvas start - region threading
          new com.destroystokyo.paper.event.server.ServerTickStartEvent((int)region.getCurrentTick()).callEvent(); // Paper - Server Tick Events
@@ -28,7 +28,7 @@
 +            dev.cosmoworks.battleship.debug.RegionPhaseTiming.end(dev.cosmoworks.battleship.debug.RegionPhaseTiming.Phase.REGION_TASKS, battleship$phase); // Battleship - region phase timing
  
              // run all player packets
-             for (final ServerPlayer player : new java.util.ArrayList<>(regionizedWorldData.getLocalPlayers())) {
+             region.drainAllPackets();
 @@ -1625,7 +_,10 @@
              }
  

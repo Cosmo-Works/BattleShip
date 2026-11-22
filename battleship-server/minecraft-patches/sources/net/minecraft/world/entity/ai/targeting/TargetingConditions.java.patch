@@ -1,8 +1,8 @@
 --- a/net/minecraft/world/entity/ai/targeting/TargetingConditions.java
 +++ b/net/minecraft/world/entity/ai/targeting/TargetingConditions.java
-@@ -61,6 +_,15 @@
-             return false;
+@@ -67,6 +_,15 @@
          }
+         // Canvas end - region threading
  
 +        // Battleship start - cheap range pre-check
 +        if (targeter != null && this.range > 0.0) {

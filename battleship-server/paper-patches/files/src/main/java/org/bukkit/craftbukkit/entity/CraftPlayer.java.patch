@@ -1,6 +1,6 @@
 --- a/src/main/java/org/bukkit/craftbukkit/entity/CraftPlayer.java
 +++ b/src/main/java/org/bukkit/craftbukkit/entity/CraftPlayer.java
-@@ -2283,6 +_,11 @@
+@@ -2287,6 +_,11 @@
              handle.expToDrop = data.getIntOr("expToDrop", 0);
              handle.keepLevel = data.getBooleanOr("keepLevel", false);
          });
@@ -12,7 +12,7 @@
      }
  
      public void setExtraData(ValueOutput output) {
-@@ -2304,6 +_,10 @@
+@@ -2308,6 +_,10 @@
          paper.putLong("LastLogin", handle.loginTime);
          paper.putLong("LastSeen", System.currentTimeMillis());
          // Paper end
@@ -23,7 +23,7 @@
      }
  
      @Override
-@@ -2898,6 +_,13 @@
+@@ -2908,6 +_,13 @@
      public boolean isAllowingServerListings() {
          return this.getHandle().allowsListing();
      }

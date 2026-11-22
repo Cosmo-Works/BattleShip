@@ -72,7 +72,7 @@
      }
  
      private ItemStack(final Holder<Item> item, final int count, final PatchedDataComponentMap components) {
-@@ -921,7 +_,7 @@
+@@ -922,7 +_,7 @@
              this.popTime--;
          }
  
@@ -81,7 +81,7 @@
              this.getItem().inventoryTick(this, serverLevel, owner, slot);
          }
      }
-@@ -967,11 +_,14 @@
+@@ -968,11 +_,14 @@
      // CraftBukkit start
      public void restorePatch(DataComponentPatch datacomponentpatch) {
          this.components.restorePatch(datacomponentpatch);
@@ -97,7 +97,7 @@
      }
  
      public <T> @Nullable T set(final TypedDataComponent<T> value) {
-@@ -992,7 +_,9 @@
+@@ -993,7 +_,9 @@
      }
  
      public <T> @Nullable T remove(final DataComponentType<? extends T> type) {
@@ -108,7 +108,7 @@
      }
  
      public void applyComponentsAndValidate(final DataComponentPatch patch) {
-@@ -1245,6 +_,7 @@
+@@ -1246,6 +_,7 @@
      // CraftBukkit start
      @Deprecated
      public void setItem(Item item) {
@@ -116,7 +116,7 @@
          this.item = item.builtInRegistryHolder();
          // Paper start - change base component prototype
          final DataComponentPatch patch = this.getComponentsPatch();
-@@ -1304,7 +_,9 @@
+@@ -1305,7 +_,9 @@
      }
  
      public void setCount(final int count) {

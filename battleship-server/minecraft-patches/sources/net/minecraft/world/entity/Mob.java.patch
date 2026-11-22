@@ -59,12 +59,12 @@
      }
  
      protected void registerGoals() {
-@@ -220,10 +_,10 @@
-     public void inactiveTick() {
+@@ -223,10 +_,10 @@
          super.inactiveTick();
          if (!this.aware) return; // Paper - Do not tick AI for inactive unaware mobs
--        if (this.goalSelector.inactiveTick()) {
-+        if (this.goalSelector.inactiveTick(me.samsuik.sakura.entity.BrainActivation.goalSelectorRate(this, true))) {
+         final boolean isThrottled = this.level().paperConfig().entities.behavior.inactiveMobGoalSelectorThrottleRate.enabled() && inactiveTickDisableCounter++ % this.level().paperConfig().entities.behavior.inactiveMobGoalSelectorThrottleRate.intValue() != 0; // Paper - Throttle inactive goal selector ticking
+-        if (this.goalSelector.inactiveTick() && !isThrottled) {
++        if (this.goalSelector.inactiveTick(me.samsuik.sakura.entity.BrainActivation.goalSelectorRate(this, true)) && !isThrottled) {
              this.goalSelector.tick();
          }
 -        if (this.targetSelector.inactiveTick()) {
@@ -72,7 +72,7 @@
              this.targetSelector.tick();
          }
      }
-@@ -444,6 +_,9 @@
+@@ -447,6 +_,9 @@
          super.addAdditionalSaveData(output);
          output.putBoolean("CanPickUpLoot", this.canPickUpLoot());
          output.putBoolean("PersistenceRequired", this.persistenceRequired);
@@ -82,7 +82,7 @@
          if (!this.dropChances.equals(DropChances.DEFAULT)) {
              output.store("drop_chances", DropChances.CODEC, this.dropChances);
          }
-@@ -483,6 +_,7 @@
+@@ -486,6 +_,7 @@
          if (isLevelAtLeast(input, 1) || persistenceRequired) {
              this.persistenceRequired = persistenceRequired;
          }
@@ -90,7 +90,7 @@
          // CraftBukkit end
          this.dropChances = input.read("drop_chances", DropChances.CODEC).orElse(DropChances.DEFAULT);
          this.readLeashData(input);
-@@ -651,7 +_,7 @@
+@@ -654,7 +_,7 @@
  
              ItemStack toEquip = slot.limit(itemStack);
              this.setItemSlotAndDropWhenKilled(slot, toEquip);
@@ -99,7 +99,7 @@
              return toEquip;
          } else {
              return ItemStack.EMPTY;
-@@ -786,7 +_,7 @@
+@@ -789,7 +_,7 @@
      @Override
      public void checkDespawn() {
          if (this.level().getDifficulty() == Difficulty.PEACEFUL && this.despawnInPeacefulOverride.toBooleanOrElse(!this.getType().isAllowedInPeaceful())) { // Paper - allow changing despawnInPeaceful
@@ -108,7 +108,7 @@
          } else {
              boolean isPersistent = this.isPersistenceRequired() || this.requiresCustomPersistence();
              Entity player = this.level().findNearbyPlayer(this, -1.0, EntitySelector.PLAYER_AFFECTS_SPAWNING); // Paper - Affects Spawning API
-@@ -801,7 +_,7 @@
+@@ -804,7 +_,7 @@
                  final double distanceSquared = dxSqr + dzSqr + dySqr;
                  // Despawn if hard/soft limit is exceeded
                  if (!isPersistent && despawnRangePair.hard().shouldDespawn(shape, dxSqr, dySqr, dzSqr, dy) && this.removeWhenFarAway(distanceSquared)) {
@@ -117,7 +117,7 @@
                  }
  
                  if (despawnRangePair.soft().shouldDespawn(shape, dxSqr, dySqr, dzSqr, dy)) {
-@@ -809,7 +_,7 @@
+@@ -812,7 +_,7 @@
                          && this.noActionTime > 600
                          && this.random.nextInt(800) == 0
                          && this.removeWhenFarAway(distanceSquared)) {
@@ -126,7 +126,7 @@
                      }
                  } else {
                      // Paper end - Configurable despawn distances
-@@ -819,6 +_,11 @@
+@@ -822,6 +_,11 @@
          }
      }
  
@@ -138,7 +138,7 @@
      @Override
      protected final void serverAiStep() {
          this.noActionTime++;
-@@ -834,11 +_,19 @@
+@@ -837,11 +_,19 @@
          this.sensing.tick();
          int idBasedTickCount = this.tickCount + this.getId();
          if (idBasedTickCount % 2 != 0 && this.tickCount > 1) {

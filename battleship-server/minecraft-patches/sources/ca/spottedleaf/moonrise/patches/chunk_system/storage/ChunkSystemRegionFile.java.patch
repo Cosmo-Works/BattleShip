@@ -1,8 +1,8 @@
 --- a/ca/spottedleaf/moonrise/patches/chunk_system/storage/ChunkSystemRegionFile.java
 +++ b/ca/spottedleaf/moonrise/patches/chunk_system/storage/ChunkSystemRegionFile.java
-@@ -9,4 +_,6 @@
+@@ -16,4 +_,6 @@
  
-     public MoonriseRegionFileIO.RegionDataController.WriteData moonrise$startWrite(final CompoundTag data, final ChunkPos pos) throws IOException;
+     public Boolean moonrise$tryRecalcHeader(final int expectedRecalcCount) throws IOException;
  
 +    public void flush() throws IOException; // Battleship - Linear region format
 +

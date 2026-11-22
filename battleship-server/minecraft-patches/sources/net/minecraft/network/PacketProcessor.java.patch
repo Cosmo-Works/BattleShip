@@ -1,6 +1,6 @@
 --- a/net/minecraft/network/PacketProcessor.java
 +++ b/net/minecraft/network/PacketProcessor.java
-@@ -36,7 +_,10 @@
+@@ -41,7 +_,10 @@
              return false;
          }
  
@@ -11,7 +11,7 @@
          return true;
      }
      // Paper end - improve tick loop
-@@ -67,10 +_,36 @@
+@@ -72,10 +_,36 @@
      public void processQueuedPackets() {
          if (!this.closed) {
              while (!this.packetsToBeHandled.isEmpty()) {

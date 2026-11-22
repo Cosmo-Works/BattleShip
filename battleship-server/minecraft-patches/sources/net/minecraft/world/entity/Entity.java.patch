@@ -88,7 +88,7 @@
          } else {
              this.defaultActivationState = false;
          }
-@@ -762,10 +_,21 @@
+@@ -768,11 +_,22 @@
      }
  
      // CraftBukkit start
@@ -103,6 +103,7 @@
 +    // Battleship end - entity packets only to its trackers
 +
      public void refreshEntityData(ServerPlayer to) {
+         if (this.isRemoved()) return; // Paper - Don't send entity data for removed entities
          List<SynchedEntityData.DataValue<?>> values = this.entityData.packAll(); // Paper - Update EVERYTHING not just not default
 +        if (to != this) values = dev.cosmoworks.battleship.spawn.BattleshipSpawnCrowd.dataForOthers(this, values); // Battleship - spawn crowd
  
@@ -111,7 +112,7 @@
              to.connection.send(new net.minecraft.network.protocol.game.ClientboundSetEntityDataPacket(this.getId(), values));
          }
      }
-@@ -774,7 +_,7 @@
+@@ -781,7 +_,7 @@
      // This method should only be used if the data of an entity could have become desynced
      // due to interactions on the client.
      public void resendPossiblyDesyncedEntityData(ServerPlayer player) {
@@ -120,7 +121,7 @@
              ServerLevel level = (ServerLevel) this.level();
              net.minecraft.server.level.ChunkMap.TrackedEntity tracker = this.moonrise$getTrackedEntity(); // Folia - region threading
              if (tracker == null) {
-@@ -784,12 +_,13 @@
+@@ -791,12 +_,13 @@
              final List<Packet<? super ClientGamePacketListener>> list = new ArrayList<>();
              serverEntity.sendPairingData(player, list::add);
              player.connection.send(new net.minecraft.network.protocol.game.ClientboundBundlePacket(list));
@@ -135,7 +136,7 @@
              return;
          }
  
-@@ -1194,11 +_,76 @@
+@@ -1201,11 +_,76 @@
          return this.mainSupportingBlockPos.isPresent() && this.mainSupportingBlockPos.get().equals(pos);
      }
  
@@ -214,7 +215,7 @@
              if (supportingBlock.isPresent() || this.onGroundNoBlocks) {
                  this.mainSupportingBlockPos = supportingBlock;
              } else if (movement != null) {
-@@ -1229,6 +_,28 @@
+@@ -1236,6 +_,28 @@
  
          final Vec3 originalMovement = delta; // Paper - Expose pre-collision velocity
          ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread("Cannot move an entity off-main");
@@ -243,7 +244,7 @@
          if (this.noPhysics) {
              // Canvas start - region threading
              Vec3 pos = this.position();
-@@ -1248,7 +_,10 @@
+@@ -1255,7 +_,10 @@
              this.verticalCollisionBelow = false;
              this.minorHorizontalCollision = false;
          } else {
@@ -255,7 +256,7 @@
                  delta = this.limitPistonMovement(delta);
                  // Paper start - EAR 2
                  this.activatedTick = Math.max(this.activatedTick, io.papermc.paper.threadedregions.RegionizedServer.getCurrentTick() + 20); // Folia - region threading
-@@ -1260,7 +_,7 @@
+@@ -1267,7 +_,7 @@
              }
  
              if (this.stuckSpeedMultiplier.lengthSqr() > 1.0E-7) {
@@ -264,7 +265,7 @@
                      delta = delta.multiply(this.stuckSpeedMultiplier);
                  }
  
-@@ -1277,6 +_,7 @@
+@@ -1284,6 +_,7 @@
              delta = this.maybeBackOffFromEdge(delta, moverType);
              // Canvas start - region threading
              if (
@@ -272,7 +273,7 @@
                  io.canvasmc.canvas.GlobalConfiguration.getInstance().regionScheduler.preventExcessiveVelocityMoveOutOfRegion &&
                  delta.lengthSqr() >= (30.0D * 30.0D) &&
                  !ca.spottedleaf.moonrise.common.util.TickThread.isTickThreadFor(level(), position(), delta, 16)
-@@ -1288,34 +_,46 @@
+@@ -1295,34 +_,46 @@
              // Canvas end - region threading
              Vec3 movement = this.collide(delta);
              double movementLength = movement.lengthSqr();
@@ -302,7 +303,7 @@
 -                    && !ca.spottedleaf.moonrise.common.util.TickThread.isTickThreadFor(this.level(), pos, movement, 0)) {
 +                if (this.leavesThisRegion(pos, movement, newPosition)) {
 +                    this.unmergeForRegionTransfer(); // Battleship - cannon region transfer
-                     throw new io.canvasmc.canvas.threadedregions.world.entities.EntityMoveOutOfRegionException(this, moverType, movement);
+                     throw new io.canvasmc.canvas.threadedregions.world.entities.EntityMoveOutOfRegionException(this, movement);
                  }
                  // Canvas end - region threading
 -                this.addMovementThisTick(new Entity.Movement(pos, newPosition, delta));
@@ -340,7 +341,7 @@
              }
  
              boolean xCollision = !Mth.equal(delta.x, movement.x);
-@@ -1342,9 +_,17 @@
+@@ -1349,9 +_,17 @@
  
              if (this.isRemoved()) {
              } else {
@@ -360,7 +361,7 @@
                  // CraftBukkit start
                  if (this.horizontalCollision && this.getBukkitEntity() instanceof org.bukkit.entity.Vehicle) {
                      org.bukkit.entity.Vehicle vehicle = (org.bukkit.entity.Vehicle) this.getBukkitEntity();
-@@ -1386,6 +_,25 @@
+@@ -1393,6 +_,25 @@
          }
      }
  
@@ -386,7 +387,7 @@
      private void restituteMovementAfterCollisions(final BlockState effectState, final boolean xCollision, final boolean zCollision, final Vec3 movement) {
          double restitution = this.isSuppressingBounce() ? 0.0 : this.getEntityBounciness();
          Vec3 currentMovement = this.getDeltaMovement();
-@@ -1494,7 +_,7 @@
+@@ -1501,7 +_,7 @@
          this.finalMovementsThisTick.clear();
          this.finalMovementsThisTick.addAll(this.movementThisTick);
          this.movementThisTick.clear();
@@ -395,7 +396,7 @@
              this.finalMovementsThisTick.add(new Entity.Movement(this.oldPosition(), this.position()));
          } else if (this.finalMovementsThisTick.getLast().to.distanceToSqr(this.position()) > 9.9999994E-11F) {
              this.finalMovementsThisTick.add(new Entity.Movement(this.finalMovementsThisTick.getLast().to, this.position()));
-@@ -1507,7 +_,7 @@
+@@ -1514,7 +_,7 @@
          this.applyEffectsFromBlocks(this.finalMovementsThisTick);
      }
  
@@ -404,7 +405,7 @@
          if (this.movementThisTick.size() >= 100) {
              Entity.Movement first = this.movementThisTick.removeFirst();
              Entity.Movement second = this.movementThisTick.removeFirst();
-@@ -1728,7 +_,153 @@
+@@ -1735,7 +_,153 @@
          return colliders.isEmpty() ? maxDistance : -Shapes.collide(Direction.Axis.Y, aabb, colliders, -maxDistance);
      }
  
@@ -559,7 +560,7 @@
          // Paper start - optimise collisions
          final boolean xZero = movement.x == 0.0;
          final boolean yZero = movement.y == 0.0;
-@@ -1764,10 +_,10 @@
+@@ -1771,10 +_,10 @@
  
          ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.getCollisionsForBlocksOrWorldBorder(
              this.level, (Entity)(Object)this, initialCollisionBox, potentialCollisionsVoxel, potentialCollisionsBB,
@@ -572,7 +573,7 @@
  
          final boolean collidedX = collided.x != movement.x;
          final boolean collidedY = collided.y != movement.y;
-@@ -1796,7 +_,7 @@
+@@ -1803,7 +_,7 @@
          );
  
          for (final float step : calculateStepHeights(collidedYBox, stepVoxels, stepAABBs, (float)stepHeight, (float)collided.y)) {
@@ -581,7 +582,7 @@
              if (stepResult.horizontalDistanceSqr() > collided.horizontalDistanceSqr()) {
                  return stepResult.add(0.0, collidedYBox.minY - currentBox.minY, 0.0);
              }
-@@ -1915,26 +_,38 @@
+@@ -1922,26 +_,38 @@
      private void checkInsideBlocks(final List<Entity.Movement> movements, final InsideBlockEffectApplier.StepBasedCollector effectCollector) {
          if (this.isAffectedByBlocks()) {
              LongSet visitedBlocks = this.visitedBlocks;
@@ -627,7 +628,7 @@
                  }
              }
  
-@@ -1947,22 +_,31 @@
+@@ -1954,22 +_,31 @@
          final Vec3 to,
          final InsideBlockEffectApplier.StepBasedCollector effectCollector,
          final LongSet visitedBlocks,
@@ -667,7 +668,7 @@
              (blockIntersection, iteration) -> {
                  if (!this.isAlive()) {
                      return false;
-@@ -1972,25 +_,12 @@
+@@ -1979,25 +_,12 @@
                      return false;
                  }
  
@@ -694,7 +695,7 @@
                  if (state.isAir()) {
                      if (debugEntityBlockIntersections) {
                          this.debugBlockIntersection((ServerLevel)this.level(), blockIntersection.immutable(), false, false);
-@@ -2002,7 +_,7 @@
+@@ -2009,7 +_,7 @@
                      boolean insideBlock = intersectShape == Shapes.block()
                          || this.collidedWithShapeMovingFrom(from, to, intersectShape.move(new Vec3(blockIntersection)).toAabbs());
                      boolean insideFluid = (state.tagFlag & io.canvasmc.canvas.world.block.BlockTags.FLUID) != 0 && this.collidedWithFluid(state.getFluidState(), blockIntersection, from, to); // Canvas - optimize checkInsideBlocks
@@ -703,7 +704,7 @@
                          if (insideBlock) {
                              try {
                                  boolean isPrecise = movedFar || deflatedBoundingBoxAtTarget.intersects(blockIntersection);
-@@ -2038,6 +_,18 @@
+@@ -2045,6 +_,18 @@
          return iterations.get() + 1;
      }
  
@@ -722,7 +723,7 @@
      private void debugBlockIntersection(final ServerLevel level, final BlockPos pos, final boolean insideBlock, final boolean insideFluid) {
          DebugEntityBlockIntersection type;
          if (insideFluid) {
-@@ -2082,6 +_,7 @@
+@@ -2089,6 +_,7 @@
      }
  
      private void walkingStepSound(final BlockPos onPos, final BlockState onState) {
@@ -730,7 +731,7 @@
          this.playStepSound(onPos, onState);
          if (this.shouldPlayAmethystStepSound(onState)) {
              this.playAmethystStepSound();
-@@ -2089,6 +_,7 @@
+@@ -2096,6 +_,7 @@
      }
  
      protected void waterSwimSound() {
@@ -738,16 +739,16 @@
          Entity entity = Objects.requireNonNullElse(this.getControllingPassenger(), this);
          float volumeModifier = entity == this ? 0.35F : 0.4F;
          Vec3 deltaMovement = entity.getDeltaMovement();
-@@ -3994,7 +_,7 @@
-             }
-             return;
+@@ -4012,7 +_,7 @@
+             newAmount = event.getAmount();
          }
--        this.entityData.set(DATA_AIR_SUPPLY_ID, event.getAmount());
-+        this.entityData.set(DATA_AIR_SUPPLY_ID, event.getAmount(), this.getMaxAirSupply()); // Battleship - packet obfuscation and reduction
-         // CraftBukkit end
+ 
+-        this.entityData.set(DATA_AIR_SUPPLY_ID, newAmount);
++        this.entityData.set(DATA_AIR_SUPPLY_ID, newAmount, this.getMaxAirSupply()); // Battleship - packet obfuscation and reduction
+         // Paper end - EntityAirChangeEvent
      }
  
-@@ -6024,7 +_,7 @@
+@@ -6060,7 +_,7 @@
      }
  
      public boolean isPushedByFluid() {
@@ -756,7 +757,7 @@
      }
  
      public static double getViewScale() {
-@@ -6885,6 +_,12 @@
+@@ -6921,6 +_,12 @@
              this.stopRiding();
          }
  
@@ -769,7 +770,7 @@
          if (this.removalReason != Entity.RemovalReason.UNLOADED_TO_CHUNK) { this.getPassengers().forEach(Entity::stopRiding); } // Paper - rewrite chunk system
          this.levelCallback.onRemove(reason);
          this.onRemoval(reason);
-@@ -6931,13 +_,14 @@
+@@ -6967,13 +_,14 @@
      @Override
      public boolean shouldBeSaved() {
          return (this.removalReason == null || this.removalReason.shouldSave())
@@ -785,7 +786,7 @@
      }
  
      public boolean mayInteract(final ServerLevel level, final BlockPos pos) {
-@@ -7092,7 +_,7 @@
+@@ -7128,7 +_,7 @@
          void accept(Entity target, double x, double y, double z);
      }
  

@@ -58,7 +58,7 @@
 -    implementation(projects.canvasApi)
 +    implementation(projects.battleshipApi)
 +    implementation("com.github.luben:zstd-jni:1.5.7-4") // Battleship - Linear region format
-     implementation(platform("ca.spottedleaf.leafpile:bom:1.2.4"))
+     implementation(platform("ca.spottedleaf.leafpile:bom:1.3.2"))
      implementation("ca.spottedleaf.leafpile:common")
      implementation("ca.spottedleaf.leafpile:concurrentutil")
 @@ -215,15 +_,15 @@ tasks.jar {

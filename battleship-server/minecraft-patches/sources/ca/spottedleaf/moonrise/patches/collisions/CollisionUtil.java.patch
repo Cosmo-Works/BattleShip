@@ -88,7 +88,7 @@
  
          // special cases:
          if (minBlockY > maxBlockY) {
-@@ -1935,23 +_,37 @@
+@@ -1935,7 +_,16 @@
          final int minChunkZ = minBlockZ >> 4;
          final int maxChunkZ = maxBlockZ >> 4;
  
@@ -103,12 +103,15 @@
 +        final boolean addTicket = (collisionFlags & COLLISION_FLAG_ADD_TICKET) != 0; // Battleship - load chunks on movement
 +        final boolean fullBlocks = (collisionFlags & COLLISION_FLAG_FULL_BLOCKS) != 0; // Battleship - collide with non-solid blocks
          final ChunkSource chunkSource = world.getChunkSource();
- 
-         for (int currChunkZ = minChunkZ; currChunkZ <= maxChunkZ; ++currChunkZ) {
-             for (int currChunkX = minChunkX; currChunkX <= maxChunkX; ++currChunkX) {
-                 // Folia start - region threading
--                if (!ca.spottedleaf.moonrise.common.util.TickThread.isTickThreadFor(world, currChunkX, currChunkZ, 4)) {
-+                final boolean neighborhoodOwned = ca.spottedleaf.moonrise.common.util.TickThread.isTickThreadFor(world, currChunkX, currChunkZ, 4);
+         // Canvas start - region threading
+         final int chunkRad = 4;
+@@ -1955,17 +_,24 @@
+                 final boolean ownsChunk =
+                     ownsEveryChunk
+                     || (!searchingOneChunk && ca.spottedleaf.moonrise.common.util.TickThread.isTickThreadFor(world, currChunkX, currChunkZ, chunkRad));
+-                if (!ownsChunk) {
++                // Battleship start - cannon region transfer
++                final boolean neighborhoodOwned = ownsChunk;
 +                if (!shouldReadChunkOnThisThread(world, entity, currChunkX, currChunkZ, neighborhoodOwned)) {
                      if (checkOnly) {
 -                        return true;
@@ -125,13 +128,14 @@
                      }
 +                    continue;
                  }
-                 // Folia end - region threading
++                // Battleship end - cannon region transfer
+                 // Folia & Canvas end - region threading
 -                final ChunkAccess chunk = chunkSource.getChunk(currChunkX, currChunkZ, ChunkStatus.FULL, loadChunks);
-+                final ChunkAccess chunk = chunkSource.getChunk(currChunkX, currChunkZ, ChunkStatus.FULL, loadChunks && neighborhoodOwned);
++                final ChunkAccess chunk = chunkSource.getChunk(currChunkX, currChunkZ, ChunkStatus.FULL, loadChunks && neighborhoodOwned); // Battleship - cannon region transfer
  
                  if (chunk == null) {
                      if ((collisionFlags & COLLISION_FLAG_COLLIDE_WITH_UNLOADED_CHUNKS) != 0) {
-@@ -1965,6 +_,11 @@
+@@ -1979,6 +_,11 @@
                      continue;
                  }
  
@@ -143,7 +147,7 @@
                  final LevelChunkSection[] sections = chunk.getSections();
  
                  // bound y
-@@ -1979,17 +_,21 @@
+@@ -1993,17 +_,21 @@
                          continue;
                      }
  
@@ -171,7 +175,7 @@
  
                      for (int currY = minYIterate; currY <= maxYIterate; ++currY) {
                          final int blockY = currY | (currChunkY << 4);
-@@ -2018,6 +_,8 @@
+@@ -2032,6 +_,8 @@
                                      mutablePos.set(blockX, blockY, blockZ);
                                      if (useEntityCollisionShape) {
                                          blockCollision = collisionShape.getCollisionShape(blockData, world, mutablePos);
@@ -180,7 +184,7 @@
                                      } else if (blockCollision == null) {
                                          blockCollision = blockData.getCollisionShape(world, mutablePos, collisionShape);
                                      }
-@@ -2028,7 +_,7 @@
+@@ -2042,7 +_,7 @@
  
                                          // Not using the epsilon violates the collision rules but this is what Vanilla does.
                                          // Check BlockCollisions.class
@@ -189,7 +193,7 @@
                                              if (!aabb.intersects(singleAABB)) {
                                                  continue;
                                              }
-@@ -2086,6 +_,45 @@
+@@ -2100,6 +_,45 @@
          }
  
          return ret;

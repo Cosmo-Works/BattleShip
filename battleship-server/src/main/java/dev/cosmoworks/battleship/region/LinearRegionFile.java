@@ -274,7 +274,7 @@ public class LinearRegionFile implements AbstractRegionFile {
     }
 
     @Override
-    public int getRecalculateCount() {
+    public int moonrise$getRecalculateCount() {
         return 0;
     }
 
@@ -319,22 +319,13 @@ public class LinearRegionFile implements AbstractRegionFile {
     }
 
     @Override
-    public boolean recalculateHeader() {
+    public boolean moonrise$recalculateHeader() {
         return false;
     }
 
     @Override
-    public void setOversized(final int x, final int z, final boolean oversized) {
-    }
-
-    @Override
-    public CompoundTag getOversizedData(final int x, final int z) throws IOException {
-        throw new IOException("Oversized chunk data is not supported in Linear format");
-    }
-
-    @Override
-    public boolean isOversized(final int x, final int z) {
-        return false;
+    public Boolean moonrise$tryRecalcHeader(final int expectedRecalcCount) {
+        return Boolean.FALSE;
     }
 
     private byte[] toByteArray(final InputStream in) throws IOException {

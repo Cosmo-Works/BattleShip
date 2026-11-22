@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/entity/LivingEntity.java
 +++ b/net/minecraft/world/entity/LivingEntity.java
-@@ -316,6 +_,66 @@
+@@ -315,6 +_,66 @@
      }
  
      // Canvas end - region threading
@@ -67,7 +67,7 @@
      @Override
      public void updateTicks(long fromTickOffset, long fromRedstoneTimeOffset) {
          super.updateTicks(fromTickOffset, fromRedstoneTimeOffset);
-@@ -348,6 +_,13 @@
+@@ -347,6 +_,13 @@
          this.setYRot(this.random.nextFloat() * (float) (Math.PI * 2));
          this.yHeadRot = this.getYRot();
          this.brain = this.makeBrain(Brain.Packed.EMPTY);
@@ -81,7 +81,7 @@
      }
  
      @Override
-@@ -583,7 +_,7 @@
+@@ -582,7 +_,7 @@
  
      @Override
      protected float getBlockSpeedFactor() {
@@ -90,7 +90,7 @@
      }
  
      private static float computeModifiedFriction(final float friction, final float modifier) {
-@@ -1501,6 +_,7 @@
+@@ -1512,6 +_,7 @@
          }
  
          this.noActionTime = 0;
@@ -98,7 +98,7 @@
          if (damage < 0.0F) {
              damage = 0.0F;
          }
-@@ -1649,7 +_,7 @@
+@@ -1651,7 +_,7 @@
          }
          // Paper end - Check distance in entity interactions
  
@@ -107,7 +107,7 @@
          if (!blocked) {
              this.indicateDamage(xd, zd);
          }
-@@ -1737,6 +_,10 @@
+@@ -1739,6 +_,10 @@
              angle = (float) Math.PI;
          }
  
@@ -118,7 +118,7 @@
          BlocksAttacks blocksAttacks = this.getItemBlockingWith().get(DataComponents.BLOCKS_ATTACKS);
          return blocksAttacks.resolveBlockedDamage(source, damage, angle);
      }
-@@ -1806,8 +_,8 @@
+@@ -1808,8 +_,8 @@
  
      protected void blockedByItem(final LivingEntity defender, final DamageSource source, final float damage, final boolean fullyBlocked) {
          if (!fullyBlocked) {
@@ -128,7 +128,7 @@
      }
  
      private boolean checkTotemDeathProtection(final DamageSource killingDamage) {
-@@ -1946,6 +_,10 @@
+@@ -1947,6 +_,10 @@
                  }
  
                  this.postDeathEventTasks.clear(); // Paper
@@ -139,7 +139,7 @@
                  this.level().broadcastEntityEvent(this, EntityEvent.DEATH);
              }
  
-@@ -2131,7 +_,7 @@
+@@ -2132,7 +_,7 @@
      }
  
      public void knockback(double power, double xd, double zd, final DamageSource source, final float damage, final boolean comesFromEffect, @Nullable Entity attacker, io.papermc.paper.event.entity.EntityKnockbackEvent.Cause eventCause) { // Paper - knockback events
@@ -148,7 +148,7 @@
          if (true || !(power <= 0.0)) { // CraftBukkit - Call event even when force is 0
              // this.needsSync = true; // Paper - moved down
              Vec3 deltaMovement = this.getDeltaMovement();
-@@ -2142,9 +_,15 @@
+@@ -2143,9 +_,15 @@
              }
  
              Vec3 deltaVector = new Vec3(xd, 0.0, zd).normalize().scale(power);
@@ -165,7 +165,7 @@
                  deltaMovement.z / 2.0 - deltaVector.z
              );
              // Paper start - knockback events
-@@ -2156,6 +_,9 @@
+@@ -2157,6 +_,9 @@
  
              this.needsSync = true;
              this.setDeltaMovement(deltaMovement.add(event.getKnockback().getX(), event.getKnockback().getY(), event.getKnockback().getZ()));
@@ -175,7 +175,7 @@
              // Paper end - knockback events
          }
      }
-@@ -2360,8 +_,12 @@
+@@ -2361,8 +_,12 @@
          this.currentImpulseImpactPos = null;
      }
  
@@ -189,7 +189,7 @@
              return 0;
          }
  
-@@ -2419,6 +_,9 @@
+@@ -2420,6 +_,9 @@
      protected float getDamageAfterArmorAbsorb(final DamageSource damageSource, float damage) {
          if (!damageSource.is(DamageTypeTags.BYPASSES_ARMOR)) {
              // this.hurtArmor(damageSource, damage); // CraftBukkit - actuallyHurt(DamageSource, float, EntityDamageEvent) for damage handling
@@ -199,7 +199,7 @@
              damage = CombatRules.getDamageAfterAbsorb(
                  this, damage, damageSource, this.getArmorValue(), (float)this.getAttributeValue(Attributes.ARMOR_TOUGHNESS)
              );
-@@ -2584,6 +_,10 @@
+@@ -2585,6 +_,10 @@
                  armorDamage += (float)event.getDamage(DamageModifier.BLOCKING);
                  armorDamage += (float)event.getDamage(DamageModifier.FREEZING);
                  armorDamage += (float)event.getDamage(DamageModifier.HARD_HAT);
@@ -210,7 +210,7 @@
                  this.hurtArmor(source, armorDamage);
              }
  
-@@ -2702,6 +_,14 @@
+@@ -2695,6 +_,14 @@
          this.entityData.set(DATA_STINGER_COUNT_ID, count);
      }
  
@@ -225,7 +225,7 @@
      private int getModifiedSwingDuration(final SwingAnimation animation) {
          int swingDuration = animation.duration();
          if (MobEffectUtil.hasDigSpeed(this)) {
-@@ -2719,7 +_,24 @@
+@@ -2712,7 +_,24 @@
      }
  
      public boolean swing(final InteractionHand hand, final SwingAnimation animation, final boolean sendToSwingingEntity) {
@@ -251,7 +251,7 @@
              if (this.level() instanceof ServerLevel serverLevel) {
                  ClientboundSwingAnimationPacket packet = new ClientboundSwingAnimationPacket(this, hand, animation);
                  ServerChunkCache chunkSource = serverLevel.getChunkSource();
-@@ -3110,7 +_,7 @@
+@@ -3103,7 +_,7 @@
  
      @Override
      public double getDefaultGravity() {
@@ -260,7 +260,7 @@
      }
  
      @Override
-@@ -3209,7 +_,7 @@
+@@ -3202,7 +_,7 @@
      protected void travelInWater(final Vec3 input, final double baseGravity, final boolean isFalling, final double oldY) {
          float slowDown = this.isSprinting() ? 0.9F : this.getWaterSlowDown();
          float speed = 0.02F;
@@ -269,7 +269,7 @@
          if (!this.onGround()) {
              waterWalker *= 0.5F;
          }
-@@ -3492,7 +_,12 @@
+@@ -3485,7 +_,12 @@
                  }
              }
  
@@ -283,7 +283,7 @@
              if (this.tickCount % 20 == 0) {
                  this.getCombatTracker().recheckStatus();
              }
-@@ -3690,6 +_,9 @@
+@@ -3683,6 +_,9 @@
                      if (this.level() instanceof ServerLevel serverLevel) {
                          EnchantmentHelper.runLocationChangedEffects(serverLevel, current, this, slot);
                      }
@@ -293,7 +293,7 @@
                  }
              }
  
-@@ -3760,7 +_,11 @@
+@@ -3753,7 +_,11 @@
              this.lerpHeadSteps--;
          }
  
@@ -306,7 +306,7 @@
          Vec3 movement = this.getDeltaMovement();
          double dx = movement.x;
          double dy = movement.y;
-@@ -3878,7 +_,7 @@
+@@ -3871,7 +_,7 @@
              }
          }
          // Paper end - Add EntityMoveEvent
@@ -315,7 +315,7 @@
              this.hurtServer(serverLevel, this.damageSources().drown(), 1.0F);
          }
      }
-@@ -3955,14 +_,34 @@
+@@ -3948,14 +_,34 @@
          }
  
          int maxCramming = ((ServerLevel) this.level()).getGameRules().get(GameRules.MAX_ENTITY_CRAMMING);
@@ -354,7 +354,7 @@
          // Canvas end - only players push config
          if (!pushableEntities.isEmpty()) {
              if (this.level() instanceof ServerLevel serverLevel) {
-@@ -3983,9 +_,9 @@
+@@ -3976,9 +_,9 @@
              }
  
              // Paper start - Cap entity collisions
@@ -366,7 +366,7 @@
                      break;
                  }
  
-@@ -5038,7 +_,7 @@
+@@ -5031,7 +_,7 @@
  
      @Override
      public boolean isTransmittingWaypoint() {

@@ -18,7 +18,7 @@
                      if (regionFile != null) {
                          regionFile.flush();
                      } // else: evicted from cache, which should have called flush
-@@ -1562,7 +_,7 @@
+@@ -1564,7 +_,7 @@
  
          public static interface IORunnable {
  
