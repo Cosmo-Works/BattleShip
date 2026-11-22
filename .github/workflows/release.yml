@@ -1,0 +1,63 @@
+name: Build and release
+
+# Every push to main is a numbered build with the server jar attached.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          java-version: 25
+          distribution: temurin
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
+      - name: Apply patches
+        # Identity for the commits the patcher makes in the generated source trees.
+        run: |
+          git config --global user.name "Battleship Build"
+          git config --global user.email "build@battleship.invalid"
+          ./gradlew --console=plain applyAllPatches
+      - name: Build
+        run: ./gradlew --console=plain createPaperclipJar
+      - name: Name the server jar
+        run: |
+          version=$(sed -n 's/^mcVersion *= *//p' gradle.properties)
+          mkdir out && cp battleship-server/build/libs/battleship-paperclip-*.jar "out/battleship-$version-$GITHUB_RUN_NUMBER.jar"
+          echo "$version" > out/version.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: battleship-jar
+          path: out/
+
+  # Publishing is a separate job with write access that runs no build tooling.
+  release:
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: battleship-jar
+      - name: Publish build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          version=$(cat version.txt)
+          n=$GITHUB_RUN_NUMBER
+          gh release create "build-$n" battleship-*.jar --target "$GITHUB_SHA" --latest \
+            --title "Battleship $version build $n" \
+            --notes "Build $n of Battleship for Minecraft $version (${GITHUB_SHA::8}). Needs Java 25: java -jar battleship-$version-$n.jar"
