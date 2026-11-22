@@ -18,8 +18,8 @@ import static me.samsuik.sakura.player.gui.ItemStackUtil.itemWithBlankName;
 
 @NullMarked
 public final class VisibilityGui extends FeatureGui {
-    private static final NamespacedKey TOGGLE_BUTTON_KEY = new NamespacedKey("battleship", "toggle_button");
-    private static final NamespacedKey MENU_ITEMS_KEY = new NamespacedKey("battleship", "menu_items");
+    private static final NamespacedKey TOGGLE_BUTTON_KEY = new NamespacedKey("sakura", "toggle_button");
+    private static final NamespacedKey MENU_ITEMS_KEY = new NamespacedKey("sakura", "menu_items");
 
     public VisibilityGui() {
         super(45, Component.text("FPS Settings"));

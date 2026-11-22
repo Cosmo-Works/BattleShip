@@ -60,7 +60,7 @@ public class BattleshipCommands {
     }
 
     public void build(final CommandDispatcher<CommandSourceStack> dispatcher, final CommandBuildContext context) {
-        final LiteralArgumentBuilder<CommandSourceStack> base = literal("battleship")
+        final LiteralArgumentBuilder<CommandSourceStack> base = literal("sakura")
             .requires(source -> {
                 boolean canUse = permission("help").test(source);
 
@@ -79,7 +79,7 @@ public class BattleshipCommands {
                 for (final SubCommand subCommand : this.subCommands) {
                     final String description = subCommand.getDescription();
                     commandContext.getSource().sendSystemMessage(Component.literal(
-                        "  /battleship " + subCommand.getName() + (description == null ? "" : " - " + description)
+                        "  /sakura " + subCommand.getName() + (description == null ? "" : " - " + description)
                     ).withColor(CommonColors.GRAY));
                 }
                 return this.subCommands.size();
@@ -95,7 +95,7 @@ public class BattleshipCommands {
                 dispatcher.register(sub.construct(literal(name)
                     .requires(permission(name)), context));
 
-                dispatcher.register(sub.construct(literal("battleship:" + name)
+                dispatcher.register(sub.construct(literal("sakura:" + name)
                     .requires(permission(name)), context));
             }
         }

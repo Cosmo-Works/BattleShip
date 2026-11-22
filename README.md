@@ -31,7 +31,7 @@ large player counts.
 
 - `battleship-server.yml` holds the server-wide switches, `battleship-worlds.yml` the per-world settings
   (mechanics, redstone, cannons, entities, chunks)
-- `/battleship` has subcommands for cannon testing and inspection: tick freeze and `fps`, TNT and sand
+- `/sakura` has subcommands for cannon testing and inspection: tick freeze and `fps`, TNT and sand
   visibility toggles, mechanics and config inspection, region and TPS overview, reload
 
 ### API

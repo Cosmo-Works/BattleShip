@@ -183,7 +183,7 @@ public class BattleshipServerConfig extends Part {
                 .greedyString();
             option("mechanicInformation")
                 .docs(
-                    "Shown by /battleship mechanic. MiniMessage.",
+                    "Shown by /sakura mechanic. MiniMessage.",
                     "The <information> tag wraps hover text for the mechanic dump."
                 )
                 .greedyString();
@@ -979,7 +979,7 @@ public class BattleshipServerConfig extends Part {
                 .docs(
                     "Time the phases of every region tick (packets by type, entity ticking by kind, tracker, chunk ticking,",
                     "chunk loader, scheduler tasks, block events, connection ticks and flush) and log the busiest regions",
-                    "every region-phase-log-interval seconds; /battleship regions shows the last report. Costs two",
+                    "every region-phase-log-interval seconds; /sakura regions shows the last report. Costs two",
                     "System.nanoTime() calls per phase, per entity and per packet."
                 );
             option("regionPhaseLogInterval")
@@ -1023,7 +1023,7 @@ public class BattleshipServerConfig extends Part {
                     .docs(
                         "Measure plugin code as the octopus head would run it: every listener call (per phase kind, event, plugin,",
                         "Folia support: calls/s, ms/s, p99), plugin scheduler tasks, plugin-class entities/goals/trackers, and the",
-                        "head cost per tick (with debug.region-phase-timing on). Logged by BattleshipGate, /battleship gate, JSON dump in",
+                        "head cost per tick (with debug.region-phase-timing on). Logged by BattleshipGate, /sakura gate, JSON dump in",
                         "logs/gate-<time>.json at shutdown. Nothing is changed."
                     );
                 option("reportInterval")

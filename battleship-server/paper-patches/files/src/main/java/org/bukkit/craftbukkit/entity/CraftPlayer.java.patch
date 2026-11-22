@@ -5,8 +5,8 @@
              handle.keepLevel = data.getBooleanOr("keepLevel", false);
          });
 +        // Battleship start - client visibility settings
-+        input.child("battleship").ifPresent(battleship -> {
-+            this.getHandle().visibilitySettings.loadData(battleship);
++        input.child("sakura").ifPresent(sakura -> {
++            this.getHandle().visibilitySettings.loadData(sakura);
 +        });
 +        // Battleship end - client visibility settings
      }
@@ -17,8 +17,8 @@
          paper.putLong("LastSeen", System.currentTimeMillis());
          // Paper end
 +        // Battleship start - client visibility settings
-+        final ValueOutput battleship = output.child("battleship");
-+        this.getHandle().visibilitySettings.saveData(battleship);
++        final ValueOutput sakura = output.child("sakura");
++        this.getHandle().visibilitySettings.saveData(sakura);
 +        // Battleship end - client visibility settings
      }
  
