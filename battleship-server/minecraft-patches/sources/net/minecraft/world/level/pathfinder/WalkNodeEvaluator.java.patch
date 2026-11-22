@@ -1,0 +1,571 @@
+--- a/net/minecraft/world/level/pathfinder/WalkNodeEvaluator.java
++++ b/net/minecraft/world/level/pathfinder/WalkNodeEvaluator.java
+@@ -1,7 +_,5 @@
+ package net.minecraft.world.level.pathfinder;
+ 
+-import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+-import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+ import it.unimi.dsi.fastutil.objects.Object2BooleanMap;
+ import it.unimi.dsi.fastutil.objects.Object2BooleanOpenHashMap;
+ import java.util.EnumSet;
+@@ -30,7 +_,31 @@
+ public class WalkNodeEvaluator extends NodeEvaluator {
+     public static final double SPACE_BETWEEN_WALL_POSTS = 0.5;
+     private static final double DEFAULT_MOB_JUMP_HEIGHT = 1.125;
+-    private final Long2ObjectMap<PathType> pathTypesByPosCacheByMob = new Long2ObjectOpenHashMap<>();
++    // Battleship start - faster pathfinding
++    private static final PathType[] PATH_TYPE_VALUES = PathType.values();
++    private final dev.cosmoworks.battleship.pathfinding.PathPositionCache pathTypesByPosCacheByMob = new dev.cosmoworks.battleship.pathfinding.PathPositionCache(4096);
++    private final dev.cosmoworks.battleship.pathfinding.PathPositionCache staticPathTypes = new dev.cosmoworks.battleship.pathfinding.PathPositionCache(8192);
++    private final dev.cosmoworks.battleship.pathfinding.PathPositionCache floorLevels = new dev.cosmoworks.battleship.pathfinding.PathPositionCache(4096);
++    private final float[] malusByType = new float[PATH_TYPE_VALUES.length];
++    private int maxFallDistance;
++    private float maxUpStep;
++    private static final Direction[] HORIZONTAL_DIRECTIONS = com.google.common.collect.Iterables.toArray(Direction.Plane.HORIZONTAL, Direction.class);
++    private final BlockPos.MutableBlockPos floorPos = new BlockPos.MutableBlockPos();
++    private static final int PERSISTABLE = 1 << 8;
++    private dev.cosmoworks.battleship.pathfinding.RegionPathCache regionCache;
++    private PathNavigationRegion navigationRegion;
++    private int searchTime;
++    private final dev.cosmoworks.battleship.pathfinding.PathPositionCache sectionVersions = new dev.cosmoworks.battleship.pathfinding.PathPositionCache(64);
++    private dev.cosmoworks.battleship.pathfinding.PathPositionCache profileTypes;
++    private boolean profileResolved;
++    private dev.cosmoworks.battleship.pathfinding.RegionPathCache.MobProfile lastProfile;
++    private dev.cosmoworks.battleship.pathfinding.RegionPathCache lastProfileRegion;
++    private dev.cosmoworks.battleship.pathfinding.PathPositionCache lastProfileTypes;
++    private boolean footprintVolatile;
++    private int readMinX, readMinY, readMinZ, readMaxX, readMaxY, readMaxZ;
++    private boolean positionSensitive;
++    private dev.cosmoworks.battleship.pathfinding.RegionPathCache.MobProfile searchProfile;
++    // Battleship end - faster pathfinding
+     private final Object2BooleanMap<AABB> collisionCache = new Object2BooleanOpenHashMap<>();
+     private final Node[] reusableNeighbors = new Node[Direction.Plane.HORIZONTAL.length()];
+ 
+@@ -38,6 +_,30 @@
+     public void prepare(final PathNavigationRegion level, final Mob entity) {
+         super.prepare(level, entity);
+         entity.onPathfindingStart();
++        // Battleship start - faster pathfinding
++        this.pathTypesByPosCacheByMob.clear();
++        this.staticPathTypes.clear();
++        this.floorLevels.clear();
++        java.util.Arrays.fill(this.malusByType, Float.NaN);
++        this.maxFallDistance = Integer.MIN_VALUE;
++        this.maxUpStep = Float.NaN;
++        this.navigationRegion = level;
++        this.regionCache = null;
++        if (entity.level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {
++            io.papermc.paper.threadedregions.RegionizedWorldData worldData = serverLevel.getCurrentWorldData();
++            if (worldData != null) {
++                this.regionCache = worldData.battleshipPathCache;
++                this.searchTime = this.regionCache.beginSearch();
++            }
++        }
++        this.sectionVersions.clear();
++        this.profileResolved = false;
++        this.profileTypes = null;
++        this.searchProfile = null;
++        this.readMinX = this.readMinY = this.readMinZ = Integer.MAX_VALUE;
++        this.readMaxX = this.readMaxY = this.readMaxZ = Integer.MIN_VALUE;
++        this.positionSensitive = false;
++        // Battleship end - faster pathfinding
+     }
+ 
+     @Override
+@@ -48,6 +_,211 @@
+         super.done();
+     }
+ 
++    // Battleship start - faster pathfinding
++    protected final float malus(final PathType type) {
++        float malus = this.malusByType[type.ordinal()];
++        if (malus != malus) {
++            malus = this.mob.getPathfindingMalus(type);
++            this.malusByType[type.ordinal()] = malus;
++        }
++        return malus;
++    }
++
++    private float maxUpStep() {
++        float maxUpStep = this.maxUpStep;
++        if (maxUpStep != maxUpStep) {
++            maxUpStep = this.mob.maxUpStep();
++            this.maxUpStep = maxUpStep;
++        }
++        return maxUpStep;
++    }
++
++    private int sectionVersion(final int x, final int y, final int z) {
++        long key = net.minecraft.core.SectionPos.asLong(x >> 4, y >> 4, z >> 4);
++        long version = this.sectionVersions.get(key);
++        if (version == dev.cosmoworks.battleship.pathfinding.PathPositionCache.MISSING) {
++            version = this.regionCache.sectionVersion(key);
++            this.sectionVersions.put(key, version);
++        }
++        return (int) version;
++    }
++
++    private boolean loadedInSnapshot(final int minX, final int minZ, final int maxX, final int maxZ) {
++        for (int cx = minX >> 4; cx <= maxX >> 4; cx++) {
++            for (int cz = minZ >> 4; cz <= maxZ >> 4; cz++) {
++                if (!this.navigationRegion.battleship$hasLoadedChunk(cx, cz)) {
++                    return false;
++                }
++            }
++        }
++        return true;
++    }
++
++    private dev.cosmoworks.battleship.pathfinding.PathPositionCache profileTypes() {
++        if (this.profileResolved) {
++            return this.profileTypes;
++        }
++        this.profileResolved = true;
++        if (this.regionCache == null || this.getClass() != WalkNodeEvaluator.class
++            || this.entityWidth > 4 || this.entityHeight > 4 || this.entityDepth > 4) {
++            return null;
++        }
++        dev.cosmoworks.battleship.pathfinding.RegionPathCache.MobProfile profile = this.currentProfile();
++        if (this.lastProfileRegion != this.regionCache || profile != this.lastProfile) {
++            this.lastProfile = profile;
++            this.lastProfileRegion = this.regionCache;
++            this.lastProfileTypes = this.regionCache.mobTypes(profile);
++        }
++        this.profileTypes = this.lastProfileTypes;
++        return this.profileTypes;
++    }
++
++    private dev.cosmoworks.battleship.pathfinding.RegionPathCache.MobProfile currentProfile() {
++        if (this.searchProfile != null) {
++            return this.searchProfile;
++        }
++        float[] malus = new float[PATH_TYPE_VALUES.length];
++        for (PathType type : PATH_TYPE_VALUES) {
++            malus[type.ordinal()] = this.malus(type);
++        }
++        dev.cosmoworks.battleship.pathfinding.RegionPathCache.MobProfile profile = new dev.cosmoworks.battleship.pathfinding.RegionPathCache.MobProfile(
++            this.entityWidth, this.entityHeight, this.entityDepth, this.canPassDoors(), this.canOpenDoors(), malus);
++        this.searchProfile = profile.equals(this.lastProfile) ? this.lastProfile : profile;
++        return this.searchProfile;
++    }
++
++    private void trackRead(final int minX, final int minY, final int minZ, final int maxX, final int maxY, final int maxZ) {
++        if (minX < this.readMinX) this.readMinX = minX;
++        if (minY < this.readMinY) this.readMinY = minY;
++        if (minZ < this.readMinZ) this.readMinZ = minZ;
++        if (maxX > this.readMaxX) this.readMaxX = maxX;
++        if (maxY > this.readMaxY) this.readMaxY = maxY;
++        if (maxZ > this.readMaxZ) this.readMaxZ = maxZ;
++    }
++
++    public dev.cosmoworks.battleship.pathfinding.PathResultCache.@Nullable Key battleship$resultKey(
++        final Node start, final Set<BlockPos> targets, final float maxPathLength, final int reachRange, final int maxVisitedNodes
++    ) {
++        if (this.regionCache == null || this.getClass() != WalkNodeEvaluator.class) {
++            return null;
++        }
++        long[] targetKeys = new long[targets.size()];
++        int index = 0;
++        for (BlockPos target : targets) {
++            targetKeys[index++] = target.asLong();
++        }
++        return new dev.cosmoworks.battleship.pathfinding.PathResultCache.Key(
++            this.mob.getType(), this.mob.getBbWidth(), this.mob.getBbHeight(), this.currentProfile(), this.canFloat(), this.canWalkOverFences(),
++            this.maxUpStep(), this.maxFallDistance(), BlockPos.asLong(start.x, start.y, start.z),
++            this.mob.blockPosition().asLong(), targetKeys, maxPathLength, reachRange, maxVisitedNodes);
++    }
++
++    public @Nullable Path battleship$cachedResult(final dev.cosmoworks.battleship.pathfinding.PathResultCache.Key key) {
++        dev.cosmoworks.battleship.pathfinding.PathResultCache results = this.regionCache.results();
++        dev.cosmoworks.battleship.pathfinding.PathResultCache.Entry entry = results.get(key);
++        if (entry == null) {
++            return null;
++        }
++        if (!dev.cosmoworks.battleship.pathfinding.RegionPathCache.freshTime(entry.time(), this.searchTime)) {
++            results.remove(key);
++            return null;
++        }
++        for (int cx = entry.minChunkX(); cx <= entry.maxChunkX(); cx++) {
++            for (int cz = entry.minChunkZ(); cz <= entry.maxChunkZ(); cz++) {
++                if (!this.navigationRegion.battleship$hasLoadedChunk(cx, cz)) {
++                    return null;
++                }
++            }
++        }
++        long[] sections = entry.sections();
++        int[] versions = entry.versions();
++        for (int i = 0; i < sections.length; i++) {
++            if (this.regionCache.sectionVersion(sections[i]) != versions[i]) {
++                results.remove(key);
++                return null;
++            }
++        }
++        if (entry.positionSensitive()
++            && (this.mob.getX() != entry.x() || this.mob.getY() != entry.y() || this.mob.getZ() != entry.z()
++                || this.mob.getMainHandItem().getItem() != entry.mainHand()
++                || this.mob.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.FEET).getItem() != entry.feet())) {
++            return null;
++        }
++        int[] nodes = entry.nodes();
++        float[] costs = entry.costs();
++        java.util.List<Node> copy = new java.util.ArrayList<>(nodes.length / 4);
++        Node previous = null;
++        for (int i = 0, n = nodes.length / 4; i < n; i++) {
++            Node node = new Node(nodes[i * 4], nodes[i * 4 + 1], nodes[i * 4 + 2]);
++            int flags = nodes[i * 4 + 3];
++            node.type = PATH_TYPE_VALUES[flags & 0xFF];
++            node.closed = (flags & PERSISTABLE) != 0;
++            node.walkedDistance = costs[i * 5];
++            node.costMalus = costs[i * 5 + 1];
++            node.g = costs[i * 5 + 2];
++            node.h = costs[i * 5 + 3];
++            node.f = costs[i * 5 + 4];
++            node.cameFrom = previous;
++            copy.add(node);
++            previous = node;
++        }
++        results.hit();
++        return new Path(copy, BlockPos.of(entry.target()), entry.reached());
++    }
++
++    public void battleship$storeResult(final dev.cosmoworks.battleship.pathfinding.PathResultCache.Key key, final @Nullable Path path) {
++        if (path == null || this.readMinX > this.readMaxX || !this.loadedInSnapshot(this.readMinX, this.readMinZ, this.readMaxX, this.readMaxZ)) {
++            return;
++        }
++        int minSX = this.readMinX >> 4, minSY = this.readMinY >> 4, minSZ = this.readMinZ >> 4;
++        int maxSX = this.readMaxX >> 4, maxSY = this.readMaxY >> 4, maxSZ = this.readMaxZ >> 4;
++        long count = (long) (maxSX - minSX + 1) * (maxSY - minSY + 1) * (maxSZ - minSZ + 1);
++        if (count > dev.cosmoworks.battleship.pathfinding.PathResultCache.MAX_SECTIONS) {
++            return;
++        }
++        long[] sections = new long[(int) count];
++        int[] versions = new int[(int) count];
++        int index = 0;
++        for (int sx = minSX; sx <= maxSX; sx++) {
++            for (int sy = minSY; sy <= maxSY; sy++) {
++                for (int sz = minSZ; sz <= maxSZ; sz++) {
++                    long section = net.minecraft.core.SectionPos.asLong(sx, sy, sz);
++                    sections[index] = section;
++                    versions[index] = this.regionCache.sectionVersion(section);
++                    index++;
++                }
++            }
++        }
++        int size = path.getNodeCount();
++        int[] nodes = new int[size * 4];
++        float[] costs = new float[size * 5];
++        for (int i = 0; i < size; i++) {
++            Node node = path.getNode(i);
++            nodes[i * 4] = node.x;
++            nodes[i * 4 + 1] = node.y;
++            nodes[i * 4 + 2] = node.z;
++            nodes[i * 4 + 3] = node.type.ordinal() | (node.closed ? PERSISTABLE : 0);
++            costs[i * 5] = node.walkedDistance;
++            costs[i * 5 + 1] = node.costMalus;
++            costs[i * 5 + 2] = node.g;
++            costs[i * 5 + 3] = node.h;
++            costs[i * 5 + 4] = node.f;
++        }
++        this.regionCache.results().put(key, new dev.cosmoworks.battleship.pathfinding.PathResultCache.Entry(
++            this.searchTime, sections, versions, this.readMinX >> 4, this.readMinZ >> 4, this.readMaxX >> 4, this.readMaxZ >> 4,
++            this.positionSensitive, this.mob.getX(), this.mob.getY(), this.mob.getZ(),
++            this.mob.getMainHandItem().getItem(), this.mob.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.FEET).getItem(),
++            nodes, costs, path.getTarget().asLong(), path.canReach()));
++    }
++
++    private int maxFallDistance() {
++        if (this.maxFallDistance == Integer.MIN_VALUE) {
++            this.maxFallDistance = this.mob.getMaxFallDistance();
++        }
++        return this.maxFallDistance;
++    }
++    // Battleship end - faster pathfinding
++
+     @Override
+     public Node getStart() {
+         BlockPos.MutableBlockPos reusablePos = new BlockPos.MutableBlockPos();
+@@ -99,13 +_,13 @@
+     protected Node getStartNode(final BlockPos pos) {
+         Node node = this.getNode(pos);
+         node.type = this.getCachedPathType(node.x, node.y, node.z);
+-        node.costMalus = this.mob.getPathfindingMalus(node.type);
++        node.costMalus = this.malus(node.type); // Battleship - faster pathfinding
+         return node;
+     }
+ 
+     protected boolean canStartAt(final BlockPos pos) {
+         PathType blockPathType = this.getCachedPathType(pos.getX(), pos.getY(), pos.getZ());
+-        return blockPathType != PathType.OPEN && this.mob.getPathfindingMalus(blockPathType) >= 0.0F;
++        return blockPathType != PathType.OPEN && this.malus(blockPathType) >= 0.0F; // Battleship - faster pathfinding
+     }
+ 
+     @Override
+@@ -119,13 +_,13 @@
+         int jumpSize = 0;
+         PathType blockPathTypeAbove = this.getCachedPathType(pos.x, pos.y + 1, pos.z);
+         PathType blockPathTypeCurrent = this.getCachedPathType(pos.x, pos.y, pos.z);
+-        if (this.mob.getPathfindingMalus(blockPathTypeAbove) >= 0.0F && blockPathTypeCurrent != PathType.STICKY_HONEY) {
+-            jumpSize = Mth.floor(Math.max(1.0F, this.mob.maxUpStep()));
++        if (this.malus(blockPathTypeAbove) >= 0.0F && blockPathTypeCurrent != PathType.STICKY_HONEY) { // Battleship - faster pathfinding
++            jumpSize = Mth.floor(Math.max(1.0F, this.maxUpStep())); // Battleship - faster pathfinding
+         }
+ 
+-        double posHeight = this.getFloorLevel(new BlockPos(pos.x, pos.y, pos.z));
++        double posHeight = this.getFloorLevel(this.floorPos.set(pos.x, pos.y, pos.z)); // Battleship - faster pathfinding
+ 
+-        for (Direction direction : Direction.Plane.HORIZONTAL) {
++        for (Direction direction : HORIZONTAL_DIRECTIONS) { // Battleship - faster pathfinding
+             Node node = this.findAcceptedNode(
+                 pos.x + direction.getStepX(), pos.y, pos.z + direction.getStepZ(), jumpSize, posHeight, direction, blockPathTypeCurrent
+             );
+@@ -135,7 +_,7 @@
+             }
+         }
+ 
+-        for (Direction direction : Direction.Plane.HORIZONTAL) {
++        for (Direction direction : HORIZONTAL_DIRECTIONS) { // Battleship - faster pathfinding
+             Direction secondDirection = direction.getClockWise();
+             if (this.isDiagonalValid(pos, this.reusableNeighbors[direction.get2DDataValue()], this.reusableNeighbors[secondDirection.get2DDataValue()])) {
+                 Node diagonalNode = this.findAcceptedNode(
+@@ -204,10 +_,20 @@
+     }
+ 
+     protected double getFloorLevel(final BlockPos pos) {
++        // Battleship start - faster pathfinding: memoise per position during a search
++        this.trackRead(pos.getX(), pos.getY() - 1, pos.getZ(), pos.getX(), pos.getY(), pos.getZ());
++        long key = pos.asLong();
++        long cached = this.floorLevels.get(key);
++        if (cached != dev.cosmoworks.battleship.pathfinding.PathPositionCache.MISSING) {
++            return Double.longBitsToDouble(cached);
++        }
+         BlockGetter level = this.currentContext.level();
+-        return (this.canFloat() || this.isAmphibious()) && level.getFluidState(pos).is(FluidTags.ENTITY_FLOATABLE)
++        double floorLevel = (this.canFloat() || this.isAmphibious()) && level.getFluidState(pos).is(FluidTags.ENTITY_FLOATABLE)
+             ? pos.getY() + 0.5
+             : getFloorLevel(level, pos);
++        this.floorLevels.put(key, Double.doubleToRawLongBits(floorLevel));
++        return floorLevel;
++        // Battleship end - faster pathfinding
+     }
+ 
+     public static double getFloorLevel(final BlockGetter level, final BlockPos pos) {
+@@ -237,7 +_,7 @@
+         }
+ 
+         PathType pathType = this.getCachedPathType(x, y, z);
+-        float pathCost = this.mob.getPathfindingMalus(pathType);
++        float pathCost = this.malus(pathType); // Battleship - faster pathfinding
+         if (pathCost >= 0.0F) {
+             best = this.getNodeAndUpdateCostToMax(x, y, z, pathType, pathCost);
+         }
+@@ -269,7 +_,7 @@
+     }
+ 
+     private double getMobJumpHeight() {
+-        return Math.max(1.125, this.mob.maxUpStep());
++        return Math.max(1.125, this.maxUpStep()); // Battleship - faster pathfinding
+     }
+ 
+     private Node getNodeAndUpdateCostToMax(final int x, final int y, final int z, final PathType pathType, final float cost) {
+@@ -340,7 +_,7 @@
+                 return best;
+             }
+ 
+-            best = this.getNodeAndUpdateCostToMax(x, y, z, pathTypeLocal, this.mob.getPathfindingMalus(pathTypeLocal));
++            best = this.getNodeAndUpdateCostToMax(x, y, z, pathTypeLocal, this.malus(pathTypeLocal)); // Battleship - faster pathfinding
+             y--;
+         }
+ 
+@@ -349,12 +_,12 @@
+ 
+     private Node tryFindFirstGroundNodeBelow(final int x, final int y, final int z) {
+         for (int currentY = y - 1; currentY >= this.mob.level().getMinY(); currentY--) {
+-            if (y - currentY > this.mob.getMaxFallDistance()) {
++            if (y - currentY > this.maxFallDistance()) { // Battleship - faster pathfinding
+                 return this.getBlockedNode(x, currentY, z);
+             }
+ 
+             PathType pathType = this.getCachedPathType(x, currentY, z);
+-            float pathCost = this.mob.getPathfindingMalus(pathType);
++            float pathCost = this.malus(pathType); // Battleship - faster pathfinding
+             if (pathType != PathType.OPEN) {
+                 if (pathCost >= 0.0F) {
+                     return this.getNodeAndUpdateCostToMax(x, currentY, z, pathType, pathCost);
+@@ -368,33 +_,73 @@
+     }
+ 
+     private boolean hasCollisions(final AABB aabb) {
+-        return this.collisionCache.computeIfAbsent(aabb, bb -> !this.currentContext.level().noCollision(this.mob, aabb));
++        // Battleship start - faster pathfinding: no capturing lambda per lookup
++        this.positionSensitive = true;
++        this.trackRead(Mth.floor(aabb.minX) - 1, Mth.floor(aabb.minY) - 1, Mth.floor(aabb.minZ) - 1,
++            Mth.floor(aabb.maxX) + 1, Mth.floor(aabb.maxY) + 1, Mth.floor(aabb.maxZ) + 1);
++        if (this.collisionCache.containsKey(aabb)) {
++            return this.collisionCache.getBoolean(aabb);
++        }
++        boolean collides = !this.currentContext.level().noCollision(this.mob, aabb);
++        this.collisionCache.put(aabb, collides);
++        return collides;
++        // Battleship end - faster pathfinding
+     }
+ 
+     protected PathType getCachedPathType(final int x, final int y, final int z) {
+-        return this.pathTypesByPosCacheByMob.computeIfAbsent(BlockPos.asLong(x, y, z), k -> this.getPathTypeOfMob(this.currentContext, x, y, z, this.mob));
++        // Battleship start - faster pathfinding
++        this.trackRead(x - 1, y - 1, z - 1, x + this.entityWidth, y + this.entityHeight, z + this.entityDepth);
++        long key = BlockPos.asLong(x, y, z);
++        long cached = this.pathTypesByPosCacheByMob.get(key);
++        if (cached != dev.cosmoworks.battleship.pathfinding.PathPositionCache.MISSING) {
++            return PATH_TYPE_VALUES[(int) cached];
++        }
++        PathType pathType;
++        dev.cosmoworks.battleship.pathfinding.PathPositionCache persistent = this.profileTypes();
++        if (persistent != null && this.loadedInSnapshot(x - 1, z - 1, x + this.entityWidth, z + this.entityDepth)) {
++            int version = this.sectionVersion(x, y, z);
++            long entry = persistent.get(key);
++            if (entry != dev.cosmoworks.battleship.pathfinding.PathPositionCache.MISSING && dev.cosmoworks.battleship.pathfinding.RegionPathCache.fresh(entry, version, this.searchTime)) {
++                pathType = PATH_TYPE_VALUES[dev.cosmoworks.battleship.pathfinding.RegionPathCache.ordinal(entry)];
++            } else {
++                this.footprintVolatile = false;
++                pathType = this.getPathTypeOfMob(this.currentContext, x, y, z, this.mob);
++                if (!this.footprintVolatile) {
++                    persistent.put(key, dev.cosmoworks.battleship.pathfinding.RegionPathCache.pack(pathType.ordinal(), version, this.searchTime));
++                }
++            }
++        } else {
++            pathType = this.getPathTypeOfMob(this.currentContext, x, y, z, this.mob);
++        }
++        this.pathTypesByPosCacheByMob.put(key, pathType.ordinal());
++        return pathType;
++        // Battleship end - faster pathfinding
+     }
+ 
+     @Override
+     public PathType getPathTypeOfMob(final PathfindingContext context, final int x, final int y, final int z, final Mob mob) {
+-        Set<PathType> blockTypes = this.getPathTypeWithinMobBB(context, x, y, z);
+-        if (blockTypes.size() == 1) {
+-            return blockTypes.iterator().next();
++        // Battleship start - faster pathfinding: footprint as a bit mask walked in ordinal order (EnumSet order)
++        final boolean searching = mob == this.mob && context == this.currentContext;
++        long blockTypes = this.getPathTypeMaskWithinMobBB(context, x, y, z);
++        if (Long.bitCount(blockTypes) == 1) {
++            return PATH_TYPE_VALUES[Long.numberOfTrailingZeros(blockTypes)];
+         }
+ 
+-        if (blockTypes.contains(PathType.FENCE)) {
++        if ((blockTypes & (1L << PathType.FENCE.ordinal())) != 0L) {
+             return PathType.FENCE;
+         }
+ 
+-        if (blockTypes.contains(PathType.UNPASSABLE_RAIL)) {
++        if ((blockTypes & (1L << PathType.UNPASSABLE_RAIL.ordinal())) != 0L) {
+             return PathType.UNPASSABLE_RAIL;
+         }
+ 
+         PathType highestMalusPathTypeWithinBB = PathType.BLOCKED;
+-        float highestMalusWithinBB = mob.getPathfindingMalus(highestMalusPathTypeWithinBB);
++        float highestMalusWithinBB = searching ? this.malus(highestMalusPathTypeWithinBB) : mob.getPathfindingMalus(highestMalusPathTypeWithinBB);
+ 
+-        for (PathType pathType : blockTypes) {
+-            float malusForPathType = mob.getPathfindingMalus(pathType);
++        for (long remaining = blockTypes; remaining != 0L; remaining &= remaining - 1L) {
++            PathType pathType = PATH_TYPE_VALUES[Long.numberOfTrailingZeros(remaining)];
++            float malusForPathType = searching ? this.malus(pathType) : mob.getPathfindingMalus(pathType);
++            // Battleship end - faster pathfinding
+             if (malusForPathType < 0.0F) {
+                 return pathType;
+             }
+@@ -408,8 +_,8 @@
+         PathType currentNodePathType = this.getPathType(context, x, y, z);
+         boolean isLargeMob = this.entityWidth > 1;
+         if (isLargeMob) {
+-            boolean isCurrentNodeCheaper = mob.getPathfindingMalus(currentNodePathType) < highestMalusWithinBB;
+-            boolean capMalusDueToCheapNode = isCurrentNodeCheaper && mob.getPathfindingMalus(PathType.BIG_MOBS_CLOSE_TO_DANGER) < highestMalusWithinBB;
++            boolean isCurrentNodeCheaper = (searching ? this.malus(currentNodePathType) : mob.getPathfindingMalus(currentNodePathType)) < highestMalusWithinBB; // Battleship - faster pathfinding
++            boolean capMalusDueToCheapNode = isCurrentNodeCheaper && (searching ? this.malus(PathType.BIG_MOBS_CLOSE_TO_DANGER) : mob.getPathfindingMalus(PathType.BIG_MOBS_CLOSE_TO_DANGER)) < highestMalusWithinBB; // Battleship - faster pathfinding
+             return capMalusDueToCheapNode ? PathType.BIG_MOBS_CLOSE_TO_DANGER : highestMalusPathTypeWithinBB;
+         } else {
+             return currentNodePathType == PathType.OPEN && highestMalusPathTypeWithinBB != PathType.OPEN && highestMalusWithinBB == 0.0F
+@@ -418,6 +_,42 @@
+         }
+     }
+ 
++    // Battleship start - faster pathfinding
++    private long getPathTypeMaskWithinMobBB(final PathfindingContext context, final int x, final int y, final int z) {
++        long blockTypes = 0L;
++        BlockPos mobPosition = this.mob.blockPosition();
++        boolean canPassDoors = this.canPassDoors();
++        boolean canOpenDoors = this.canOpenDoors();
++        for (int dx = 0; dx < this.entityWidth; dx++) {
++            for (int dy = 0; dy < this.entityHeight; dy++) {
++                for (int dz = 0; dz < this.entityDepth; dz++) {
++                    PathType blockType = this.getPathType(context, dx + x, dy + y, dz + z);
++                    if (blockType == PathType.DOOR_WOOD_CLOSED && canOpenDoors && canPassDoors) {
++                        blockType = PathType.WALKABLE_DOOR;
++                    }
++
++                    if (blockType == PathType.DOOR_OPEN && !canPassDoors) {
++                        blockType = PathType.BLOCKED;
++                    }
++
++                    if (blockType == PathType.RAIL
++                        && this.getPathType(context, mobPosition.getX(), mobPosition.getY(), mobPosition.getZ()) != PathType.RAIL
++                        && this.getPathType(context, mobPosition.getX(), mobPosition.getY() - 1, mobPosition.getZ()) != PathType.RAIL) {
++                        blockType = PathType.UNPASSABLE_RAIL;
++                    }
++
++                    if (blockType == PathType.RAIL || blockType == PathType.UNPASSABLE_RAIL) {
++                        this.footprintVolatile = true; // Battleship - faster pathfinding: depends on where the mob stands
++                    }
++                    blockTypes |= 1L << blockType.ordinal();
++                }
++            }
++        }
++
++        return blockTypes;
++    }
++    // Battleship end - faster pathfinding
++
+     public Set<PathType> getPathTypeWithinMobBB(final PathfindingContext context, final int x, final int y, final int z) {
+         EnumSet<PathType> blockTypes = EnumSet.noneOf(PathType.class);
+ 
+@@ -454,7 +_,38 @@
+ 
+     @Override
+     public PathType getPathType(final PathfindingContext context, final int x, final int y, final int z) {
+-        return getPathTypeStatic(context, new BlockPos.MutableBlockPos(x, y, z));
++        // Battleship start - faster pathfinding: memoise per position during a search (includes the 26-block neighbour scan)
++        if (context != this.currentContext) {
++            return getPathTypeStatic(context, new BlockPos.MutableBlockPos(x, y, z));
++        }
++        this.trackRead(x - 1, y - 1, z - 1, x + 1, y + 1, z + 1);
++        long key = BlockPos.asLong(x, y, z);
++        long cached = this.staticPathTypes.get(key);
++        if (cached != dev.cosmoworks.battleship.pathfinding.PathPositionCache.MISSING) {
++            if ((cached & PERSISTABLE) == 0) {
++                this.footprintVolatile = true;
++            }
++            return PATH_TYPE_VALUES[(int) (cached & 0xFF)];
++        }
++        PathType pathType;
++        boolean persistable = this.regionCache != null && this.loadedInSnapshot(x - 1, z - 1, x + 1, z + 1);
++        if (persistable) {
++            int version = this.sectionVersion(x, y, z);
++            dev.cosmoworks.battleship.pathfinding.PathPositionCache persistent = this.regionCache.staticTypes();
++            long entry = persistent.get(key);
++            if (entry != dev.cosmoworks.battleship.pathfinding.PathPositionCache.MISSING && dev.cosmoworks.battleship.pathfinding.RegionPathCache.fresh(entry, version, this.searchTime)) {
++                pathType = PATH_TYPE_VALUES[dev.cosmoworks.battleship.pathfinding.RegionPathCache.ordinal(entry)];
++            } else {
++                pathType = getPathTypeStatic(context, new BlockPos.MutableBlockPos(x, y, z));
++                persistent.put(key, dev.cosmoworks.battleship.pathfinding.RegionPathCache.pack(pathType.ordinal(), version, this.searchTime));
++            }
++        } else {
++            this.footprintVolatile = true;
++            pathType = getPathTypeStatic(context, new BlockPos.MutableBlockPos(x, y, z));
++        }
++        this.staticPathTypes.put(key, pathType.ordinal() | (persistable ? PERSISTABLE : 0));
++        return pathType;
++        // Battleship end - faster pathfinding
+     }
+ 
+     public static PathType getPathTypeStatic(final Mob mob, final BlockPos pos) {

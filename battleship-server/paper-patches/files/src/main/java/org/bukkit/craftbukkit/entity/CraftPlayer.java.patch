@@ -1,0 +1,39 @@
+--- a/src/main/java/org/bukkit/craftbukkit/entity/CraftPlayer.java
++++ b/src/main/java/org/bukkit/craftbukkit/entity/CraftPlayer.java
+@@ -2283,6 +_,11 @@
+             handle.expToDrop = data.getIntOr("expToDrop", 0);
+             handle.keepLevel = data.getBooleanOr("keepLevel", false);
+         });
++        // Battleship start - client visibility settings
++        input.child("battleship").ifPresent(battleship -> {
++            this.getHandle().visibilitySettings.loadData(battleship);
++        });
++        // Battleship end - client visibility settings
+     }
+ 
+     public void setExtraData(ValueOutput output) {
+@@ -2304,6 +_,10 @@
+         paper.putLong("LastLogin", handle.loginTime);
+         paper.putLong("LastSeen", System.currentTimeMillis());
+         // Paper end
++        // Battleship start - client visibility settings
++        final ValueOutput battleship = output.child("battleship");
++        this.getHandle().visibilitySettings.saveData(battleship);
++        // Battleship end - client visibility settings
+     }
+ 
+     @Override
+@@ -2898,6 +_,13 @@
+     public boolean isAllowingServerListings() {
+         return this.getHandle().allowsListing();
+     }
++
++    // Battleship start - client visibility settings
++    @Override
++    public final me.samsuik.sakura.player.visibility.VisibilitySettings getVisibility() {
++        return this.getHandle().visibilitySettings;
++    }
++    // Battleship end - client visibility settings
+ 
+     // Paper start
+     @Override

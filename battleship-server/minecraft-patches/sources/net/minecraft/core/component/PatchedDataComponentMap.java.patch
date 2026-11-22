@@ -1,0 +1,31 @@
+--- a/net/minecraft/core/component/PatchedDataComponentMap.java
++++ b/net/minecraft/core/component/PatchedDataComponentMap.java
+@@ -18,6 +_,11 @@
+     private Reference2ObjectMap<DataComponentType<?>, Object> patch;
+     private boolean copyOnWrite;
+ 
++    public <T> void sakura$patchComponent(final DataComponentType<T> prototype, final @org.jspecify.annotations.Nullable T newValue) {
++        this.ensureMapOwnership();
++        this.patch.put(prototype, java.util.Optional.ofNullable(newValue));
++    }
++
+     public PatchedDataComponentMap(final DataComponentMap prototype) {
+         this(prototype, Reference2ObjectMaps.emptyMap(), true);
+     }
+@@ -133,7 +_,16 @@
+         }
+     }
+ 
++    // Battleship start - skip unchanged slots
++    private int battleship$modCount;
++
++    public final int battleship$modCount() {
++        return this.battleship$modCount;
++    }
++    // Battleship end - skip unchanged slots
++
+     private void ensureMapOwnership() {
++        this.battleship$modCount++; // Battleship - skip unchanged slots - every change starts here
+         if (this.copyOnWrite) {
+             this.patch = new Reference2ObjectArrayMap<>(this.patch);
+             this.copyOnWrite = false;

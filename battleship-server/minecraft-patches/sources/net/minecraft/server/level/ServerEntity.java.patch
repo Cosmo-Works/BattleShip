@@ -1,0 +1,93 @@
+--- a/net/minecraft/server/level/ServerEntity.java
++++ b/net/minecraft/server/level/ServerEntity.java
+@@ -116,6 +_,11 @@
+         }
+         // Paper end - optimise collisions
+         this.entity.updateDataBeforeSync();
++        // Battleship start - spawn crowd
++        if (this.entity instanceof ServerPlayer player) {
++            dev.cosmoworks.battleship.spawn.BattleshipSpawnCrowd.updateSprintMask(player, this.synchronizer);
++        }
++        // Battleship end - spawn crowd
+         List<Entity> passengers = this.entity.getPassengers();
+         if (!passengers.equals(this.lastPassengers)) {
+             this.synchronizer.sendToTrackingPlayers(new ClientboundSetPassengersPacket(this.entity));
+@@ -154,7 +_,7 @@
+             this.entity.syncPosition = false;
+         }
+ 
+-        if (this.forceStateResync || this.entity.needsSync || this.updateInterval.test(this.tickCount) || this.entity.getEntityData().isDirty()) { // Paper - fix desync when a player is added to the tracker
++        if (this.forceStateResync || this.updateInterval.test(this.tickCount) || this.entity.needsSync || this.entity.getEntityData().isForeignDirty()) { // Battleship - packet obfuscation and reduction // Paper - fix desync when a player is added to the tracker
+             byte yRotn = Mth.packDegrees(this.entity.getYRot());
+             byte xRotn = Mth.packDegrees(this.entity.getXRot());
+             boolean shouldSendRotation = Math.abs(yRotn - this.lastSentYRot) >= 1 || Math.abs(xRotn - this.lastSentXRot) >= 1;
+@@ -378,6 +_,7 @@
+     }
+ 
+     public void removePairing(final ServerPlayer player) {
++        dev.cosmoworks.battleship.spawn.BattleshipSpawnCrowd.onPairing(player, this.entity, false); // Battleship - spawn crowd - count tracked players
+         this.entity.stopSeenByPlayer(player);
+         player.connection.send(new ClientboundRemoveEntitiesPacket(this.entity.getId()));
+     }
+@@ -386,9 +_,19 @@
+         List<Packet<? super ClientGamePacketListener>> packets = new ArrayList<>();
+         this.sendPairingData(player, packets::add);
+         player.connection.send(new ClientboundBundlePacket(packets));
++        this.battleship$syncEquipmentAfterPairing(); // Battleship - entity packets only after the spawn
++        dev.cosmoworks.battleship.spawn.BattleshipSpawnCrowd.onPairing(player, this.entity, true); // Battleship - spawn crowd - count tracked players
+         this.entity.startSeenByPlayer(player);
+     }
+ 
++    // Battleship start - entity packets only after the spawn
++    public void battleship$syncEquipmentAfterPairing() {
++        if (this.entity instanceof LivingEntity livingEntity && !this.entity.isRemoved()) {
++            livingEntity.detectEquipmentUpdates(); // CraftBukkit - SPIGOT-3789: sync again immediately after sending
++        }
++    }
++    // Battleship end - entity packets only after the spawn
++
+     public void sendPairingData(final ServerPlayer player, final Consumer<Packet<ClientGamePacketListener>> broadcast) {
+         this.entity.updateDataBeforeSync();
+         if (this.entity.isRemoved()) {
+@@ -401,7 +_,7 @@
+         Packet<ClientGamePacketListener> packet = this.entity.getAddEntityPacket(this);
+         broadcast.accept(packet);
+         if (this.trackedDataValues != null) {
+-            broadcast.accept(new ClientboundSetEntityDataPacket(this.entity.getId(), this.trackedDataValues));
++            broadcast.accept(new ClientboundSetEntityDataPacket(this.entity.getId(), this.entity == player ? this.trackedDataValues : dev.cosmoworks.battleship.spawn.BattleshipSpawnCrowd.dataForOthers(this.entity, this.trackedDataValues))); // Battleship - spawn crowd
+         }
+ 
+         if (this.entity instanceof LivingEntity livingEntity) {
+@@ -429,7 +_,7 @@
+             if (!slots.isEmpty()) {
+                 broadcast.accept(new ClientboundSetEquipmentPacket(this.entity.getId(), slots, true)); // Paper - data sanitization
+             }
+-            ((LivingEntity) this.entity).detectEquipmentUpdates(); // CraftBukkit - SPIGOT-3789: sync again immediately after sending
++            // Battleship - entity packets only after the spawn: the CraftBukkit re-sync (SPIGOT-3789) broadcast equipment
+         }
+ 
+         if (!this.entity.getPassengers().isEmpty()) {
+@@ -470,7 +_,22 @@
+         List<SynchedEntityData.DataValue<?>> packedValues = entityData.packDirty();
+         if (packedValues != null) {
+             this.trackedDataValues = entityData.getNonDefaultValues();
+-            this.synchronizer.sendToTrackingPlayersAndSelf(new ClientboundSetEntityDataPacket(this.entity.getId(), packedValues));
++            // Battleship start - packet obfuscation and reduction
++            if (!(this.entity instanceof ServerPlayer)) {
++                packedValues = entityData.packForeignDirty(packedValues);
++            }
++            if (packedValues != null) {
++                // Battleship start - spawn crowd
++                final List<SynchedEntityData.DataValue<?>> othersValues = dev.cosmoworks.battleship.spawn.BattleshipSpawnCrowd.dataForOthers(this.entity, packedValues);
++                if (othersValues != packedValues) {
++                    this.synchronizer.sendToTrackingPlayers(new ClientboundSetEntityDataPacket(this.entity.getId(), othersValues));
++                    ((ServerPlayer) this.entity).connection.send(new ClientboundSetEntityDataPacket(this.entity.getId(), packedValues));
++                } else {
++                this.synchronizer.sendToTrackingPlayersAndSelf(new ClientboundSetEntityDataPacket(this.entity.getId(), packedValues));
++                }
++                // Battleship end - spawn crowd
++            }
++            // Battleship end - packet obfuscation and reduction
+         }
+ 
+         if (this.entity instanceof LivingEntity livingEntity) {

@@ -1,0 +1,14 @@
+--- a/src/main/java/io/canvasmc/canvas/configuration/NodeDiff.java
++++ b/src/main/java/io/canvasmc/canvas/configuration/NodeDiff.java
+@@ -121,6 +_,11 @@
+                 final Node objectValue = entry.getValue().getValueNode();
+ 
+                 if (objectValue instanceof MappingNode om) {
++                    // Battleship start - user-keyed maps: the user's entries are the value, not fields to diff
++                    if (token != null && token.freeform() && fileValue instanceof MappingNode) {
++                        continue;
++                    }
++                    // Battleship end - user-keyed maps
+                     // file side might be null/scalar if the section existed but was empty
+                     if (fileValue instanceof MappingNode fm) {
+                         collectChanges(fm, om, fqn, out, childTokens);

@@ -1,0 +1,10 @@
+--- a/net/minecraft/world/entity/projectile/hurtingprojectile/windcharge/BreezeWindCharge.java
++++ b/net/minecraft/world/entity/projectile/hurtingprojectile/windcharge/BreezeWindCharge.java
+@@ -22,6 +_,7 @@
+ 
+     @Override
+     public void explode(final Vec3 position) {
++        if (!this.canExplode) { return; } // Battleship - optimise explosions
+         // Paper start - Fire event for WindCharge explosions
+         org.bukkit.event.entity.ExplosionPrimeEvent event = org.bukkit.craftbukkit.event.CraftEventFactory.callExplosionPrimeEvent(this, RADIUS, false);
+         if (event.isCancelled()) {

@@ -1,0 +1,29 @@
+--- a/net/minecraft/world/level/block/piston/PistonBaseBlock.java
++++ b/net/minecraft/world/level/block/piston/PistonBaseBlock.java
+@@ -110,6 +_,11 @@
+                 event = 2;
+             }
+ 
++            // Battleship start - configure server mechanics
++            if (level.mechanicsTarget().before(me.samsuik.sakura.mechanics.MechanicVersion.v1_9)) {
++                level.setBlock(pos, state.setValue(PistonBaseBlock.EXTENDED, false), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
++            }
++            // Battleship end - configure server mechanics
+             level.blockEvent(pos, this, event, direction.get3DDataValue());
+         }
+     }
+@@ -373,6 +_,14 @@
+         for (int i = toPush.size() - 1; i >= 0; i--) {
+             // Paper start - fix a variety of piston desync dupes
+             boolean allowDesync = io.papermc.paper.configuration.GlobalConfiguration.get().unsupportedSettings.allowPistonDuplication;
++            // Battleship start - configure tnt duplication
++            if (level.battleshipConfig().technical.allowTntDuplication) {
++                final BlockState movedState = toPushShapes.get(i);
++                if (movedState.is(Blocks.TNT) || movedState.getBlock() instanceof net.minecraft.world.level.block.BaseCoralPlantTypeBlock) {
++                    allowDesync = true;
++                }
++            }
++            // Battleship end - configure tnt duplication
+             BlockPos oldPos = toPush.get(i);
+             BlockPos pos = oldPos;
+             BlockState blockState = allowDesync ? level.getBlockState(oldPos) : null;

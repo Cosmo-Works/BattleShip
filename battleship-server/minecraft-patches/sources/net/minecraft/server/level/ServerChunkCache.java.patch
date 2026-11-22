@@ -1,0 +1,96 @@
+--- a/net/minecraft/server/level/ServerChunkCache.java
++++ b/net/minecraft/server/level/ServerChunkCache.java
+@@ -492,18 +_,28 @@
+ 
+     @Override
+     public void tick(final BooleanSupplier haveTime, final boolean tickChunks) {
++        long battleship$phase = dev.cosmoworks.battleship.debug.RegionPhaseTiming.start(dev.cosmoworks.battleship.debug.RegionPhaseTiming.Phase.CHUNK_TICKETS); // Battleship - region phase timing
+         if (this.level.getCurrentWorldData().regionData.tickHandle.getTickManager().doesRunGameElements() || !tickChunks || this.level.spigotConfig.unloadFrozenChunks) { // Spigot // Canvas - region threading
+             this.ticketStorage.purgeStaleTickets(this.chunkMap);
+         }
+ 
+         this.runDistanceManagerUpdates();
++        dev.cosmoworks.battleship.debug.RegionPhaseTiming.end(dev.cosmoworks.battleship.debug.RegionPhaseTiming.Phase.CHUNK_TICKETS, battleship$phase); // Battleship - region phase timing
+         if (tickChunks) {
++            battleship$phase = dev.cosmoworks.battleship.debug.RegionPhaseTiming.start(dev.cosmoworks.battleship.debug.RegionPhaseTiming.Phase.CHUNK_LOADER); // Battleship - region phase timing
+             ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel)this.level).moonrise$getPlayerChunkLoader().tick(); // Paper - rewrite chunk system
++            dev.cosmoworks.battleship.debug.RegionPhaseTiming.end(dev.cosmoworks.battleship.debug.RegionPhaseTiming.Phase.CHUNK_LOADER, battleship$phase); // Battleship - region phase timing
++            battleship$phase = dev.cosmoworks.battleship.debug.RegionPhaseTiming.start(dev.cosmoworks.battleship.debug.RegionPhaseTiming.Phase.CHUNK_TICK); // Battleship - region phase timing
+             this.tickChunks();
++            dev.cosmoworks.battleship.debug.RegionPhaseTiming.end(dev.cosmoworks.battleship.debug.RegionPhaseTiming.Phase.CHUNK_TICK, battleship$phase); // Battleship - region phase timing
++            battleship$phase = dev.cosmoworks.battleship.debug.RegionPhaseTiming.start(dev.cosmoworks.battleship.debug.RegionPhaseTiming.Phase.TRACKER); // Battleship - region phase timing
+             this.chunkMap.tick();
++            dev.cosmoworks.battleship.debug.RegionPhaseTiming.end(dev.cosmoworks.battleship.debug.RegionPhaseTiming.Phase.TRACKER, battleship$phase); // Battleship - region phase timing
+         }
+ 
++        battleship$phase = dev.cosmoworks.battleship.debug.RegionPhaseTiming.start(dev.cosmoworks.battleship.debug.RegionPhaseTiming.Phase.CHUNK_UNLOAD); // Battleship - region phase timing
+         this.chunkMap.tick(haveTime);
++        dev.cosmoworks.battleship.debug.RegionPhaseTiming.end(dev.cosmoworks.battleship.debug.RegionPhaseTiming.Phase.CHUNK_UNLOAD, battleship$phase); // Battleship - region phase timing
+         this.clearCache();
+     }
+ 
+@@ -533,7 +_,6 @@
+         final io.papermc.paper.threadedregions.RegionizedWorldData regionizedWorldData = this.level.getCurrentWorldData(); // Folia - region threading
+         int chunkCount = this.distanceManager.getNaturalSpawnChunkCount();
+         // Paper start - Optional per player mob spawns
+-        NaturalSpawner.SpawnState spawnCookie;
+         if ((this.spawnFriendlies || this.spawnEnemies) && this.level.paperConfig().entities.spawning.perPlayerMobSpawns) { // don't count mobs when animals and monsters are disabled
+             // re-set mob counts
+             for (ServerPlayer player : this.level.getLocalPlayers()) { // Folia - region threading
+@@ -549,15 +_,13 @@
+                 }
+                 // Paper end - per player mob spawning backoff
+             }
+-            spawnCookie = NaturalSpawner.createState(chunkCount, this.level, this::getFullChunk, null, true, regionizedWorldData); // Canvas - optimize natural spawning
+-        } else {
+-            spawnCookie = NaturalSpawner.createState(chunkCount, this.level, this::getFullChunk, !this.level.paperConfig().entities.spawning.perPlayerMobSpawns ? new LocalMobCapCalculator(this.chunkMap) : null, false, regionizedWorldData); // Canvas - optimize natural spawning
+         }
+         // Paper end - Optional per player mob spawns
+-        regionizedWorldData.lastSpawnState = spawnCookie; // Folia - region threading
++        // Battleship - skip unused spawn state - the spawn state is created below, once it is known to be needed
+         boolean doMobSpawning = this.level.getGameRules().get(GameRules.SPAWN_MOBS) && !this.level.getLocalPlayers().isEmpty(); // CraftBukkit // Folia - region threading
+         int tickSpeed = this.level.getGameRules().get(GameRules.RANDOM_TICK_SPEED);
+         List<MobCategory> spawningCategories;
++        boolean anyNaturalSpawner = false; // Battleship - skip unused spawn state
+         if (doMobSpawning && (this.spawnEnemies || this.spawnFriendlies)) { // Paper
+             // Paper start - PlayerNaturallySpawnCreaturesEvent
+             for (ServerPlayer player : this.level.getLocalPlayers()) { // Folia - region threading
+@@ -566,8 +_,19 @@
+                 player.playerNaturallySpawnedEvent = new com.destroystokyo.paper.event.entity.PlayerNaturallySpawnCreaturesEvent(player.getBukkitEntity(), (byte) chunkRange);
+                 player.playerNaturallySpawnedEvent.callEvent();
+                 regionizedWorldData.getCanvasWorldData().natureSpawnChunkMap.addPlayer(player); // Canvas - optimize collect spawning chunks
++                anyNaturalSpawner |= !player.isSpectator() && !player.playerNaturallySpawnedEvent.isCancelled(); // Battleship - skip unused spawn state - same test as NatureSpawnChunkMap#addPlayer
+             }
+             // Paper end - PlayerNaturallySpawnCreaturesEvent
++        }
++        // Battleship start - skip unused spawn state
++        final boolean computeSpawnState = anyNaturalSpawner || !dev.cosmoworks.battleship.BattleshipServerConfig.skipUnusedSpawnState();
++        NaturalSpawner.SpawnState spawnCookie = null;
++        if (computeSpawnState) {
++            spawnCookie = this.createSpawnState(chunkCount, regionizedWorldData);
++        }
++        regionizedWorldData.lastSpawnState = spawnCookie; // Folia - region threading
++        if (anyNaturalSpawner) {
++        // Battleship end - skip unused spawn state
+             boolean spawnPersistent = this.level.ticksPerSpawnCategory.getLong(org.bukkit.entity.SpawnCategory.ANIMAL) != 0L && this.level.getRedstoneGameTime() % this.level.ticksPerSpawnCategory.getLong(org.bukkit.entity.SpawnCategory.ANIMAL) == 0L; // CraftBukkit // Folia - region threading
+             spawningCategories = NaturalSpawner.getFilteredSpawningCategories(spawnCookie, this.spawnFriendlies, this.spawnEnemies, spawnPersistent, this.level); // CraftBukkit
+         } else {
+@@ -600,6 +_,18 @@
+             this.level.tickCustomSpawners(this.spawnEnemies);
+         }
+     }
++
++    // Battleship start - skip unused spawn state
++    private NaturalSpawner.SpawnState createSpawnState(final int chunkCount, final io.papermc.paper.threadedregions.RegionizedWorldData regionizedWorldData) {
++        // Paper start - Optional per player mob spawns
++        if ((this.spawnFriendlies || this.spawnEnemies) && this.level.paperConfig().entities.spawning.perPlayerMobSpawns) { // don't count mobs when animals and monsters are disabled
++            return NaturalSpawner.createState(chunkCount, this.level, this::getFullChunk, null, true, regionizedWorldData); // Canvas - optimize natural spawning
++        } else {
++            return NaturalSpawner.createState(chunkCount, this.level, this::getFullChunk, !this.level.paperConfig().entities.spawning.perPlayerMobSpawns ? new LocalMobCapCalculator(this.chunkMap) : null, false, regionizedWorldData); // Canvas - optimize natural spawning
++        }
++        // Paper end - Optional per player mob spawns
++    }
++    // Battleship end - skip unused spawn state
+ 
+     private void tickSpawningChunk(final LevelChunk chunk, final List<MobCategory> spawningCategories, final NaturalSpawner.SpawnState spawnCookie) {
+         ChunkPos chunkPos = chunk.getPos();

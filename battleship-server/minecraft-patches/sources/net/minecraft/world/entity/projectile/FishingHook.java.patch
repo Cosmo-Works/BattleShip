@@ -1,0 +1,22 @@
+--- a/net/minecraft/world/entity/projectile/FishingHook.java
++++ b/net/minecraft/world/entity/projectile/FishingHook.java
+@@ -306,6 +_,10 @@
+         if (!this.level().isClientSide()) {
+             this.setHookedEntity(hitResult.getEntity());
+         }
++        if (this.level().battleshipConfig().players.fishingHooksApplyKnockback) {
++            final Entity entity = hitResult.getEntity();
++            entity.hurt(this.damageSources().thrown(this, this.getOwner()), 0.0f);
++        }
+     }
+ 
+     @Override
+@@ -608,7 +_,7 @@
+ 
+     public void pullEntity(final Entity entity) {
+         Entity owner = this.getOwner();
+-        if (owner != null && entity.canSimulateMovement()) {
++        if (owner != null && (this.level().battleshipConfig().players.fishingHooksPullEntities || entity instanceof ItemEntity)) {
+             Vec3 delta = new Vec3(owner.getX() - this.getX(), owner.getY() - this.getY(), owner.getZ() - this.getZ()).scale(0.1);
+             entity.setDeltaMovement(entity.getDeltaMovement().add(delta));
+             // Canvas start - MC-100991

@@ -1,0 +1,33 @@
+--- a/net/minecraft/network/protocol/game/ClientboundLevelChunkWithLightPacket.java
++++ b/net/minecraft/network/protocol/game/ClientboundLevelChunkWithLightPacket.java
+@@ -44,6 +_,7 @@
+     ) {
+         // Paper start - Anti-Xray
+         this(levelChunk, lightEngine, skyChangedLightSectionFilter, blockChangedLightSectionFilter, true);
++        levelChunk.battleship$invalidatePacket(); // Battleship - chunk packet cache - plugins (FAWE) refreshing a chunk they edited directly
+     }
+     public ClientboundLevelChunkWithLightPacket(
+         final LevelChunk levelChunk,
+@@ -69,6 +_,22 @@
+         levelChunk.getLevel().chunkPacketBlockController.modifyBlocks(this, chunkPacketInfo);
+         // Paper end - Anti-Xray - Modify blocks
+     }
++
++    // Battleship start - async chunk serialization
++    public static ClientboundLevelChunkWithLightPacket battleship$snapshot(final LevelChunk levelChunk, final LevelLightEngine lightEngine) {
++        final ChunkPos chunkPos = levelChunk.getPos();
++        final net.minecraft.world.level.chunk.LevelChunkSection[] sections = levelChunk.getSections();
++        final net.minecraft.world.level.chunk.LevelChunkSection[] copies = new net.minecraft.world.level.chunk.LevelChunkSection[sections.length];
++        for (int i = 0; i < sections.length; ++i) {
++            copies[i] = sections[i].copy();
++        }
++        return new ClientboundLevelChunkWithLightPacket(
++            chunkPos.x(), chunkPos.z(),
++            new ClientboundLevelChunkPacketData(levelChunk, copies),
++            new ClientboundLightUpdatePacketData(chunkPos, lightEngine, null, null)
++        );
++    }
++    // Battleship end - async chunk serialization
+ 
+     @Override
+     public PacketType<ClientboundLevelChunkWithLightPacket> type() {

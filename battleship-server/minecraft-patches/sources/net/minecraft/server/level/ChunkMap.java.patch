@@ -1,0 +1,232 @@
+--- a/net/minecraft/server/level/ChunkMap.java
++++ b/net/minecraft/server/level/ChunkMap.java
+@@ -1099,6 +_,16 @@
+         final ca.spottedleaf.moonrise.common.misc.NearbyPlayers nearbyPlayers = this.level.moonrise$getNearbyPlayers();
+         worldData.iteratingTrackerEntities = true;
+         // Folia end - region threading
++        // Battleship start - parallel entity tracker
++        if (dev.cosmoworks.battleship.parallel.ParallelTracker.shouldRun(worldData.trackerEntities.size())) {
++            try {
++                dev.cosmoworks.battleship.parallel.ParallelTracker.tick(this.level, worldData, nearbyPlayers);
++            } finally {
++                worldData.iteratingTrackerEntities = false;
++            }
++            return;
++        }
++        // Battleship end - parallel entity tracker
+         try {
+             final ca.spottedleaf.moonrise.common.list.ReferenceList<net.minecraft.world.entity.Entity> trackerEntities = worldData.trackerEntities; // Folia - region threading
+             final Entity[] trackerEntitiesRaw = trackerEntities.getRawDataUnchecked();
+@@ -1108,7 +_,11 @@
+                 if (tracker == null) {
+                     continue;
+                 }
+-                ((ca.spottedleaf.moonrise.patches.entity_tracker.EntityTrackerTrackedEntity)tracker).moonrise$tick(nearbyPlayers.getChunk(entity.chunkPosition())); // Folia - region threading
++                // Battleship start - reduce entity tracker player updates
++                if (tracker.shouldUpdatePlayers()) {
++                    ((ca.spottedleaf.moonrise.patches.entity_tracker.EntityTrackerTrackedEntity)tracker).moonrise$tick(nearbyPlayers.getChunk(entity.chunkPosition())); // Folia - region threading
++                }
++                // Battleship end - reduce entity tracker player updates
+                 if (((ca.spottedleaf.moonrise.patches.entity_tracker.EntityTrackerTrackedEntity)tracker).moonrise$hasPlayers()
+                     || ((ca.spottedleaf.moonrise.patches.chunk_system.entity.ChunkSystemEntity)entity).moonrise$getChunkStatus().isOrAfter(FullChunkStatus.ENTITY_TICKING)) {
+                     tracker.serverEntity.sendChanges();
+@@ -1264,14 +_,39 @@
+             this.lastChunkUpdate = currChunkUpdate;
+             this.lastTrackedChunk = chunk;
+ 
++            // Battleship start - tracker full update frequency and per-entity tracker cap (adapted from ShreddedPaper)
++            final boolean candidatesChanged = lastChunkUpdate != currChunkUpdate || lastTrackedChunk != chunk;
++            final boolean fullUpdate = dev.cosmoworks.battleship.tracker.BattleshipTracker.fullUpdate(++this.battleship$trackerTicks);
++            final int maxTrackers = dev.cosmoworks.battleship.tracker.BattleshipTracker.maximumTrackersPerEntity();
++            if (maxTrackers > 0 && players.size() > maxTrackers) {
++                if (fullUpdate || candidatesChanged || this.battleship$allowedTrackers == null) {
++                    this.battleship$allowedTrackers = dev.cosmoworks.battleship.tracker.BattleshipTracker.nearestTrackers(this.entity, players, maxTrackers, this.battleship$allowedTrackers);
++                }
++            } else {
++                this.battleship$allowedTrackers = null;
++            }
++            final it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet<ServerPlayer> allowedTrackers = this.battleship$allowedTrackers;
++            // Battleship end - tracker full update frequency and per-entity tracker cap (adapted from ShreddedPaper)
++
+             final ServerPlayer[] playersRaw = players.getRawDataUnchecked();
+ 
+             for (int i = 0, len = players.size(); i < len; ++i) {
+                 final ServerPlayer player = playersRaw[i];
++                // Battleship start - tracker full update frequency and per-entity tracker cap (adapted from ShreddedPaper)
++                if (allowedTrackers != null && !allowedTrackers.contains(player)) {
++                    if (this.seenBy.contains(player.connection)) {
++                        this.removePlayer(player);
++                    }
++                    continue;
++                }
++                if (!fullUpdate && (this.seenBy.contains(player.connection) || dev.cosmoworks.battleship.spawn.BattleshipSpawnCrowd.skipUnseen(player, this.entity))) {
++                    continue;
++                }
++                // Battleship end - tracker full update frequency and per-entity tracker cap (adapted from ShreddedPaper)
+                 this.updatePlayer(player);
+             }
+ 
+-            if (lastChunkUpdate != currChunkUpdate || lastTrackedChunk != chunk) {
++            if (candidatesChanged) {
+                 // need to purge any players possible not in the chunk list
+                 for (final ServerPlayerConnection conn : new java.util.ArrayList<>(this.seenBy)) {
+                     final ServerPlayer player = conn.getPlayer();
+@@ -1322,12 +_,34 @@
+             return !this.seenBy.isEmpty();
+         }
+         // Paper end - optimise entity tracker
++        // Battleship start - tracker full update frequency and per-entity tracker cap
++        private int battleship$trackerTicks;
++        private it.unimi.dsi.fastutil.objects.@org.jspecify.annotations.Nullable ReferenceOpenHashSet<ServerPlayer> battleship$allowedTrackers;
++        // Battleship end - tracker full update frequency and per-entity tracker cap
++        // Battleship start - reduce entity tracker player updates
++        private final int playerUpdateInterval;
++        private net.minecraft.world.phys.Vec3 entityPosition;
++
++        public final boolean shouldUpdatePlayers() {
++            if (this.entity instanceof net.minecraft.world.entity.player.Player || this.entity.tickCount % this.playerUpdateInterval == 0) {
++                return true;
++            }
++            final net.minecraft.world.phys.Vec3 lastPosition = this.entityPosition;
++            this.entityPosition = this.entity.position();
++            return this.entity.position().distanceToSqr(lastPosition) >= (double) this.range / 2.0;
++        }
++        // Battleship end - reduce entity tracker player updates
+ 
+         public TrackedEntity(final Entity entity, final int range, final UpdateInterval updateInterval, final boolean trackDelta) {
+             this.serverEntity = new ServerEntity(ChunkMap.this.level, entity, updateInterval, trackDelta, this, this.seenBy); // Paper
+             this.entity = entity;
+             this.range = range;
+             this.lastSectionPos = SectionPos.of(entity);
++            // Battleship start - reduce entity tracker player updates
++            this.playerUpdateInterval = Math.max(1, Math.min(entity.getType().hasUpdateInterval() ? entity.getType().updateInterval() : 20, 20));
++            this.entityPosition = entity.position();
++            this.battleship$trackerTicks = entity.getId(); // Battleship - tracker full update frequency - stagger full updates between entities
++            // Battleship end - reduce entity tracker player updates
+         }
+ 
+         @Override
+@@ -1342,9 +_,12 @@
+ 
+         @Override
+         public void sendToTrackingPlayers(final Packet<? super ClientGamePacketListener> packet) {
++            final dev.cosmoworks.battleship.network.SharedFrames.Broadcast battleship$broadcast = dev.cosmoworks.battleship.network.SharedFrames.begin(packet, this.seenBy.size()); // Battleship - shared broadcast frames
++            try { // Battleship - shared broadcast frames
+             for (ServerPlayerConnection connection : this.seenBy) {
+                 connection.send(packet);
+             }
++            } finally { dev.cosmoworks.battleship.network.SharedFrames.end(battleship$broadcast); } // Battleship - shared broadcast frames
+         }
+ 
+         @Override
+@@ -1383,6 +_,17 @@
+         public void updatePlayer(final ServerPlayer player) {
+             org.spigotmc.AsyncCatcher.catchOp("player tracker update"); // Spigot
+             if (player != this.entity) {
++                // Battleship start - parallel entity tracker - the checks are in battleship$baseVisible so the parallel scan can run them
++                boolean visibleToPlayer = this.battleship$baseVisible(player);
++                visibleToPlayer = visibleToPlayer && (!(this.entity instanceof ServerPlayer trackedPlayer) || dev.cosmoworks.battleship.spawn.BattleshipSpawnCrowd.canTrack(player, trackedPlayer, this.seenBy.contains(player.connection))); // Battleship - spawn crowd
++                this.battleship$apply(player, visibleToPlayer);
++                // Battleship end - parallel entity tracker
++            }
++        }
++
++        // Battleship start - parallel entity tracker
++        public final boolean battleship$baseVisible(final ServerPlayer player) {
++            {
+                 // Paper start - remove allocation of Vec3 here
+                 // Vec3 deltaToPlayer = player.position().subtract(this.entity.position());
+                 double deltaToPlayerX = player.getX() - this.entity.getX();
+@@ -1405,6 +_,7 @@
+                     && this.entity.broadcastToPlayer(player)
+                     && ChunkMap.this.isChunkTracked(player, this.entity.chunkPosition().x(), this.entity.chunkPosition().z());
+                 // Paper end - Configurable entity tracking range by Y
++                visibleToPlayer = visibleToPlayer && me.samsuik.sakura.player.visibility.FilterOrModifyPackets.canSendEntityUpdates(this.entity, player, ChunkMap.this.level.minimalVisibility); // Battleship - client visibility settings; entity visibility
+                 // Folia start - region threading
+                 if (visibleToPlayer && (this.entity instanceof ServerPlayer thisEntity) && thisEntity.broadcastedDeath) {
+                     visibleToPlayer = false;
+@@ -1415,6 +_,13 @@
+                     visibleToPlayer = false;
+                 }
+                 // CraftBukkit end
++                visibleToPlayer = visibleToPlayer && !me.samsuik.sakura.player.visibility.TrackerOcclusion.hiddenFrom(this.entity, player, this.seenBy.contains(player.connection));
++                return visibleToPlayer;
++            }
++        }
++
++        public final void battleship$apply(final ServerPlayer player, final boolean visibleToPlayer) {
++            {
+                 if (visibleToPlayer) {
+                     if (this.seenBy.add(player.connection)) {
+                         // Paper start - entity tracking events
+@@ -1434,6 +_,70 @@
+                 }
+             }
+         }
++
++        public final dev.cosmoworks.battleship.parallel.ParallelTracker.@org.jspecify.annotations.Nullable Scan battleship$scan(final ca.spottedleaf.moonrise.common.misc.NearbyPlayers.@org.jspecify.annotations.Nullable TrackedChunk chunk) {
++            final ca.spottedleaf.moonrise.common.list.ReferenceList<ServerPlayer> players = chunk == null ? null : chunk.getPlayers(ca.spottedleaf.moonrise.common.misc.NearbyPlayers.NearbyMapType.VIEW_DISTANCE);
++            if (players == null) {
++                return this.seenBy.isEmpty() && this.lastTrackedChunk == null ? null : dev.cosmoworks.battleship.parallel.ParallelTracker.Scan.clear(this);
++            }
++            final long lastChunkUpdate = this.lastChunkUpdate;
++            final long currChunkUpdate = chunk.getUpdateCount();
++            final ca.spottedleaf.moonrise.common.misc.NearbyPlayers.TrackedChunk lastTrackedChunk = this.lastTrackedChunk;
++            this.lastChunkUpdate = currChunkUpdate;
++            this.lastTrackedChunk = chunk;
++
++            final boolean candidatesChanged = lastChunkUpdate != currChunkUpdate || lastTrackedChunk != chunk;
++            final boolean fullUpdate = dev.cosmoworks.battleship.tracker.BattleshipTracker.fullUpdate(++this.battleship$trackerTicks);
++            final int maxTrackers = dev.cosmoworks.battleship.tracker.BattleshipTracker.maximumTrackersPerEntity();
++            if (maxTrackers > 0 && players.size() > maxTrackers) {
++                if (fullUpdate || candidatesChanged || this.battleship$allowedTrackers == null) {
++                    this.battleship$allowedTrackers = dev.cosmoworks.battleship.tracker.BattleshipTracker.nearestTrackers(this.entity, players, maxTrackers, this.battleship$allowedTrackers);
++                }
++            } else {
++                this.battleship$allowedTrackers = null;
++            }
++            final it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet<ServerPlayer> allowedTrackers = this.battleship$allowedTrackers;
++            final boolean crowdCapped = this.entity instanceof ServerPlayer;
++
++            dev.cosmoworks.battleship.parallel.ParallelTracker.Scan scan = null;
++            final ServerPlayer[] playersRaw = players.getRawDataUnchecked();
++            for (int i = 0, len = players.size(); i < len; ++i) {
++                final ServerPlayer player = playersRaw[i];
++                if (player == null || player == this.entity) {
++                    continue;
++                }
++                final boolean seen = this.seenBy.contains(player.connection);
++                if (allowedTrackers != null && !allowedTrackers.contains(player)) {
++                    if (seen) {
++                        scan = dev.cosmoworks.battleship.parallel.ParallelTracker.Scan.remove(scan, this, player);
++                    }
++                    continue;
++                }
++                if (!fullUpdate && (seen || dev.cosmoworks.battleship.spawn.BattleshipSpawnCrowd.skipUnseen(player, this.entity))) {
++                    continue;
++                }
++                final boolean visible = this.battleship$baseVisible(player);
++                if (visible && crowdCapped) {
++                    scan = dev.cosmoworks.battleship.parallel.ParallelTracker.Scan.crowd(scan, this, player);
++                } else if (visible != seen) {
++                    scan = visible ? dev.cosmoworks.battleship.parallel.ParallelTracker.Scan.add(scan, this, player) : dev.cosmoworks.battleship.parallel.ParallelTracker.Scan.remove(scan, this, player);
++                }
++            }
++            if (candidatesChanged) {
++                for (final ServerPlayerConnection conn : this.seenBy) {
++                    final ServerPlayer player = conn.getPlayer();
++                    if (!players.contains(player)) {
++                        scan = dev.cosmoworks.battleship.parallel.ParallelTracker.Scan.remove(scan, this, player);
++                    }
++                }
++            }
++            return scan;
++        }
++
++        public final Entity battleship$entity() {
++            return this.entity;
++        }
++        // Battleship end - parallel entity tracker
+ 
+         private int scaledRange(final int range) {
+             return ChunkMap.this.level.getServer().getScaledTrackingDistance(range);

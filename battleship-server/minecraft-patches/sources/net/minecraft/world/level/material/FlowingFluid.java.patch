@@ -1,0 +1,160 @@
+--- a/net/minecraft/world/level/material/FlowingFluid.java
++++ b/net/minecraft/world/level/material/FlowingFluid.java
+@@ -152,12 +_,12 @@
+     }
+ 
+     protected void spread(final ServerLevel level, final BlockPos pos, final BlockState state, final FluidState fluidState) {
+-        if (!fluidState.isEmpty()) {
++        if (!fluidState.isEmpty() && (!level.battleshipConfig().environment.disableFluidsFlowingThroughTheWorldBorder || level.getWorldBorder().isWithinBounds(pos))) {
+             BlockPos belowPos = pos.below();
+             BlockState belowState = level.getBlockState(belowPos);
+             FluidState belowFluid = belowState.getFluidState();
+             if (this.canMaybePassThrough(level, pos, state, Direction.DOWN, belowPos, belowState, belowFluid)) {
+-                FluidState newBelowFluid = this.getNewLiquid(level, belowPos, belowState);
++                FluidState newBelowFluid = this.getLiquidFromSurroundings(level, belowPos, belowState, Direction.DOWN);
+                 Fluid newBelowFluidType = newBelowFluid.getType();
+                 if (belowFluid.canBeReplacedWith(level, belowPos, newBelowFluidType, Direction.DOWN)
+                     && canHoldSpecificFluid(level, belowPos, belowState, newBelowFluidType)) {
+@@ -200,6 +_,9 @@
+                 BlockPos neighborPos = pos.relative(spread);
+                 final BlockState neighborState = level.getBlockStateIfLoaded(neighborPos); // Paper - Prevent chunk loading from fluid flowing
+                 if (neighborState == null) continue; // Paper - Prevent chunk loading from fluid flowing
++                if (level.battleshipConfig().environment.disableFluidsFlowingThroughTheWorldBorder && !level.getWorldBorder().isWithinBounds(neighborPos)) {
++                    continue;
++                }
+                 // CraftBukkit start
+                 org.bukkit.block.Block source = org.bukkit.craftbukkit.block.CraftBlock.at(level, pos);
+                 org.bukkit.event.block.BlockFromToEvent event = new org.bukkit.event.block.BlockFromToEvent(source, org.bukkit.craftbukkit.block.CraftBlock.notchToBlockFace(spread));
+@@ -214,17 +_,76 @@
+         }
+     }
+ 
++    private static final int FORM_LIQUID_SOURCE = 0xff;
++
++    private boolean canLiquidFlowDown(
++        final ServerLevel level,
++        final BlockPos pos,
++        final BlockState state,
++        final BlockPos.MutableBlockPos mutablePos
++    ) {
++        final BlockPos abovePos = mutablePos.setWithOffset(pos, Direction.UP);
++        final BlockState stateAbove = level.getBlockState(abovePos);
++        final FluidState fluidStateAbove = stateAbove.getFluidState();
++        return !fluidStateAbove.isEmpty()
++            && fluidStateAbove.getType().isSame(this)
++            && canPassThroughWall(Direction.UP, level, pos, state, abovePos, stateAbove);
++    }
++
++    private boolean canFormLiquidSource(final ServerLevel level, final BlockPos pos, final BlockPos.MutableBlockPos mutablePos) {
++        if (!this.canConvertToSource(level)) {
++            return false;
++        }
++        final BlockPos belowPos = mutablePos.setWithOffset(pos, Direction.DOWN);
++        final BlockState stateBelow = level.getBlockState(belowPos);
++        final FluidState fluidStateBelow = stateBelow.getFluidState();
++        return stateBelow.isSolid() || this.isSourceBlockOfThisType(fluidStateBelow);
++    }
++
+     protected FluidState getNewLiquid(final ServerLevel level, final BlockPos pos, final BlockState state) {
++        return this.getLiquidFromSurroundings(level, pos, state, null);
++    }
++
++    private FluidState getLiquidFromSurroundings(
++        final ServerLevel level,
++        final BlockPos pos,
++        final BlockState state,
++        final @org.jspecify.annotations.Nullable Direction flowing
++    ) {
++        final BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos();
++        final boolean flowingDown = flowing == Direction.DOWN || this.canLiquidFlowDown(level, pos, state, mutableBlockPos);
++        if (flowingDown && !this.canFormLiquidSource(level, pos, mutableBlockPos)) {
++            return this.getFlowing(8, true);
++        }
++
++        final Direction incoming = flowing != null ? flowing.getOpposite() : null;
++        final int liquidLevel = this.getLiquidLevelFromSurroundings(level, pos, state, mutableBlockPos, incoming);
++        if (liquidLevel == FORM_LIQUID_SOURCE) {
++            return this.getSource(false);
++        }
++        if (flowingDown) {
++            return this.getFlowing(8, true);
++        }
++        final int newLiquidLevel = liquidLevel - this.getDropOff(level);
++        return newLiquidLevel <= 0 ? Fluids.EMPTY.defaultFluidState() : this.getFlowing(newLiquidLevel, false);
++    }
++
++    private int getLiquidLevelFromSurroundings(
++        final ServerLevel level,
++        final BlockPos pos,
++        final BlockState state,
++        final BlockPos.MutableBlockPos mutablePos,
++        final @org.jspecify.annotations.Nullable Direction incoming
++    ) {
+         int highestNeighbor = 0;
+         int neighbourSources = 0;
+-        BlockPos.MutableBlockPos mutablePos = new BlockPos.MutableBlockPos();
+ 
+         for (Direction direction : Direction.Plane.HORIZONTAL) {
+             BlockPos relativePos = mutablePos.setWithOffset(pos, direction);
+             BlockState blockState = level.getBlockStateIfLoaded(relativePos); // Paper - Prevent chunk loading from fluid flowing
+             if (blockState == null) continue; // Paper - Prevent chunk loading from fluid flowing
+             FluidState fluidState = blockState.getFluidState();
+-            if (fluidState.getType().isSame(this) && canPassThroughWall(direction, level, pos, state, relativePos, blockState)) {
++            if (fluidState.getType().isSame(this) && (incoming == direction || canPassThroughWall(direction, level, pos, state, relativePos, blockState))) {
+                 if (fluidState.isSource()) {
+                     neighbourSources++;
+                 }
+@@ -237,19 +_,11 @@
+             BlockState belowState = level.getBlockState(mutablePos.setWithOffset(pos, Direction.DOWN));
+             FluidState belowFluid = belowState.getFluidState();
+             if (belowState.isSolid() || this.isSourceBlockOfThisType(belowFluid)) {
+-                return this.getSource(false);
++                return FORM_LIQUID_SOURCE;
+             }
+         }
+ 
+-        BlockPos abovePos = mutablePos.setWithOffset(pos, Direction.UP);
+-        BlockState aboveState = level.getBlockState(abovePos);
+-        FluidState aboveFluid = aboveState.getFluidState();
+-        if (!aboveFluid.isEmpty() && aboveFluid.getType().isSame(this) && canPassThroughWall(Direction.UP, level, pos, state, abovePos, aboveState)) {
+-            return this.getFlowing(8, true);
+-        }
+-
+-        int amount = highestNeighbor - this.getDropOff(level);
+-        return amount <= 0 ? Fluids.EMPTY.defaultFluidState() : this.getFlowing(amount, false);
++        return highestNeighbor;
+     }
+ 
+     // Paper start - fluid method optimisations
+@@ -522,7 +_,7 @@
+             if (testState == null) continue; // Paper - Prevent chunk loading from fluid flowing
+             FluidState testFluidState = testState.getFluidState();
+             if (this.canMaybePassThrough(level, pos, state, direction, testPos, testState, testFluidState)) {
+-                FluidState newFluid = this.getNewLiquid(level, testPos, testState);
++                FluidState newFluid = this.getLiquidFromSurroundings(level, testPos, testState, direction);
+                 if (canHoldSpecificFluid(level, testPos, testState, newFluid.getType())) {
+                     if (context == null) {
+                         context = new FlowingFluid.SpreadContext(level, pos);
+@@ -563,6 +_,13 @@
+     }
+ 
+     public static boolean canHoldSpecificFluid(final BlockGetter level, final BlockPos pos, final BlockState state, final Fluid newFluid) {
++        // Battleship start - configure fluids breaking redstone components
++        if (level instanceof final Level gameLevel
++            && !gameLevel.battleshipConfig().technical.redstone.fluidsBreakRedstone
++            && (state.isSignalSource() || state.getBlock() instanceof net.minecraft.world.level.block.CarpetBlock)) {
++            return false;
++        }
++        // Battleship end - configure fluids breaking redstone components
+         return !(state.getBlock() instanceof LiquidBlockContainer container) || container.canPlaceLiquid(null, level, pos, state, newFluid);
+     }
+ 
+@@ -575,7 +_,7 @@
+     @Override
+     public void tick(final ServerLevel level, final BlockPos pos, BlockState blockState, FluidState fluidState) {
+         if (!fluidState.isSource()) {
+-            FluidState newFluidState = this.getNewLiquid(level, pos, level.getBlockState(pos));
++            FluidState newFluidState = this.getNewLiquid(level, pos, blockState);
+             int tickDelay = this.getSpreadDelay(level, pos, fluidState, newFluidState);
+             if (newFluidState.isEmpty()) {
+                 fluidState = newFluidState;

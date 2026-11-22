@@ -1,0 +1,23 @@
+--- a/src/main/java/org/bukkit/Bukkit.java
++++ b/src/main/java/org/bukkit/Bukkit.java
+@@ -127,6 +_,20 @@
+         // Paper end
+     }
+ 
++    // Battleship start - expose git information
++    @NotNull
++    public static String getGitInformation() {
++        final io.papermc.paper.ServerBuildInfo version = io.papermc.paper.ServerBuildInfo.buildInfo();
++        final String gitBranch = version.gitBranch().orElse("Dev");
++        final String gitCommit = version.gitCommit().orElse("");
++        String branchMsg = " on " + gitBranch;
++        if ("master".equals(gitBranch) || "main".equals(gitBranch)) {
++            branchMsg = "";
++        }
++        return "(Git: " + gitCommit + branchMsg + ")";
++    }
++    // Battleship end - expose git information
++
+     /**
+      * Gets the name of this server implementation.
+      *

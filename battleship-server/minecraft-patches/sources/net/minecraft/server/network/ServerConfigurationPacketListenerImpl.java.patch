@@ -1,0 +1,41 @@
+--- a/net/minecraft/server/network/ServerConfigurationPacketListenerImpl.java
++++ b/net/minecraft/server/network/ServerConfigurationPacketListenerImpl.java
+@@ -228,6 +_,9 @@
+             // now the connection responsibility is transferred to the region
+             final net.minecraft.server.level.ServerLevel world = this.prepareSpawnTask.getSpawnWorld();
+             final net.minecraft.world.level.ChunkPos chunkPos = net.minecraft.world.level.ChunkPos.containing(net.minecraft.core.BlockPos.containing(this.prepareSpawnTask.getSpawnPosition()));
++            // Battleship start - skip the spawn region round trips when the spawn chunk is already ticking
++            final Runnable battleship$scheduleSpawn = () -> {
++            // Battleship end - skip the spawn region round trips when the spawn chunk is already ticking
+             world.moonrise$getChunkTaskScheduler().scheduleTickingState(
+                 chunkPos.x(), chunkPos.z(), net.minecraft.server.level.FullChunkStatus.ENTITY_TICKING, true,
+                 ca.spottedleaf.concurrentutil.util.Priority.HIGHER,
+@@ -244,6 +_,28 @@
+                     );
+                 }
+             );
++            // Battleship start - skip the spawn region round trips when the spawn chunk is already ticking
++            };
++            if (dev.cosmoworks.battleship.join.JoinFastPath.skipLoadedChunkWaits()
++                && dev.cosmoworks.battleship.join.JoinFastPath.chunksAtLeast(world, chunkPos.x(), chunkPos.z(), 0, net.minecraft.server.level.FullChunkStatus.ENTITY_TICKING)) {
++                world.moonrise$getChunkTaskScheduler().chunkHolderManager.addTicketAtLevel(
++                    net.minecraft.server.level.TicketType.PLAYER_SPAWN, chunkPos,
++                    ca.spottedleaf.moonrise.patches.chunk_system.scheduling.ChunkHolderManager.ENTITY_TICKING_TICKET_LEVEL,
++                    null
++                );
++                io.papermc.paper.threadedregions.RegionizedServer.getInstance().taskQueue.queueTickTaskQueue(
++                    world, chunkPos.x(), chunkPos.z(), () -> {
++                        if (dev.cosmoworks.battleship.join.JoinFastPath.chunksAtLeast(world, chunkPos.x(), chunkPos.z(), 0, net.minecraft.server.level.FullChunkStatus.ENTITY_TICKING)) {
++                            ServerConfigurationPacketListenerImpl.this.prepareSpawnTask.spawnPlayer(connection, commonListenerCookie, serverPlayer);
++                        } else {
++                            battleship$scheduleSpawn.run();
++                        }
++                    }
++                );
++            } else {
++                battleship$scheduleSpawn.run();
++            }
++            // Battleship end - skip the spawn region round trips when the spawn chunk is already ticking
+             // Folia end - region threading - rewrite login process
+         } catch (Exception e) {
+             LOGGER.error("Couldn't place player in world", e);

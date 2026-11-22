@@ -1,0 +1,108 @@
+--- a/net/minecraft/server/MinecraftServer.java
++++ b/net/minecraft/server/MinecraftServer.java
+@@ -977,6 +_,7 @@
+             this.isSaving = true;
+             this.getPlayerList().saveAll(); // Paper - Incremental chunk and player saving; diff on change
+             boolean result = this.saveAllChunks(silent, flush, force);
++            if (flush) dev.cosmoworks.battleship.io.AsyncFileWriter.INSTANCE.flush(60_000L); // Battleship - async player saves: save-all flush waits for player files too
+             this.warnOnLowDiskSpace();
+             return result;
+         } finally {
+@@ -1606,9 +_,20 @@
+         this.server.spark.tickStart(); // Paper - spark
+         // Folia & Canvas start - region threading
+         new com.destroystokyo.paper.event.server.ServerTickStartEvent((int)region.getCurrentTick()).callEvent(); // Paper - Server Tick Events
++        // Battleship start - suspend flushing for the whole region tick
++        final List<ServerPlayer> battleship$earlySuspended = region != null && dev.cosmoworks.battleship.BattleshipServerConfig.network().suspendFlushingWholeTick
++            ? new java.util.ArrayList<>(region.world.getCurrentWorldData().getLocalPlayers()) : List.of();
++        for (final ServerPlayer player : battleship$earlySuspended) {
++            player.connection.suspendFlushing();
++        }
++        // Battleship end - suspend flushing for the whole region tick
++        final long battleship$tickStart = dev.cosmoworks.battleship.debug.RegionPhaseTiming.beginTick(); // Battleship - region phase timing
++        try { // Battleship - region phase timing
+         if (region != null) {
+             // drain tasks
++            long battleship$phase = dev.cosmoworks.battleship.debug.RegionPhaseTiming.start(dev.cosmoworks.battleship.debug.RegionPhaseTiming.Phase.REGION_TASKS); // Battleship - region phase timing
+             region.getTaskQueueData().drainTasks();
++            dev.cosmoworks.battleship.debug.RegionPhaseTiming.end(dev.cosmoworks.battleship.debug.RegionPhaseTiming.Phase.REGION_TASKS, battleship$phase); // Battleship - region phase timing
+ 
+             // run all player packets
+             for (final ServerPlayer player : new java.util.ArrayList<>(regionizedWorldData.getLocalPlayers())) {
+@@ -1625,7 +_,10 @@
+             }
+ 
+             // tick the region scheduler
++            battleship$phase = dev.cosmoworks.battleship.debug.RegionPhaseTiming.start(dev.cosmoworks.battleship.debug.RegionPhaseTiming.Phase.PLUGIN_REGION_TASKS); // Battleship - region phase timing
+             ((io.papermc.paper.threadedregions.scheduler.FoliaRegionScheduler)org.bukkit.Bukkit.getRegionScheduler()).tick();
++            dev.cosmoworks.battleship.debug.RegionPhaseTiming.end(dev.cosmoworks.battleship.debug.RegionPhaseTiming.Phase.PLUGIN_REGION_TASKS, battleship$phase); // Battleship - region phase timing
++            battleship$phase = dev.cosmoworks.battleship.debug.RegionPhaseTiming.start(dev.cosmoworks.battleship.debug.RegionPhaseTiming.Phase.ENTITY_SCHEDULERS); // Battleship - region phase timing
+ 
+             // now run all the entity schedulers
+             for (final io.papermc.paper.threadedregions.EntityScheduler scheduler : regionizedWorldData.entitySchedulerTickList.getAllSchedulers()) {
+@@ -1636,6 +_,7 @@
+ 
+                 scheduler.executeTick();
+             }
++            dev.cosmoworks.battleship.debug.RegionPhaseTiming.end(dev.cosmoworks.battleship.debug.RegionPhaseTiming.Phase.ENTITY_SCHEDULERS, battleship$phase); // Battleship - region phase timing
+ 
+             // fix passenger desync
+             for (final net.minecraft.world.entity.Entity entity : regionizedWorldData.getLocalEntitiesCopy()) {
+@@ -1645,6 +_,11 @@
+ 
+         // consume unload ticket
+         if (region.world.canvas$unloadTicket.isPresent()) {
++            // Battleship start - suspend flushing for the whole region tick
++            for (final ServerPlayer player : battleship$earlySuspended) {
++                if (ca.spottedleaf.moonrise.common.util.TickThread.isTickThreadFor(player)) player.connection.resumeFlushing();
++            }
++            // Battleship end - suspend flushing for the whole region tick
+             region.getRegionSchedulingHandle().markNonSchedulable();
+             return;
+         }
+@@ -1657,6 +_,7 @@
+             region.world.fillReportDetails(crashReport);
+             throw new ReportedException(crashReport);
+         }
++        } finally { dev.cosmoworks.battleship.debug.RegionPhaseTiming.endTick(battleship$tickStart); } // Battleship - region phase timing
+         // Folia & Canvas end - region threading
+         if (false && nano - this.lastServerStatus >= STATUS_EXPIRE_TIME_NANOS) { // Folia - region threading
+             this.lastServerStatus = nano;
+@@ -1860,11 +_,14 @@
+             }
+ 
+             regionizedWorldData.explosionDensityCache.clear(); // Paper - Optimize explosions // Folia - region threading
++            regionizedWorldData.battleshipTickScheduler.tick(level); // Battleship - per-region tick scheduler
+         }
+         // this.isIteratingOverLevels = false; // Paper - Throw exception on world create while being ticked // Folia - region threading
+ 
+         // Folia & Canvas start - region threading
++        long battleship$phase = dev.cosmoworks.battleship.debug.RegionPhaseTiming.start(dev.cosmoworks.battleship.debug.RegionPhaseTiming.Phase.CONNECTIONS); // Battleship - region phase timing
+         regionizedWorldData.tickConnections();
++        dev.cosmoworks.battleship.debug.RegionPhaseTiming.end(dev.cosmoworks.battleship.debug.RegionPhaseTiming.Phase.CONNECTIONS, battleship$phase); // Battleship - region phase timing
+         // this.playerList.tick(); // moved to global tick
+         regionizedWorldData.debugSubscribers.tick();
+         // the game test framework is not safe for region threading
+@@ -1878,6 +_,14 @@
+         } */
+         // Folia & Canvas end - region threading
+ 
++        battleship$phase = dev.cosmoworks.battleship.debug.RegionPhaseTiming.start(dev.cosmoworks.battleship.debug.RegionPhaseTiming.Phase.FLUSH); // Battleship - region phase timing
++        // Battleship start - parallel connection flush
++        if (dev.cosmoworks.battleship.parallel.ParallelPlayers.resumeFlushing(suspendedFlushes)) {
++            dev.cosmoworks.battleship.debug.RegionPhaseTiming.end(dev.cosmoworks.battleship.debug.RegionPhaseTiming.Phase.FLUSH, battleship$phase); // Battleship - region phase timing
++            this.serverActivityMonitor.tick();
++            return;
++        }
++        // Battleship end - parallel connection flush
+         // Folia start - region threading
+         for (final ServerPlayer player : suspendedFlushes) {
+             if (!ca.spottedleaf.moonrise.common.util.TickThread.isTickThreadFor(player)) {
+@@ -1886,6 +_,7 @@
+         // Folia end - region threading
+             player.connection.resumeFlushing();
+         }
++        dev.cosmoworks.battleship.debug.RegionPhaseTiming.end(dev.cosmoworks.battleship.debug.RegionPhaseTiming.Phase.FLUSH, battleship$phase); // Battleship - region phase timing
+ 
+         this.serverActivityMonitor.tick();
+     }

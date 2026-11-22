@@ -1,0 +1,102 @@
+--- a/net/minecraft/server/network/ServerCommonPacketListenerImpl.java
++++ b/net/minecraft/server/network/ServerCommonPacketListenerImpl.java
+@@ -272,7 +_,7 @@
+         if (io.canvasmc.canvas.GlobalConfiguration.getInstance().networking.purpurAlternativeKeepalive) {
+             if (this.checkIfClosed(now)) {
+                 long currTime = System.nanoTime();
+-                if ((currTime - this.keepAlive.lastKeepAliveTx) >= java.util.concurrent.TimeUnit.SECONDS.toNanos(1L)) { // 1 second
++                if ((currTime - this.keepAlive.lastKeepAliveTx) >= me.samsuik.sakura.player.knockback.KnockbackSync.keepAliveIntervalNanos(this)) { // 1 second
+                     this.keepAlive.lastKeepAliveTx = currTime;
+                     if (this.keepAlivePending && keepAlives.size() * 1000L >= KEEPALIVE_LIMIT) {
+                         this.disconnect(TIMEOUT_DISCONNECTION_MESSAGE, io.papermc.paper.connection.DisconnectionReason.TIMEOUT);
+@@ -288,7 +_,7 @@
+         if (this.checkIfClosed(now)) {
+             long currTime = System.nanoTime();
+ 
+-            if ((currTime - this.keepAlive.lastKeepAliveTx) >= java.util.concurrent.TimeUnit.SECONDS.toNanos(1L)) {
++            if ((currTime - this.keepAlive.lastKeepAliveTx) >= me.samsuik.sakura.player.knockback.KnockbackSync.keepAliveIntervalNanos(this)) {
+                 this.keepAlive.lastKeepAliveTx = currTime;
+ 
+                 io.papermc.paper.util.KeepAlive.PendingKeepAlive pka = new io.papermc.paper.util.KeepAlive.PendingKeepAlive(currTime, now);
+@@ -317,20 +_,45 @@
+         }
+     }
+ 
++    // Battleship start - cache the owning-thread check for the tick
++    private record OwnerCheck(Object region, long tick, boolean owned) {
++    }
++
++    private volatile @Nullable OwnerCheck battleship$ownerCheck;
++
++    private boolean battleship$ownedByCurrentThread() {
++        final net.minecraft.server.level.ServerPlayer player = this.connection.getPlayer();
++        final io.papermc.paper.threadedregions.ThreadedRegionizer.ThreadedRegion<io.papermc.paper.threadedregions.TickRegions.TickRegionData, io.papermc.paper.threadedregions.TickRegions.TickRegionSectionData> region =
++            io.papermc.paper.threadedregions.TickRegionScheduler.getCurrentRegion();
++        if (region == null || player == null || !dev.cosmoworks.battleship.BattleshipServerConfig.network().fastSendPath) {
++            return ca.spottedleaf.moonrise.common.util.TickThread.isTickThreadFor(player);
++        }
++        final long tick = region.getData().getCurrentTick();
++        final OwnerCheck cached = this.battleship$ownerCheck;
++        if (cached != null && cached.region() == region && cached.tick() == tick) {
++            return cached.owned();
++        }
++        final boolean owned = ca.spottedleaf.moonrise.common.util.TickThread.isTickThreadFor(player);
++        this.battleship$ownerCheck = new OwnerCheck(region, tick, owned);
++        return owned;
++    }
++    // Battleship end - cache the owning-thread check for the tick
++
+     public void suspendFlushing() {
+         this.suspendFlushingOnServerThread = true;
+     }
+ 
+     // Canvas start - optimize flush calls with region threading
+     private int lastSentNonFlushPacketCount = 0;
+-    private int sentNonFlushPacketCount = 0;
++    private final java.util.concurrent.atomic.AtomicInteger sentNonFlushPacketCount = new java.util.concurrent.atomic.AtomicInteger(); // Battleship - parallel entity tracker - counted from helper threads too
+ 
+     public void resumeFlushing() {
+         this.suspendFlushingOnServerThread = false;
+         // this helps reduce flush calls when we have nothing to flush
+-        if (lastSentNonFlushPacketCount != sentNonFlushPacketCount) {
++        final int sentNonFlush = sentNonFlushPacketCount.get(); // Battleship - parallel entity tracker
++        if (lastSentNonFlushPacketCount != sentNonFlush) {
+             connection.flushChannel();
+-            lastSentNonFlushPacketCount = sentNonFlushPacketCount;
++            lastSentNonFlushPacketCount = sentNonFlush;
+         }
+     }
+     // Canvas end - optimize flush calls with region threading
+@@ -382,6 +_,21 @@
+         } else if (packet instanceof net.minecraft.network.protocol.game.ClientboundSetDefaultSpawnPositionPacket defaultSpawnPositionPacket && this instanceof ServerGamePacketListenerImpl serverGamePacketListener) {
+             serverGamePacketListener.player.compassTarget = org.bukkit.craftbukkit.util.CraftLocation.toBukkit(defaultSpawnPositionPacket.respawnData().pos(), serverGamePacketListener.getPlayer().level());
+         }
++        // Battleship start - client visibility settings
++        final net.minecraft.server.level.ServerPlayer player = this instanceof final ServerGamePacketListenerImpl gamePacketListener
++            ? gamePacketListener.getPlayer()
++            : this.connection.getPlayer();
++        if (player != null && player.visibilitySettings.playerModified()) {
++            final Packet<?> filtered = me.samsuik.sakura.player.visibility.FilterOrModifyPackets.filterOrModifyPacket(packet, player);
++            if (filtered == null) {
++                return;
++            }
++            if (filtered != packet) {
++                this.send(filtered, listener);
++                return;
++            }
++        }
++        // Battleship end - client visibility settings
+         // CraftBukkit end
+         if (packet.isTerminal()) {
+             this.close();
+@@ -389,8 +_,8 @@
+ 
+         // Canvas start - region threading
+         boolean flush = !this.suspendFlushingOnServerThread ||
+-            !ca.spottedleaf.moonrise.common.util.TickThread.isTickThreadFor(connection.getPlayer());
+-        if (!flush) sentNonFlushPacketCount++;
++            !this.battleship$ownedByCurrentThread(); // Battleship - cache the owning-thread check for the tick
++        if (!flush) sentNonFlushPacketCount.incrementAndGet(); // Battleship - parallel entity tracker
+         // Canvas end - region threading
+ 
+         try {

@@ -1,0 +1,80 @@
+--- a/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/ChunkHolderManager.java
++++ b/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/ChunkHolderManager.java
+@@ -765,8 +_,22 @@
+         }
+     }
+ 
++    // Battleship start - count keep-dimension-active tickets as one number
++    private final boolean battleship$countKeepActive = dev.cosmoworks.battleship.BattleshipServerConfig.ticking().countKeepDimensionActiveTickets;
++    private final java.util.concurrent.atomic.AtomicLong battleship$keepActiveTickets = new java.util.concurrent.atomic.AtomicLong();
++
++    public boolean battleship$hasKeepDimensionActiveTickets() {
++        if (this.battleship$countKeepActive) {
++            return this.battleship$keepActiveTickets.get() > 0L;
++        }
++        final ConcurrentChainedLong2LongHashTable counters = this.ticketCounters.get(ca.spottedleaf.moonrise.patches.chunk_system.ticket.ChunkSystemTicketType.COUNTER_TYPE_KEEP_DIMENSION_ACTIVE);
++        return counters != null && !counters.isEmpty();
++    }
++    // Battleship end - count keep-dimension-active tickets as one number
++
+     private void addTicketCounter(final TicketType type, final long pos) {
+         for (final long counterType : ((ChunkSystemTicketType<?>)(Object)type).moonrise$getCounterTypes()) {
++            if (this.battleship$countKeepActive && counterType == ca.spottedleaf.moonrise.patches.chunk_system.ticket.ChunkSystemTicketType.COUNTER_TYPE_KEEP_DIMENSION_ACTIVE) { this.battleship$keepActiveTickets.incrementAndGet(); continue; } // Battleship - count keep-dimension-active tickets as one number
+             this.ticketCounters.computeIfAbsent(counterType, (final long counterId) -> {
+                 return new ConcurrentChainedLong2LongHashTable();
+             }).addTo(pos, 1L, 1L);
+@@ -775,6 +_,7 @@
+ 
+     private void removeTicketCounter(final TicketType type, final long pos) {
+         for (final long counterType : ((ChunkSystemTicketType<?>)(Object)type).moonrise$getCounterTypes()) {
++            if (this.battleship$countKeepActive && counterType == ca.spottedleaf.moonrise.patches.chunk_system.ticket.ChunkSystemTicketType.COUNTER_TYPE_KEEP_DIMENSION_ACTIVE) { this.battleship$keepActiveTickets.decrementAndGet(); continue; } // Battleship - count keep-dimension-active tickets as one number
+             this.ticketCounters.get(counterType).decFrom(pos, 1L, 0L);
+         }
+     }
+@@ -935,9 +_,12 @@
+         if (removeDelay == NO_TIMEOUT_MARKER) {
+             return false;
+         }
+-        --removeDelay;
++        // Battleship start - purge stale tickets frequency (from ShreddedPaper)
++        final int frequency = Math.max(1, dev.cosmoworks.battleship.BattleshipServerConfig.ticking().purgeStaleTicketsFrequency);
++        removeDelay -= frequency;
+         ((ChunkSystemTicket<?>)(Object)ticket).moonrise$setRemoveDelay(removeDelay);
+-        return removeDelay <= 0L;
++        return removeDelay <= 1L - frequency;
++        // Battleship end - purge stale tickets frequency (from ShreddedPaper)
+     }
+ 
+     public void tick() {
+@@ -1588,6 +_,31 @@
+     }
+ 
+     public void performTicketUpdates(final Collection<TicketOperation<?, ?>> operations) {
++        // Battleship start - batch ticket updates
++        if (operations.size() > 1 && dev.cosmoworks.battleship.BattleshipServerConfig.ticking().batchTicketUpdates) {
++            int minX = Integer.MAX_VALUE;
++            int minZ = Integer.MAX_VALUE;
++            int maxX = Integer.MIN_VALUE;
++            int maxZ = Integer.MIN_VALUE;
++            for (final TicketOperation<?, ?> operation : operations) {
++                final int x = CoordinateUtils.getChunkX(operation.chunkCoord);
++                final int z = CoordinateUtils.getChunkZ(operation.chunkCoord);
++                minX = Math.min(minX, x);
++                minZ = Math.min(minZ, z);
++                maxX = Math.max(maxX, x);
++                maxZ = Math.max(maxZ, z);
++            }
++            final ReentrantAreaLock.Node ticketLock = this.ticketLockArea.lock(minX, minZ, maxX, maxZ);
++            try {
++                for (final TicketOperation<?, ?> operation : operations) {
++                    this.processTicketOp(operation, false);
++                }
++            } finally {
++                this.ticketLockArea.unlock(ticketLock);
++            }
++            return;
++        }
++        // Battleship end - batch ticket updates
+         final Long2ObjectOpenHashMap<List<TicketOperation<?, ?>>> operationsBySection = new Long2ObjectOpenHashMap<>();
+         final int sectionShift = this.ticketLockArea.coordinateShift;
+ 

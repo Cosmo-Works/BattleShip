@@ -1,0 +1,32 @@
+--- a/io/papermc/paper/threadedregions/scheduler/FoliaRegionScheduler.java
++++ b/io/papermc/paper/threadedregions/scheduler/FoliaRegionScheduler.java
+@@ -35,11 +_,14 @@
+     @Contract(pure = true)
+     private static Runnable wrap(final Plugin plugin, final World world, final int chunkX, final int chunkZ, final Runnable run) {
+         return () -> {
++            final long battleship$gate = dev.cosmoworks.battleship.octopus.PluginGate.OBSERVE ? dev.cosmoworks.battleship.octopus.PluginGate.enter() : 0L; // Battleship - octopus plugin gate (observe)
+             try {
+                 run.run();
+             } catch (final Throwable thrown) {
+                 plugin.getLogger().log(Level.WARNING, "Location task for " + plugin.getDescription().getFullName()
+                     + " in world " + world + " at " + chunkX + ", " + chunkZ + " generated an exception", thrown);
++            } finally {
++                if (battleship$gate != 0L) dev.cosmoworks.battleship.octopus.PluginGate.task(dev.cosmoworks.battleship.octopus.PluginGate.Scheduler.REGION, plugin, battleship$gate); // Battleship - octopus plugin gate (observe)
+             }
+         };
+     }
+@@ -339,12 +_,14 @@
+                 return;
+             }
+ 
++            final long battleship$gate = dev.cosmoworks.battleship.octopus.PluginGate.OBSERVE ? dev.cosmoworks.battleship.octopus.PluginGate.enter() : 0L; // Battleship - octopus plugin gate (observe)
+             try {
+                 this.run.accept(this);
+             } catch (final Throwable thrown) {
+                 this.plugin.getLogger().log(Level.WARNING, "Location task for " + this.plugin.getDescription().getFullName()
+                     + " in world " + world + " at " + chunkX + ", " + chunkZ + " generated an exception", thrown);
+             } finally {
++                if (battleship$gate != 0L) dev.cosmoworks.battleship.octopus.PluginGate.task(dev.cosmoworks.battleship.octopus.PluginGate.Scheduler.REGION, this.plugin, battleship$gate); // Battleship - octopus plugin gate (observe)
+                 boolean reschedule = false;
+                  if (!repeating) {
+                     this.setStateVolatile(STATE_FINISHED);

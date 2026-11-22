@@ -1,0 +1,265 @@
+--- a/net/minecraft/world/entity/item/PrimedTnt.java
++++ b/net/minecraft/world/entity/item/PrimedTnt.java
+@@ -37,7 +_,7 @@
+ import org.bukkit.event.entity.ExplosionPrimeEvent;
+ // CraftBukkit end
+ 
+-public class PrimedTnt extends Entity implements TraceableEntity {
++public class PrimedTnt extends Entity implements TraceableEntity, me.samsuik.sakura.entity.SakuraEntity { // Battleship - cannon entity merge
+     private static final EntityDataAccessor<Integer> DATA_FUSE_ID = SynchedEntityData.defineId(PrimedTnt.class, EntityDataSerializers.INT);
+     private static final EntityDataAccessor<BlockState> DATA_BLOCK_STATE_ID = SynchedEntityData.defineId(PrimedTnt.class, EntityDataSerializers.BLOCK_STATE);
+     public static final short DEFAULT_FUSE_TIME = 80;
+@@ -64,10 +_,15 @@
+     private boolean usedPortal;
+     public float explosionPower = 4.0F;
+     public boolean isIncendiary = false; // CraftBukkit
++    public int heightLimit = Integer.MIN_VALUE; // Battleship - cannon mechanics
+ 
+     public PrimedTnt(final EntityType<? extends PrimedTnt> type, final Level level) {
+         super(type, level);
+         this.blocksBuilding = true;
++        this.cannonEntity = true; // Battleship - cannon entity identity
++        this.sakuraEntityController = new me.samsuik.sakura.entity.SakuraEntityController(this); // Battleship - cannon entity merge
++        this.loadChunks = level.battleshipConfig().cannons.loadChunks; // Battleship - load chunks on movement
++        this.battleship$applyHeightLimit(); // Battleship - cannon mechanics
+     }
+ 
+     public PrimedTnt(final Level level, final double x, final double y, final double z, final @Nullable LivingEntity owner) {
+@@ -75,6 +_,7 @@
+         this.setPos(x, y, z);
+         double rot = this.getRandom().nextDouble() * (float) (Math.PI * 2); // Paper - Don't use level random in entity constructors
+         this.setDeltaMovement(-Math.sin(rot) * 0.02, 0.2F, -Math.cos(rot) * 0.02);
++        this.battleship$applyCannonMechanics(); // Battleship - cannon mechanics
+         this.setFuse(80);
+         this.xo = x;
+         this.yo = y;
+@@ -82,6 +_,107 @@
+         this.owner = EntityReference.of(owner);
+     }
+ 
++    // Battleship start - cannon mechanics
++    private me.samsuik.sakura.mechanics.MinecraftMechanicsTarget battleship$target() {
++        final me.samsuik.sakura.mechanics.MinecraftMechanicsTarget target = this.level().battleshipConfig().mechanics.parsedTarget.valueSafe();
++        return target != null ? target : me.samsuik.sakura.mechanics.MinecraftMechanicsTarget.latest();
++    }
++
++    private void battleship$applyCannonMechanics() {
++        final me.samsuik.sakura.configuration.local.CachedLocalConfiguration config = this.level().localConfig().at(this.blockPosition());
++        final me.samsuik.sakura.entity.TntSpread spread = config.tntSpread;
++        if (spread != null) {
++            switch (spread) {
++                case NONE -> this.setDeltaMovement(0.0, 0.0, 0.0);
++                case Y -> this.setDeltaMovement(this.getDeltaMovement().multiply(0.0, 1.0, 0.0));
++                default -> {
++                }
++            }
++        }
++
++        if (this.battleship$target().isLegacy()) {
++            this.setDeltaMovement(this.getDeltaMovement().multiply(0.0, 1.0, 0.0));
++        }
++        this.battleship$applyHeightLimit();
++    }
++
++    @Override
++    public final void sakura$addedToWorld() {
++        this.battleship$applyHeightLimit();
++    }
++
++    private void battleship$applyHeightLimit() {
++        final me.samsuik.sakura.configuration.local.CachedLocalConfiguration config = this.level().localConfig().at(this.blockPosition());
++        this.heightLimit = config.heightLimit != Integer.MIN_VALUE
++            ? config.heightLimit
++            : this.level().battleshipConfig().mechanics.heightLimitOr(
++                this.level().paperConfig().fixes.tntEntityHeightNerf.or(Integer.MIN_VALUE)
++            );
++    }
++
++    @Override
++    public final double getEyeY() {
++        // Battleship - cannon mechanics: legacy tnt uses an eye height of 0.49
++        return this.battleship$target().isLegacy() ? this.getY() + (double) 0.49f : this.getY();
++    }
++
++    @Override
++    public final double distanceToSqr(final net.minecraft.world.phys.Vec3 pos) {
++        if (!this.battleship$target().isLegacy()) {
++            return super.distanceToSqr(pos);
++        }
++        // Battleship - cannon mechanics: legacy tnt measures distance from its eye position
++        final double x = this.getX() - pos.x;
++        final double y = this.getEyeY() - pos.y;
++        final double z = this.getZ() - pos.z;
++        return x * x + y * y + z * z;
++    }
++    // Battleship end - cannon mechanics
++    // Battleship start - cannon entity merge
++    private final me.samsuik.sakura.entity.SakuraEntityController sakuraEntityController;
++    public boolean canExplode = true; // Battleship - optimise explosions
++
++    @Override
++    public final me.samsuik.sakura.entity.SakuraEntityController getSakuraEntityController() {
++        return this.sakuraEntityController;
++    }
++
++    @Override
++    public final boolean canLink(final Entity otherEntity, final int tickDifference) {
++        return otherEntity instanceof final PrimedTnt otherTnt
++            && Math.abs(this.getFuse() - otherTnt.getFuse()) <= tickDifference
++            && this.explosionPower == otherTnt.explosionPower
++            && this.isIncendiary == otherTnt.isIncendiary;
++    }
++
++    @Override
++    public final boolean sameProperties(final Entity otherEntity, final int tickDifference) {
++        return otherEntity instanceof final PrimedTnt otherTnt
++            && this.getFuse() - tickDifference == otherTnt.getFuse();
++    }
++
++    @Override
++    public final void catchupOnTicks(final int ticks) {
++        this.setFuse(this.getFuse() - ticks);
++    }
++
++    @Override
++    public final net.minecraft.world.phys.Vec3 sakura$position() {
++        return this.sakuraEntityController.getLinks().getHead().entity.position();
++    }
++
++    @Override
++    public final net.minecraft.world.phys.Vec3 sakura$deltaMovement() {
++        return this.sakuraEntityController.getLinks().getHead().entity.getDeltaMovement();
++    }
++    // Battleship end - cannon entity merge
++    // Battleship start - optimise cannon entity movement
++    @Override
++    protected final net.minecraft.world.phys.Vec3 collide(final net.minecraft.world.phys.Vec3 movement) {
++        return this.sakura$collide(movement);
++    }
++    // Battleship end - optimise cannon entity movement
++
+     @Override
+     protected void defineSynchedData(final SynchedEntityData.Builder entityData) {
+         entityData.define(DATA_FUSE_ID, 80);
+@@ -100,30 +_,53 @@
+ 
+     @Override
+     public double getDefaultGravity() {
+-        return 0.04;
++        return this.battleship$target().before(me.samsuik.sakura.mechanics.MechanicVersion.v1_14) ? 0.04f : 0.04; // Battleship - cannon mechanics: pre-1.14 used float gravity
+     }
+ 
+     @Override
+     public void tick() {
+-        if (this.level().spigotConfig.maxTntTicksPerTick > 0 && ++this.level().getCurrentWorldData().currentPrimedTnt > this.level().spigotConfig.maxTntTicksPerTick) { return; } // Spigot // Folia - region threading
++        if (!this.level().battleshipConfig().cannons.tnt.removeMaxTntPerTick && this.level().spigotConfig.maxTntTicksPerTick > 0 && ++this.level().getCurrentWorldData().currentPrimedTnt > this.level().spigotConfig.maxTntTicksPerTick) { return; } // Spigot // Folia - region threading // Battleship - cannon mechanics: optionally remove the tnt tick limit
+         // this.handlePortal(); // Folia - region threading
+         this.applyGravity();
++        // Battleship start - cannon mechanics
++        final me.samsuik.sakura.mechanics.MinecraftMechanicsTarget battleship$mechanicsTarget = this.battleship$target();
++        final boolean battleship$effectsBeforeMovement = battleship$mechanicsTarget.isLegacy();
++        if (battleship$effectsBeforeMovement) {
++            this.applyEffectsFromBlocks();
++        }
++        // Battleship end - cannon mechanics
+         this.move(MoverType.SELF, this.getDeltaMovement());
+-        this.applyEffectsFromBlocks();
++        // Battleship start - cannon mechanics
++        if (!battleship$effectsBeforeMovement) {
++            this.applyEffectsFromBlocks();
++        }
++        // Battleship end - cannon mechanics
+         // Paper start - Configurable TNT height nerf
+-        if (this.level().paperConfig().fixes.tntEntityHeightNerf.test(v -> this.getY() > v)) {
++        if (this.heightLimit != Integer.MIN_VALUE && this.getY() > this.heightLimit) { // Battleship - cannon mechanics
+             this.discard(EntityRemoveEvent.Cause.OUT_OF_WORLD);
+             return;
+         }
+         // Paper end - Configurable TNT height nerf
+-        this.setDeltaMovement(this.getDeltaMovement().scale(this.getAirDrag()));
++        // Battleship start - cannon mechanics
++        if (battleship$mechanicsTarget.atLeast(me.samsuik.sakura.mechanics.MechanicVersion.v1_12)) {
++            final double drag = battleship$mechanicsTarget.between(me.samsuik.sakura.mechanics.MechanicVersion.v1_14, me.samsuik.sakura.mechanics.MechanicVersion.v26_2)
++                ? 0.98
++                : this.getAirDrag();
++            this.setDeltaMovement(this.getDeltaMovement().scale(drag));
++        }
++        // Battleship end - cannon mechanics
+         if (this.onGround()) {
+-            this.setDeltaMovement(this.getDeltaMovement().multiply(0.7, -0.5, 0.7));
++            // Battleship start - cannon mechanics
++            final double friction = battleship$mechanicsTarget.before(me.samsuik.sakura.mechanics.MechanicVersion.v1_14)
++                ? 0.7f
++                : 0.7;
++            this.setDeltaMovement(this.getDeltaMovement().multiply(friction, -0.5, friction));
++            // Battleship end - cannon mechanics
+         }
+ 
+         int fuse = this.getFuse() - 1;
+         this.setFuse(fuse);
+-        if (fuse <= 0) {
++        if (battleship$mechanicsTarget.before(me.samsuik.sakura.mechanics.MechanicVersion.v1_9) ? (fuse < 0) : (fuse <= 0)) { // Battleship - cannon mechanics: pre-1.9 tnt explodes a tick later
+             // CraftBukkit start - Need to reverse the order of the explosion and the entity death so we have a location for the event
+             //this.discard();
+             if (!this.level().isClientSide()) {
+@@ -139,16 +_,22 @@
+         }
+ 
+         this.setRequiresPrecisePosition(this.horizontalCollision || this.verticalCollision);
+-        // Paper start - Option to prevent TNT from moving in water
+-        if (!this.isRemoved() && this.wasTouchingWater && this.level().paperConfig().fixes.preventTntFromMovingInWater) {
++        // Battleship start - configure force position updates
++        if (this.level().battleshipConfig().cannons.tnt.forcePositionUpdates) {
++            this.forcePositionUpdateInWater();
++        }
++    }
++
++    private void forcePositionUpdateInWater() {
++        if (!this.isRemoved() && this.wasTouchingWater && !this.isPushedByFluid()) {
+             this.syncVelocity = true;
+             this.needsSync = true;
+         }
+-        // Paper end - Option to prevent TNT from moving in water
++        // Battleship end - configure force position updates
+     }
+ 
+     private void explode() {
+-        if (this.level() instanceof ServerLevel level && level.getGameRules().get(GameRules.TNT_EXPLODES)) {
++        if (this.level() instanceof ServerLevel level && level.getGameRules().get(GameRules.TNT_EXPLODES) && this.canExplode) { // Battleship - optimise explosions
+             // CraftBukkit start
+             ExplosionPrimeEvent event = CraftEventFactory.callExplosionPrimeEvent((org.bukkit.entity.Explosive) this.getBukkitEntity());
+             if (event.isCancelled()) {
+@@ -161,7 +_,7 @@
+                     Explosion.getDefaultDamageSource(this.level(), this),
+                     this.usedPortal ? USED_PORTAL_DAMAGE_CALCULATOR : null,
+                     this.getX(),
+-                    this.getY(0.0625),
++                    me.samsuik.sakura.mechanics.ExplosionBehaviour.getY(this), // Battleship - cannon mechanics: explosion height
+                     this.getZ(),
+                     event.getRadius(), // CraftBukkit
+                     event.getFire(), // CraftBukkit
+@@ -203,7 +_,11 @@
+     }
+ 
+     public void setFuse(final int time) {
+-        this.entityData.set(DATA_FUSE_ID, time);
++        // Battleship start - packet obfuscation and reduction
++        final int phase = (((time - 1) / 10) & 1) == 0 ? 0 : 10;
++        final int obfuscatedFuse = 80 - phase - 1;
++        this.entityData.set(DATA_FUSE_ID, time, obfuscatedFuse);
++        // Battleship end - packet obfuscation and reduction
+     }
+ 
+     public int getFuse() {
+@@ -257,6 +_,11 @@
+     // Paper start - Option to prevent TNT from moving in water
+     @Override
+     public boolean isPushedByFluid() {
++        // Battleship start - cannon mechanics
++        if (!this.level().localConfig().at(this.blockPosition()).tntFlowsInWater || this.battleship$target().isLegacy()) {
++            return false;
++        }
++        // Battleship end - cannon mechanics
+         return !this.level().paperConfig().fixes.preventTntFromMovingInWater && super.isPushedByFluid();
+     }
+     // Paper end - Option to prevent TNT from moving in water

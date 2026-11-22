@@ -1,0 +1,10 @@
+--- a/net/minecraft/world/level/levelgen/Heightmap.java
++++ b/net/minecraft/world/level/levelgen/Heightmap.java
+@@ -141,6 +_,7 @@
+     }
+ 
+     public void setRawData(final ChunkAccess chunk, final Heightmap.Types type, final long[] data) {
++        chunk.battleship$invalidatePacket(); // Battleship - chunk packet cache
+         long[] rawData = this.data.getRaw();
+         if (rawData.length == data.length) {
+             System.arraycopy(data, 0, rawData, 0, data.length);

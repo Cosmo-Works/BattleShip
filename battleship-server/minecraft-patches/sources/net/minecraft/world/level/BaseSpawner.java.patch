@@ -1,0 +1,128 @@
+--- a/net/minecraft/world/level/BaseSpawner.java
++++ b/net/minecraft/world/level/BaseSpawner.java
+@@ -70,57 +_,27 @@
+     // able to fetch the current region and pull the Canvas config from there
+ 
+     private int getMinSpawnDelayDefault() {
+-        final io.papermc.paper.threadedregions.RegionizedWorldData worldData = io.papermc.paper.threadedregions.TickRegionScheduler.getCurrentRegionizedWorldData();
+-        if (worldData == null) {
+-            // return vanilla default
+-            return 200;
+-        }
+-        return worldData.world.canvasConfig().blocks.spawner.minSpawnDelay;
++        return dev.cosmoworks.battleship.BattleshipServerConfig.mobSpawnerDefaults().minSpawnDelay;
+     }
+ 
+     private int getMaxSpawnDelayDefault() {
+-        final io.papermc.paper.threadedregions.RegionizedWorldData worldData = io.papermc.paper.threadedregions.TickRegionScheduler.getCurrentRegionizedWorldData();
+-        if (worldData == null) {
+-            // return vanilla default
+-            return 800;
+-        }
+-        return worldData.world.canvasConfig().blocks.spawner.maxSpawnDelay;
++        return dev.cosmoworks.battleship.BattleshipServerConfig.mobSpawnerDefaults().maxSpawnDelay;
+     }
+ 
+     private int getSpawnCountDefault() {
+-        final io.papermc.paper.threadedregions.RegionizedWorldData worldData = io.papermc.paper.threadedregions.TickRegionScheduler.getCurrentRegionizedWorldData();
+-        if (worldData == null) {
+-            // return vanilla default
+-            return 4;
+-        }
+-        return worldData.world.canvasConfig().blocks.spawner.spawnCount;
++        return dev.cosmoworks.battleship.BattleshipServerConfig.mobSpawnerDefaults().spawnCount;
+     }
+ 
+     private int getMaxNearbyEntitiesDefault() {
+-        final io.papermc.paper.threadedregions.RegionizedWorldData worldData = io.papermc.paper.threadedregions.TickRegionScheduler.getCurrentRegionizedWorldData();
+-        if (worldData == null) {
+-            // return vanilla default
+-            return 6;
+-        }
+-        return worldData.world.canvasConfig().blocks.spawner.maxNearbyEntities;
++        return dev.cosmoworks.battleship.BattleshipServerConfig.mobSpawnerDefaults().maxNearbyEntities;
+     }
+ 
+     private int getRequiredPlayerRangeDefault() {
+-        final io.papermc.paper.threadedregions.RegionizedWorldData worldData = io.papermc.paper.threadedregions.TickRegionScheduler.getCurrentRegionizedWorldData();
+-        if (worldData == null) {
+-            // return vanilla default
+-            return 16;
+-        }
+-        return worldData.world.canvasConfig().blocks.spawner.requiredPlayerRange;
++        return dev.cosmoworks.battleship.BattleshipServerConfig.mobSpawnerDefaults().requiredPlayerRange;
+     }
+ 
+     private int getSpawnRangeDefault() {
+-        final io.papermc.paper.threadedregions.RegionizedWorldData worldData = io.papermc.paper.threadedregions.TickRegionScheduler.getCurrentRegionizedWorldData();
+-        if (worldData == null) {
+-            // return vanilla default
+-            return 4;
+-        }
+-        return worldData.world.canvasConfig().blocks.spawner.spawnRange;
++        return dev.cosmoworks.battleship.BattleshipServerConfig.mobSpawnerDefaults().spawnRange;
+     }
+     // Canvas end - spawner configs
+ 
+@@ -135,6 +_,11 @@
+     }
+ 
+     public boolean isNearPlayer(final Level level, final BlockPos pos) {
++        // Battleship start - player-simulated chunks and always-active spawners (negative range)
++        if (this.requiredPlayerRange < 0 || dev.cosmoworks.battleship.chunk.BattleshipChunkSimulation.activatesSpawner(level, pos)) {
++            return true;
++        }
++        // Battleship end - player-simulated chunks and always-active spawners (negative range)
+         return level.canvas$hasNearbyAlivePlayerThatAffectsSpawningForSpawner(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, this.requiredPlayerRange); // Paper - Affects Spawning API // Canvas - optimize spawners
+     }
+ 
+@@ -164,7 +_,7 @@
+         tickDelay = level.paperConfig().tickRates.mobSpawner;
+         if (tickDelay == -1) { return; } // If disabled
+         // Paper end - Configurable mob spawner tick rate
+-        if (this.isNearPlayer(level, pos) && level.isSpawnerBlockEnabled()) {
++        if ((!level.battleshipConfig().environment.mobSpawner.requireNearbyPlayer || this.isNearPlayer(level, pos)) && level.isSpawnerBlockEnabled()) {
+             if (this.spawnDelay < -tickDelay) { // Paper - Configurable mob spawner tick rate
+                 this.delay(level, pos);
+             }
+@@ -172,6 +_,11 @@
+             if (this.spawnDelay > 0) {
+                 this.spawnDelay -= tickDelay; // Paper - Configurable mob spawner tick rate
+             } else {
++                if (!me.samsuik.sakura.event.SakuraEvents.preSpawnerTick(pos, level)) {
++                    this.delay(level, pos);
++                    return;
++                }
++
+                 boolean delay = false;
+                 RandomSource random = level.getRandom();
+                 SpawnData nextSpawnData = this.getOrCreateNextSpawnData(level, random, pos);
+@@ -204,7 +_,7 @@
+                                 if (!customSpawnRules.isValidPosition(spawnBlockPos, level)) {
+                                     continue;
+                                 }
+-                            } else if (!SpawnPlacements.checkSpawnRules(entityType.get(), level, EntitySpawnReason.SPAWNER, spawnBlockPos, level.getRandom())) {
++                            } else if (level.battleshipConfig().environment.mobSpawner.checkSpawnConditions && !SpawnPlacements.checkSpawnRules(entityType.get(), level, EntitySpawnReason.SPAWNER, spawnBlockPos, level.getRandom())) {
+                                 continue;
+                             }
+ 
+@@ -232,7 +_,7 @@
+                                 return;
+                             }
+ 
+-                            int nearBy = level.canvasConfig().blocks.spawner.disableMaxNearbyEntitiesCheck ? Integer.MIN_VALUE : level.getEntities( // Canvas - spawner configs
++                            int nearBy = level.canvasConfig().blocks.spawner.disableMaxNearbyEntitiesCheck || level.battleshipConfig().environment.mobSpawner.ignoreEntityLimit ? Integer.MIN_VALUE : level.getEntities( // Canvas - spawner configs
+                                     EntityTypeTest.forExactClass(entity.getClass()),
+                                     new AABB(pos.getX(), pos.getY(), pos.getZ(), pos.getX() + 1, pos.getY() + 1, pos.getZ() + 1).inflate(this.spawnRange),
+                                     EntitySelector.NO_SPECTATORS
+@@ -245,8 +_,8 @@
+ 
+                             entity.snapTo(entity.getX(), entity.getY(), entity.getZ(), random.nextFloat() * 360.0F, 0.0F);
+                             if (entity instanceof Mob mob) {
+-                                if (nextSpawnData.getCustomSpawnRules().isEmpty() && !mob.checkSpawnRules(level, EntitySpawnReason.SPAWNER)
+-                                    || !mob.checkSpawnObstruction(level)) {
++                                if (level.battleshipConfig().environment.mobSpawner.checkSpawnConditions && (nextSpawnData.getCustomSpawnRules().isEmpty() && !mob.checkSpawnRules(level, EntitySpawnReason.SPAWNER)
++                                    || !mob.checkSpawnObstruction(level))) {
+                                     continue;
+                                 }
+ 

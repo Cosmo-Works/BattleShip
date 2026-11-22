@@ -1,0 +1,15 @@
+--- a/src/main/java/org/bukkit/craftbukkit/CraftWorld.java
++++ b/src/main/java/org/bukkit/craftbukkit/CraftWorld.java
+@@ -296,6 +_,12 @@
+         ).isValid();
+     }
+     // Paper end
++    // Battleship start - local config api
++    @Override
++    public final me.samsuik.sakura.configuration.local.LocalConfigurationAccessor localConfig() {
++        return this.getHandle().localConfig();
++    }
++    // Battleship end - local config api
+ 
+     private static final Random rand = new Random();
+ 

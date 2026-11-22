@@ -1,0 +1,21 @@
+--- a/src/main/java/org/bukkit/craftbukkit/entity/CraftFallingBlock.java
++++ b/src/main/java/org/bukkit/craftbukkit/entity/CraftFallingBlock.java
+@@ -14,6 +_,18 @@
+         super(server, entity);
+     }
+ 
++    // Battleship start - cannon entity identity
++    @Override
++    public final void setHeightParity(final boolean heightParity) {
++        this.getHandle().heightParity = heightParity;
++    }
++
++    @Override
++    public final boolean getHeightParity() {
++        return this.getHandle().heightParity;
++    }
++    // Battleship end - cannon entity identity
++
+     @Override
+     public FallingBlockEntity getHandle() {
+         ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread(this.entity, "Accessing entity state off owning region's thread"); // Folia - region threading

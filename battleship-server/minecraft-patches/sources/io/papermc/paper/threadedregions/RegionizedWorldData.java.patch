@@ -1,0 +1,99 @@
+--- a/io/papermc/paper/threadedregions/RegionizedWorldData.java
++++ b/io/papermc/paper/threadedregions/RegionizedWorldData.java
+@@ -178,6 +_,14 @@
+ 
+             // chunkHoldersToBroadcast
+             into.chunkHoldersToBroadcast.addAll(from.chunkHoldersToBroadcast);
++            // Battleship start - per-region tick scheduler and block state watchers
++            into.battleshipTickScheduler.mergeFrom(from.battleshipTickScheduler);
++            into.battleshipBlockStateChangeTracker.mergeFrom(from.battleshipBlockStateChangeTracker);
++            into.battleshipBlockStateRevision = Math.max(into.battleshipBlockStateRevision, from.battleshipBlockStateRevision);
++            into.battleshipEntityManager.mergeFrom(from.battleshipEntityManager);
++            into.battleshipDurableBlockManager.mergeFrom(from.battleshipDurableBlockManager);
++            // Battleship end - per-region tick scheduler and block state watchers
++            into.battleshipPathCache.clear(); // Battleship - faster pathfinding: section versions are per region
+             // Canvas start - region threading
+ 
+             // debug subscribers
+@@ -365,6 +_,15 @@
+                     into.chunkHoldersToBroadcast.add(chunkHolder);
+                 }
+             }
++            // Battleship start - per-region tick scheduler and block state watchers
++            from.battleshipTickScheduler.splitInto(chunkToRegionShift, regionToData, dataSet);
++            from.battleshipBlockStateChangeTracker.splitInto(chunkToRegionShift, regionToData);
++            from.battleshipEntityManager.splitInto(from.allEntities, chunkToRegionShift, regionToData);
++            from.battleshipDurableBlockManager.splitInto(chunkToRegionShift, regionToData);
++            for (final RegionizedWorldData regionizedWorldData : dataSet) {
++                regionizedWorldData.battleshipBlockStateRevision = from.battleshipBlockStateRevision;
++            }
++            // Battleship end - per-region tick scheduler and block state watchers
+         }
+     };
+ 
+@@ -484,11 +_,24 @@
+     public int wakeupInactiveRemainingVillagers;
+     // Paper end
+     public int currentPrimedTnt = 0; // Spigot
++    // Battleship start - per-region tick scheduler and block state watchers
++    public final me.samsuik.sakura.scheduler.LevelTickScheduler battleshipTickScheduler = new me.samsuik.sakura.scheduler.LevelTickScheduler();
++    public final me.samsuik.sakura.tracking.block_change.BlockStateChangeTracker battleshipBlockStateChangeTracker;
++    public long battleshipBlockStateRevision;
++    public final me.samsuik.sakura.entity.SakuraEntityManager battleshipEntityManager = new me.samsuik.sakura.entity.SakuraEntityManager();
++    public final me.samsuik.sakura.explosion.density.ExplosionObstructionCache battleshipObstructionCache = new me.samsuik.sakura.explosion.density.ExplosionObstructionCache();
++    public final me.samsuik.sakura.explosion.DurableBlockManager battleshipDurableBlockManager;
++    public final me.samsuik.sakura.mechanics.sake.DispenseRelocationHandler battleshipDispenseRelocationHandler;
++    public final me.samsuik.sakura.entity.FallingBlockColumnLimits battleshipFallingBlockColumnLimits = new me.samsuik.sakura.entity.FallingBlockColumnLimits();
++    public final me.samsuik.sakura.redstone.RedstoneWireCache battleshipRedstoneWireCache = new me.samsuik.sakura.redstone.RedstoneWireCache();
++    public final me.samsuik.sakura.tps.TickInformationCollector battleshipTickInformation = new me.samsuik.sakura.tps.TickInformationCollector();
++    // Battleship end - per-region tick scheduler and block state watchers
+     @VisibleForDebug
+     public NaturalSpawner.@Nullable SpawnState lastSpawnState;
+     public boolean shouldSignal = true;
+     public final Map<ServerExplosion.CacheKey, Float> explosionDensityCache = new HashMap<>(64, 0.25f);
+     public final PathTypeCache pathTypesByPosCache = new PathTypeCache();
++    public final dev.cosmoworks.battleship.pathfinding.RegionPathCache battleshipPathCache = new dev.cosmoworks.battleship.pathfinding.RegionPathCache(); // Battleship - faster pathfinding
+     public final List<LevelChunk> temporaryChunkTickList = new it.unimi.dsi.fastutil.objects.ObjectArrayList<>(); // Canvas - optimized collection
+     public final Set<ChunkHolder> chunkHoldersToBroadcast = new ReferenceLinkedOpenHashSet<>();
+ 
+@@ -548,6 +_,10 @@
+         this.wireHandler = new WireHandler(world);
+         this.turbo = new RedstoneWireTurbo((RedstoneWireBlock)Blocks.REDSTONE_WIRE);
+         this.regionData = regionData;
++        this.battleshipBlockStateChangeTracker = new me.samsuik.sakura.tracking.block_change.BlockStateChangeTracker(world); // Battleship - per-region block state watchers
++        this.battleshipDurableBlockManager = new me.samsuik.sakura.explosion.DurableBlockManager(world); // Battleship - explosion durable blocks
++        this.battleshipDispenseRelocationHandler = new me.samsuik.sakura.mechanics.sake.DispenseRelocationHandler(world); // Battleship - dispenser relocation
++        me.samsuik.sakura.scheduler.ScheduleSakuraTasks.schedule(this.battleshipTickScheduler); // Battleship - per-region tick scheduler
+         // Canvas start - region threading
+         this.debugSubscribers = new ServerDebugSubscribers(MinecraftServer.getServer());
+         this.debugSynchronizers = new LevelDebugSynchronizers(world);
+@@ -770,6 +_,29 @@
+             }
+         } finally {
+             iterator.finishedIterating();
++        }
++    }
++
++    public IteratorSafeOrderedReferenceSet<Entity> tickingEntities() {
++        return this.entityTickList;
++    }
++
++    public me.samsuik.sakura.tps.ServerTickInformation latestTickInformation() {
++        return this.battleshipTickInformation.latestTickInformation();
++    }
++
++    public it.unimi.dsi.fastutil.objects.ObjectImmutableList<me.samsuik.sakura.tps.ServerTickInformation> tickHistory(final long from, final long to) {
++        return this.battleshipTickInformation.collect(from, to);
++    }
++
++    public void recordBattleshipTick(final long durationNanos) {
++        this.battleshipTickInformation.tickDuration(java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(Math.max(0L, durationNanos)));
++        if (this.battleshipTickInformation.hasFullSecond()) {
++            this.battleshipTickInformation.regionData(
++                this.chunks.size(),
++                this.entityTickList.size(),
++                io.papermc.paper.threadedregions.TickRegionScheduler.getTickRate()
++            );
+         }
+     }
+ 

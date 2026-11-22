@@ -1,0 +1,103 @@
+--- a/net/minecraft/network/syncher/SynchedEntityData.java
++++ b/net/minecraft/network/syncher/SynchedEntityData.java
+@@ -20,6 +_,30 @@
+     private final SyncedDataHolder entity;
+     private final SynchedEntityData.DataItem<?>[] itemsById;
+     private boolean isDirty;
++    // Battleship start - packet obfuscation and reduction
++    private boolean isForeignDirty;
++
++    public final boolean isForeignDirty() {
++        return this.isForeignDirty;
++    }
++
++    public final @Nullable List<SynchedEntityData.DataValue<?>> packForeignDirty(final List<DataValue<?>> packedValues) {
++        List<SynchedEntityData.DataValue<?>> foreignValues = null;
++        for (final DataValue<?> dataItem : packedValues) {
++            final DataItem<?> item = this.itemsById[dataItem.id()];
++            if (!item.isDirty(true)) {
++                continue;
++            }
++            item.setForeignDirty(false);
++            if (foreignValues == null) {
++                foreignValues = new ArrayList<>();
++            }
++            foreignValues.add(item.copy(true));
++        }
++        this.isForeignDirty = false;
++        return foreignValues;
++    }
++    // Battleship end - packet obfuscation and reduction
+ 
+     private SynchedEntityData(final SyncedDataHolder entity, final SynchedEntityData.DataItem<?>[] itemsById) {
+         this.entity = entity;
+@@ -58,6 +_,19 @@
+     }
+ 
+     public <T> void set(final EntityDataAccessor<T> accessor, final T value, final boolean forceDirty) {
++        this.set(accessor, value, null, forceDirty);
++    }
++
++    public final <T> void set(final EntityDataAccessor<T> accessor, final T value, final @Nullable T foreignValue) {
++        this.set(accessor, value, foreignValue, false);
++    }
++
++    public final <T> void set(
++        final EntityDataAccessor<T> accessor,
++        final T value,
++        final @Nullable T foreignValue,
++        final boolean forceDirty
++    ) {
+         SynchedEntityData.DataItem<T> dataItem = this.getItem(accessor);
+         if (forceDirty || ObjectUtils.notEqual(value, dataItem.getValue())) {
+             dataItem.setValue(value);
+@@ -65,6 +_,13 @@
+             dataItem.setDirty(true);
+             this.isDirty = true;
+         }
++
++        // Battleship start - packet obfuscation and reduction
++        if (foreignValue != null && ObjectUtils.notEqual(foreignValue, dataItem.getForeignValue())) {
++            dataItem.setForeignValue(foreignValue);
++            this.isForeignDirty = true;
++        }
++        // Battleship end - packet obfuscation and reduction
+     }
+ 
+     // CraftBukkit start - add method from above
+@@ -197,6 +_,35 @@
+         private T value;
+         private final T initialValue;
+         private boolean dirty;
++        // Battleship start - packet obfuscation and reduction
++        private @Nullable T foreignValue;
++        private boolean foreignDirty = true;
++
++        public final void setForeignValue(final @Nullable T foreignValue) {
++            this.foreignValue = foreignValue;
++            this.foreignDirty = true;
++        }
++
++        public final @Nullable T getForeignValue() {
++            return this.foreignValue;
++        }
++
++        public final boolean isDirty(final boolean foreign) {
++            if (foreign) {
++                return this.foreignValue == null || this.foreignDirty;
++            }
++            return this.dirty;
++        }
++
++        public final void setForeignDirty(final boolean dirty) {
++            this.foreignDirty = dirty;
++        }
++
++        public final SynchedEntityData.DataValue<T> copy(final boolean foreign) {
++            final T sent = foreign && this.foreignValue != null ? this.foreignValue : this.value;
++            return SynchedEntityData.DataValue.create(this.accessor, sent);
++        }
++        // Battleship end - packet obfuscation and reduction
+ 
+         public DataItem(final EntityDataAccessor<T> accessor, final T initialValue) {
+             this.accessor = accessor;

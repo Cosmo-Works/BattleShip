@@ -6,9 +6,9 @@ build
 
 /run
 
-/shrek-server/build.gradle.kts
-/shrek-server/src/minecraft
-/shrek-api/build.gradle.kts
+/battleship-server/build.gradle.kts
+/battleship-server/src/minecraft
+/battleship-api/build.gradle.kts
 /canvas-api
 /canvas-server
 /folia-api

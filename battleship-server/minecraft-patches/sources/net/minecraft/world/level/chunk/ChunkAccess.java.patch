@@ -1,0 +1,66 @@
+--- a/net/minecraft/world/level/chunk/ChunkAccess.java
++++ b/net/minecraft/world/level/chunk/ChunkAccess.java
+@@ -56,7 +_,7 @@
+ import org.jspecify.annotations.Nullable;
+ import org.slf4j.Logger;
+ 
+-public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeResolver, ca.spottedleaf.moonrise.patches.starlight.chunk.StarlightChunk { // Paper - rewrite chunk system
++public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeResolver, ca.spottedleaf.moonrise.patches.starlight.chunk.StarlightChunk, dev.cosmoworks.battleship.chunk.ChunkPacketCache.Holder<net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket> { // Paper - rewrite chunk system // Battleship - chunk packet cache
+     public static final int NO_FILLED_SECTION = -1;
+     private static final Logger LOGGER = LogUtils.getLogger();
+     private static final LongSet EMPTY_REFERENCE_SET = new LongOpenHashSet();
+@@ -394,6 +_,17 @@
+     private final int minSection;
+     private final int maxSection;
+     // Paper end - get block chunk optimisation
++    // Battleship start - load chunks on movement
++    private long lastMovementLoadTicket = 0;
++
++    public final boolean refreshMovementTicket(final long gameTime) {
++        final boolean refresh = gameTime - this.lastMovementLoadTicket >= 100;
++        if (refresh) {
++            this.lastMovementLoadTicket = gameTime;
++        }
++        return refresh;
++    }
++    // Battleship end - load chunks on movement
+     // Paper start - getblock optimisations - cache world height/sections
+     private final int minY;
+     private final int height;
+@@ -622,7 +_,35 @@
+ 
+     public void markUnsaved() {
+         this.unsaved = true;
+-    }
++        this.battleship$invalidatePacket(); // Battleship - chunk packet cache
++    }
++
++    // Battleship start - chunk packet cache
++    private volatile int battleship$packetVersion;
++    private volatile dev.cosmoworks.battleship.chunk.ChunkPacketCache.@Nullable Entry<net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket> battleship$packetEntry;
++
++    @Override
++    public final int battleship$packetVersion() {
++        return this.battleship$packetVersion;
++    }
++
++    @Override
++    public final dev.cosmoworks.battleship.chunk.ChunkPacketCache.@Nullable Entry<net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket> battleship$packetEntry() {
++        return this.battleship$packetEntry;
++    }
++
++    @Override
++    public final void battleship$packetEntry(final dev.cosmoworks.battleship.chunk.ChunkPacketCache.@Nullable Entry<net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket> entry) {
++        this.battleship$packetEntry = entry;
++    }
++
++    public final void battleship$invalidatePacket() {
++        this.battleship$packetVersion++;
++        if (this.battleship$packetEntry != null) {
++            this.battleship$packetEntry = null;
++        }
++    }
++    // Battleship end - chunk packet cache
+ 
+     public boolean tryMarkSaved() {
+         if (this.unsaved) {

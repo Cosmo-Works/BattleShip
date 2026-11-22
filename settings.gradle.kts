@@ -13,8 +13,8 @@ plugins {
 
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
-rootProject.name = "shrek"
-for (name in listOf("shrek-api", "shrek-server")) {
+rootProject.name = "battleship"
+for (name in listOf("battleship-api", "battleship-server")) {
     val projName = name.lowercase(Locale.ENGLISH)
     include(projName)
     findProject(":$projName")!!.projectDir = file(name)
@@ -22,12 +22,12 @@ for (name in listOf("shrek-api", "shrek-server")) {
 
 gradle.lifecycle.beforeProject {
     val mcVersion = providers.gradleProperty("mcVersion").get().trim()
-    val shrekChannel = providers.gradleProperty("channel").get().trim()
-    val shrekBuildNumber = providers.environmentVariable("BUILD_NUMBER").orNull?.trim()?.toInt()
-    val versionString = if (shrekBuildNumber == null) {
+    val battleshipChannel = providers.gradleProperty("channel").get().trim()
+    val battleshipBuildNumber = providers.environmentVariable("BUILD_NUMBER").orNull?.trim()?.toInt()
+    val versionString = if (battleshipBuildNumber == null) {
         "$mcVersion.local-SNAPSHOT"
     } else {
-        "$mcVersion.build.$shrekBuildNumber-${shrekChannel.lowercase()}"
+        "$mcVersion.build.$battleshipBuildNumber-${battleshipChannel.lowercase()}"
     }
     version = versionString
 }

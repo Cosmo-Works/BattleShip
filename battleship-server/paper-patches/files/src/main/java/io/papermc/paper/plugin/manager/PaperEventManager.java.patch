@@ -1,0 +1,26 @@
+--- a/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java
++++ b/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java
+@@ -39,6 +_,7 @@
+         RegisteredListener[] listeners = handlers.getRegisteredListeners();
+         if (listeners.length == 0) return;
+         // Canvas end - skip event if no listeners
++        dev.cosmoworks.battleship.parallel.RegionParallel.checkEventOutsidePhase(event); // Battleship - plugin code must not run in a parallel phase
+         if (event.isAsynchronous() && this.server.isPrimaryThread()) {
+             throw new IllegalStateException(event.getEventName() + " may only be triggered asynchronously.");
+         } else if (!event.isAsynchronous() && !this.server.isPrimaryThread() && !this.server.isStopping()) {
+@@ -51,6 +_,7 @@
+                 continue;
+             }
+ 
++            final long battleship$gate = dev.cosmoworks.battleship.octopus.PluginGate.OBSERVE ? dev.cosmoworks.battleship.octopus.PluginGate.enter() : 0L; // Battleship - octopus plugin gate (observe)
+             try {
+                 registration.callEvent(event);
+             } catch (AuthorNagException ex) {
+@@ -73,6 +_,7 @@
+                     this.callEvent(new ServerExceptionEvent(new ServerEventException(msg, ex, registration.getPlugin(), registration.getListener(), event)));
+                 }
+             }
++            if (battleship$gate != 0L) dev.cosmoworks.battleship.octopus.PluginGate.listener(event, registration.getPlugin(), battleship$gate); // Battleship - octopus plugin gate (observe)
+         }
+     }
+ 

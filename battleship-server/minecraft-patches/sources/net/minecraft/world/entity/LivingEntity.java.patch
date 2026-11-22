@@ -1,0 +1,377 @@
+--- a/net/minecraft/world/entity/LivingEntity.java
++++ b/net/minecraft/world/entity/LivingEntity.java
+@@ -316,6 +_,66 @@
+     }
+ 
+     // Canvas end - region threading
++    // Battleship start - cache attribute and equipment changes
++    private final me.samsuik.sakura.tracking.watchers.AttributeValueWatcher wayPointTransmitRangeWatcher;
++    private final me.samsuik.sakura.tracking.watchers.AttributeValueWatcher gravityWatcher;
++    private final me.samsuik.sakura.tracking.watchers.AttributeValueWatcher movementEfficiencyWatcher;
++    private final me.samsuik.sakura.tracking.watchers.AttributeValueWatcher waterMovementEfficiencyWatcher;
++    private final me.samsuik.sakura.tracking.watchers.AnyChangeWatcher<EntityEquipment> equipmentWatcher;
++    public boolean equipmentEmpty;
++    // Battleship end - cache attribute and equipment changes
++    private static final net.minecraft.resources.Identifier ATTACK_OVERRIDE_MODIFIER_ID = net.minecraft.resources.Identifier.fromNamespaceAndPath("sakura", "attack_override");
++    private static final net.minecraft.resources.Identifier LEGACY_ATTACK_COMBAT_MODIFIER_ID = net.minecraft.resources.Identifier.fromNamespaceAndPath("sakura", "legacy_combat");
++    private static final net.minecraft.resources.Identifier LEGACY_STRENGTH_MODIFIER_ID = net.minecraft.resources.Identifier.fromNamespaceAndPath("sakura", "legacy_strength");
++    private static final AttributeModifier LEGACY_ATTACK_SPEED_MODIFIER = new AttributeModifier(LEGACY_ATTACK_COMBAT_MODIFIER_ID, 100.0, AttributeModifier.Operation.ADD_VALUE);
++
++    private void updateAttackSpeedModifier() {
++        final AttributeInstance attackSpeed = this.getAttribute(Attributes.ATTACK_SPEED);
++        if (attackSpeed != null) {
++            attackSpeed.removeModifier(LEGACY_ATTACK_SPEED_MODIFIER);
++            if (this.level().battleshipConfig().players.combat.legacyCombatMechanics) {
++                attackSpeed.addTransientModifier(LEGACY_ATTACK_SPEED_MODIFIER);
++            }
++        }
++    }
++
++    public final float getAttackDamageFromAttributes() {
++        final AttributeInstance attackDamage = this.getAttribute(Attributes.ATTACK_DAMAGE);
++        final java.util.List<AttributeModifier> attackModifiers = new java.util.ArrayList<>();
++        final ItemStack heldItem = this.lastEquipmentItems.get(EquipmentSlot.MAINHAND);
++        double modifiedDamage = me.samsuik.sakura.player.combat.CombatUtil.getModifiedItemAttackDamage(this.level(), heldItem);
++        if (this.level().battleshipConfig().players.combat.oldPotionEffects) {
++            final MobEffectInstance strength = this.getEffect(MobEffects.STRENGTH);
++            if (strength != null) {
++                modifiedDamage -= me.samsuik.sakura.player.combat.CombatUtil.getEffectAttackDamage(strength);
++                attackModifiers.add(new AttributeModifier(
++                    LEGACY_STRENGTH_MODIFIER_ID,
++                    1.3 * (strength.getAmplifier() + 1),
++                    AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL)
++                );
++            }
++            final MobEffectInstance weakness = this.getEffect(MobEffects.WEAKNESS);
++            if (weakness != null) {
++                modifiedDamage -= me.samsuik.sakura.player.combat.CombatUtil.getEffectAttackDamage(weakness) + 0.5 * (weakness.getAmplifier() + 1);
++            }
++        }
++        if (modifiedDamage != 0.0) {
++            attackModifiers.add(new AttributeModifier(
++                ATTACK_OVERRIDE_MODIFIER_ID,
++                modifiedDamage,
++                AttributeModifier.Operation.ADD_VALUE)
++            );
++        }
++        final double damage;
++        if (attackDamage == null || attackModifiers.isEmpty()) {
++            damage = this.getAttributeValue(Attributes.ATTACK_DAMAGE);
++        } else {
++            attackModifiers.forEach(attackDamage::addTransientModifier);
++            damage = this.getAttributeValue(Attributes.ATTACK_DAMAGE);
++            attackModifiers.forEach(attackDamage::removeModifier);
++        }
++        return (float) damage;
++    }
+     @Override
+     public void updateTicks(long fromTickOffset, long fromRedstoneTimeOffset) {
+         super.updateTicks(fromTickOffset, fromRedstoneTimeOffset);
+@@ -348,6 +_,13 @@
+         this.setYRot(this.random.nextFloat() * (float) (Math.PI * 2));
+         this.yHeadRot = this.getYRot();
+         this.brain = this.makeBrain(Brain.Packed.EMPTY);
++        // Battleship start - cache attribute and equipment changes
++        this.wayPointTransmitRangeWatcher = new me.samsuik.sakura.tracking.watchers.AttributeValueWatcher(this.attributes, Attributes.WAYPOINT_TRANSMIT_RANGE);
++        this.gravityWatcher = new me.samsuik.sakura.tracking.watchers.AttributeValueWatcher(this.attributes, Attributes.GRAVITY);
++        this.movementEfficiencyWatcher = new me.samsuik.sakura.tracking.watchers.AttributeValueWatcher(this.attributes, Attributes.MOVEMENT_EFFICIENCY);
++        this.waterMovementEfficiencyWatcher = new me.samsuik.sakura.tracking.watchers.AttributeValueWatcher(this.attributes, Attributes.WATER_MOVEMENT_EFFICIENCY);
++        this.equipmentWatcher = new me.samsuik.sakura.tracking.watchers.AnyChangeWatcher<>(this.equipment);
++        // Battleship end - cache attribute and equipment changes
+     }
+ 
+     @Override
+@@ -583,7 +_,7 @@
+ 
+     @Override
+     protected float getBlockSpeedFactor() {
+-        return Mth.lerp((float)this.getAttributeValue(Attributes.MOVEMENT_EFFICIENCY), super.getBlockSpeedFactor(), 1.0F);
++        return Mth.lerp((float)this.movementEfficiencyWatcher.getValue(), super.getBlockSpeedFactor(), 1.0F); // Battleship - cache attribute and equipment changes
+     }
+ 
+     private static float computeModifiedFriction(final float friction, final float modifier) {
+@@ -1501,6 +_,7 @@
+         }
+ 
+         this.noActionTime = 0;
++        me.samsuik.sakura.player.knockback.KnockbackSync.rememberPlayerAttack(this, source);
+         if (damage < 0.0F) {
+             damage = 0.0F;
+         }
+@@ -1649,7 +_,7 @@
+         }
+         // Paper end - Check distance in entity interactions
+ 
+-        this.knockback(0.4F, xd, zd, source, damage, source.getDirectEntity(), source.getDirectEntity() == null ? io.papermc.paper.event.entity.EntityKnockbackEvent.Cause.DAMAGE : io.papermc.paper.event.entity.EntityKnockbackEvent.Cause.ENTITY_ATTACK); // CraftBukkit // Paper - knockback events
++        this.knockback((float) this.level().battleshipConfig().players.knockback.baseKnockback, xd, zd, source, damage, source.getDirectEntity(), source.getDirectEntity() == null ? io.papermc.paper.event.entity.EntityKnockbackEvent.Cause.DAMAGE : io.papermc.paper.event.entity.EntityKnockbackEvent.Cause.ENTITY_ATTACK);
+         if (!blocked) {
+             this.indicateDamage(xd, zd);
+         }
+@@ -1737,6 +_,10 @@
+             angle = (float) Math.PI;
+         }
+ 
++        if (me.samsuik.sakura.player.combat.CombatUtil.overrideBlockingAndHalveDamage(this.getItemBlockingWith(), this)) {
++            final boolean facingTowardsSource = angle <= (float) (Math.PI / 180.0) * 90.0;
++            return facingTowardsSource ? damage * 0.5f : 0.0f;
++        }
+         BlocksAttacks blocksAttacks = this.getItemBlockingWith().get(DataComponents.BLOCKS_ATTACKS);
+         return blocksAttacks.resolveBlockedDamage(source, damage, angle);
+     }
+@@ -1806,8 +_,8 @@
+ 
+     protected void blockedByItem(final LivingEntity defender, final DamageSource source, final float damage, final boolean fullyBlocked) {
+         if (!fullyBlocked) {
+-            defender.knockback(0.5, defender.getX() - this.getX(), defender.getZ() - this.getZ(), source, damage, this, io.papermc.paper.event.entity.EntityKnockbackEvent.Cause.SHIELD_BLOCK); // CraftBukkit // Paper - fix attacker & knockback events
+         }
++        defender.knockback((float) this.level().battleshipConfig().players.knockback.shieldHitKnockback, defender.getX() - this.getX(), defender.getZ() - this.getZ(), source, damage, this, io.papermc.paper.event.entity.EntityKnockbackEvent.Cause.SHIELD_BLOCK);
+     }
+ 
+     private boolean checkTotemDeathProtection(final DamageSource killingDamage) {
+@@ -1946,6 +_,10 @@
+                 }
+ 
+                 this.postDeathEventTasks.clear(); // Paper
++                if (this.level().battleshipConfig().entities.instantDeathAnimation && !(this instanceof Player)) {
++                    this.deathTime = 20;
++                    return;
++                }
+                 this.level().broadcastEntityEvent(this, EntityEvent.DEATH);
+             }
+ 
+@@ -2131,7 +_,7 @@
+     }
+ 
+     public void knockback(double power, double xd, double zd, final DamageSource source, final float damage, final boolean comesFromEffect, @Nullable Entity attacker, io.papermc.paper.event.entity.EntityKnockbackEvent.Cause eventCause) { // Paper - knockback events
+-        power *= 1.0 - this.getAttributeValue(Attributes.KNOCKBACK_RESISTANCE);
++        power *= 1.0 - this.getAttributeValue(Attributes.KNOCKBACK_RESISTANCE) * this.level().battleshipConfig().players.knockback.knockbackResistanceModifier;
+         if (true || !(power <= 0.0)) { // CraftBukkit - Call event even when force is 0
+             // this.needsSync = true; // Paper - moved down
+             Vec3 deltaMovement = this.getDeltaMovement();
+@@ -2142,9 +_,15 @@
+             }
+ 
+             Vec3 deltaVector = new Vec3(xd, 0.0, zd).normalize().scale(power);
++            double velocityY = deltaMovement.y / 2.0D + this.level().battleshipConfig().players.knockback.knockbackVerticalOr(power);
++            if (!this.level().battleshipConfig().players.knockback.verticalKnockbackRequireGround || this.onGround()) {
++                velocityY = Math.min(this.level().battleshipConfig().players.knockback.knockbackVerticalLimit, velocityY);
++            } else {
++                velocityY = deltaMovement.y;
++            }
+             Vec3 targetMovement = new Vec3( // Paper - knockback events
+                 deltaMovement.x / 2.0 - deltaVector.x,
+-                this.onGround() ? Math.min(0.4, deltaMovement.y / 2.0 + power) : deltaMovement.y,
++                velocityY,
+                 deltaMovement.z / 2.0 - deltaVector.z
+             );
+             // Paper start - knockback events
+@@ -2156,6 +_,9 @@
+ 
+             this.needsSync = true;
+             this.setDeltaMovement(deltaMovement.add(event.getKnockback().getX(), event.getKnockback().getY(), event.getKnockback().getZ()));
++            if (this instanceof final net.minecraft.server.level.ServerPlayer victim) {
++                me.samsuik.sakura.player.knockback.KnockbackSync.applyToKnockback(victim, eventCause);
++            }
+             // Paper end - knockback events
+         }
+     }
+@@ -2360,8 +_,12 @@
+         this.currentImpulseImpactPos = null;
+     }
+ 
++    protected boolean isFallDamageImmune() {
++        return this.is(EntityTypeTags.FALL_DAMAGE_IMMUNE);
++    }
++
+     protected int calculateFallDamage(final double fallDistance, final float damageModifier) {
+-        if (this.is(EntityTypeTags.FALL_DAMAGE_IMMUNE)) {
++        if (this.isFallDamageImmune()) {
+             return 0;
+         }
+ 
+@@ -2419,6 +_,9 @@
+     protected float getDamageAfterArmorAbsorb(final DamageSource damageSource, float damage) {
+         if (!damageSource.is(DamageTypeTags.BYPASSES_ARMOR)) {
+             // this.hurtArmor(damageSource, damage); // CraftBukkit - actuallyHurt(DamageSource, float, EntityDamageEvent) for damage handling
++            if (this.level().battleshipConfig().players.combat.legacyCombatMechanics) {
++                return damage * (1.0f - (this.getArmorValue() / 25.0f));
++            }
+             damage = CombatRules.getDamageAfterAbsorb(
+                 this, damage, damageSource, this.getArmorValue(), (float)this.getAttributeValue(Attributes.ARMOR_TOUGHNESS)
+             );
+@@ -2584,6 +_,10 @@
+                 armorDamage += (float)event.getDamage(DamageModifier.BLOCKING);
+                 armorDamage += (float)event.getDamage(DamageModifier.FREEZING);
+                 armorDamage += (float)event.getDamage(DamageModifier.HARD_HAT);
++                final int maxArmourDamage = this.level().battleshipConfig().players.combat.maxArmourDamageOrDisabled();
++                if (maxArmourDamage >= 0) {
++                    armorDamage = Math.min(armorDamage, maxArmourDamage);
++                }
+                 this.hurtArmor(source, armorDamage);
+             }
+ 
+@@ -2702,6 +_,14 @@
+         this.entityData.set(DATA_STINGER_COUNT_ID, count);
+     }
+ 
++    // Battleship start - one swing broadcast per tick
++    private long battleship$lastSwingTick = Long.MIN_VALUE;
++    private @Nullable InteractionHand battleship$lastSwingHand;
++    private @Nullable SwingAnimation battleship$lastSwingAnimation;
++    private int battleship$lastSwingDuration;
++    private boolean battleship$lastSwingToSelf;
++    // Battleship end - one swing broadcast per tick
++
+     private int getModifiedSwingDuration(final SwingAnimation animation) {
+         int swingDuration = animation.duration();
+         if (MobEffectUtil.hasDigSpeed(this)) {
+@@ -2719,7 +_,24 @@
+     }
+ 
+     public boolean swing(final InteractionHand hand, final SwingAnimation animation, final boolean sendToSwingingEntity) {
+-        if (this.swingState.startIfAble(hand, animation, this.getModifiedSwingDuration(animation))) {
++        final int swingDuration = this.getModifiedSwingDuration(animation); // Battleship - one swing broadcast per tick
++        if (this.swingState.startIfAble(hand, animation, swingDuration)) {
++            // Battleship start - one swing broadcast per tick
++            if (this.level() instanceof ServerLevel && dev.cosmoworks.battleship.BattleshipServerConfig.network().oneSwingBroadcastPerTick) {
++                final long tick = io.papermc.paper.threadedregions.RegionizedServer.getCurrentTick();
++                final boolean repeat = this.battleship$lastSwingTick == tick && this.battleship$lastSwingHand == hand
++                    && java.util.Objects.equals(this.battleship$lastSwingAnimation, animation) && this.battleship$lastSwingDuration == swingDuration
++                    && this.battleship$lastSwingToSelf == sendToSwingingEntity;
++                this.battleship$lastSwingTick = tick;
++                this.battleship$lastSwingHand = hand;
++                this.battleship$lastSwingAnimation = animation;
++                this.battleship$lastSwingDuration = swingDuration;
++                this.battleship$lastSwingToSelf = sendToSwingingEntity;
++                if (repeat) {
++                    return true;
++                }
++            }
++            // Battleship end - one swing broadcast per tick
+             if (this.level() instanceof ServerLevel serverLevel) {
+                 ClientboundSwingAnimationPacket packet = new ClientboundSwingAnimationPacket(this, hand, animation);
+                 ServerChunkCache chunkSource = serverLevel.getChunkSource();
+@@ -3110,7 +_,7 @@
+ 
+     @Override
+     public double getDefaultGravity() {
+-        return this.getAttributeValue(Attributes.GRAVITY);
++        return this.gravityWatcher.getValue(); // Battleship - cache attribute and equipment changes
+     }
+ 
+     @Override
+@@ -3209,7 +_,7 @@
+     protected void travelInWater(final Vec3 input, final double baseGravity, final boolean isFalling, final double oldY) {
+         float slowDown = this.isSprinting() ? 0.9F : this.getWaterSlowDown();
+         float speed = 0.02F;
+-        float waterWalker = (float)this.getAttributeValue(Attributes.WATER_MOVEMENT_EFFICIENCY);
++        float waterWalker = (float)this.waterMovementEfficiencyWatcher.getValue(); // Battleship - cache attribute and equipment changes
+         if (!this.onGround()) {
+             waterWalker *= 0.5F;
+         }
+@@ -3492,7 +_,12 @@
+                 }
+             }
+ 
+-            this.detectEquipmentUpdates();
++            // Battleship start - cache attribute and equipment changes
++            if (this.equipmentWatcher.hasChanged()) {
++                this.detectEquipmentUpdates();
++                this.equipmentEmpty = this.equipment.isEmpty();
++            }
++            // Battleship end - cache attribute and equipment changes
+             if (this.tickCount % 20 == 0) {
+                 this.getCombatTracker().recheckStatus();
+             }
+@@ -3690,6 +_,9 @@
+                     if (this.level() instanceof ServerLevel serverLevel) {
+                         EnchantmentHelper.runLocationChangedEffects(serverLevel, current, this, slot);
+                     }
++                    if (this instanceof ServerPlayer && slot == EquipmentSlot.MAINHAND) {
++                        this.updateAttackSpeedModifier();
++                    }
+                 }
+             }
+ 
+@@ -3760,7 +_,11 @@
+             this.lerpHeadSteps--;
+         }
+ 
+-        this.equipment.tick(this);
++        // Battleship start - cache attribute and equipment changes
++        if (!this.equipmentEmpty) {
++            this.equipment.tick(this);
++        }
++        // Battleship end - cache attribute and equipment changes
+         Vec3 movement = this.getDeltaMovement();
+         double dx = movement.x;
+         double dy = movement.y;
+@@ -3878,7 +_,7 @@
+             }
+         }
+         // Paper end - Add EntityMoveEvent
+-        if (this.level() instanceof ServerLevel serverLevel && this.isSensitiveToWater() && this.isInWaterOrRain()) {
++        if (this.level() instanceof ServerLevel serverLevel && this.level().battleshipConfig().entities.waterSensitivity && this.isSensitiveToWater() && this.isInWaterOrRain()) {
+             this.hurtServer(serverLevel, this.damageSources().drown(), 1.0F);
+         }
+     }
+@@ -3955,14 +_,34 @@
+         }
+ 
+         int maxCramming = ((ServerLevel) this.level()).getGameRules().get(GameRules.MAX_ENTITY_CRAMMING);
+-        if (maxCramming <= 0 && this.level().paperConfig().collisions.maxEntityCollisions <= 0) {
++        int maxEntityCollisions = this.level().paperConfig().collisions.maxEntityCollisions;
++        if (this instanceof final Mob mob && !mob.aware && !this.level().battleshipConfig().entities.nerfedMobsCanPushEntities) {
++            maxEntityCollisions = 0;
++        }
++        if (maxCramming <= 0 && maxEntityCollisions <= 0) {
+             return;
+         }
+         // Paper end - don't run getEntities if we're not going to use its result
+         // Canvas start - only players push config
+-        List<? extends Entity> pushableEntities = collisionMode.onlyPlayersPushable() ?
+-            this.level().canvas$getIntersectingPlayers(this, this.getBoundingBox(), EntitySelector.pushableBy(this))
+-            : this.level().getPushableEntities(this, this.getBoundingBox());
++        List<? extends Entity> pushableEntities;
++        if (collisionMode.onlyPlayersPushable()) {
++            pushableEntities = this.level().canvas$getIntersectingPlayers(this, this.getBoundingBox(), EntitySelector.pushableBy(this));
++        } else {
++            // Battleship start - use maxEntityCollision limit for entity retrieval
++            final int limit = Math.max(maxCramming, maxEntityCollisions);
++            final int search = limit * limit;
++            final List<Entity> found = new java.util.ArrayList<>(4);
++            this.level().getEntities(
++                net.minecraft.world.level.entity.EntityTypeTest.forClass(Entity.class),
++                this.getBoundingBox(),
++                EntitySelector.pushableBy(this),
++                found,
++                limit,
++                search
++            );
++            pushableEntities = found;
++            // Battleship end - use maxEntityCollision limit for entity retrieval
++        }
+         // Canvas end - only players push config
+         if (!pushableEntities.isEmpty()) {
+             if (this.level() instanceof ServerLevel serverLevel) {
+@@ -3983,9 +_,9 @@
+             }
+ 
+             // Paper start - Cap entity collisions
+-            this.numCollisions = Math.max(0, this.numCollisions - this.level().paperConfig().collisions.maxEntityCollisions);
++            this.numCollisions = Math.max(0, this.numCollisions - maxEntityCollisions);
+             for (Entity entity : pushableEntities) {
+-                if (this.numCollisions >= this.level().paperConfig().collisions.maxEntityCollisions) {
++                if (this.numCollisions >= maxEntityCollisions) {
+                     break;
+                 }
+ 
+@@ -5038,7 +_,7 @@
+ 
+     @Override
+     public boolean isTransmittingWaypoint() {
+-        return this.getAttributeValue(Attributes.WAYPOINT_TRANSMIT_RANGE) > 0.0;
++        return this.wayPointTransmitRangeWatcher.getValue() > 0.0; // Battleship - cache attribute and equipment changes
+     }
+ 
+     @Override

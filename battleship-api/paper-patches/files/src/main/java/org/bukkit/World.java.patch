@@ -1,0 +1,14 @@
+--- a/src/main/java/org/bukkit/World.java
++++ b/src/main/java/org/bukkit/World.java
+@@ -4660,6 +_,11 @@
+     void setSendViewDistance(int viewDistance);
+     // Paper end - view distance api
+ 
++    // Battleship start - local config api
++    @NotNull
++    me.samsuik.sakura.configuration.local.LocalConfigurationAccessor localConfig();
++    // Battleship end - local config api
++
+     /**
+      * Gets all generated structures that intersect the chunk at the given
+      * coordinates. <br>

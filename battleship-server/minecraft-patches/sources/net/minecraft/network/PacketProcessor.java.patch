@@ -1,0 +1,51 @@
+--- a/net/minecraft/network/PacketProcessor.java
++++ b/net/minecraft/network/PacketProcessor.java
+@@ -36,7 +_,10 @@
+             return false;
+         }
+ 
++        if (this.battleship$collapsed(task)) return true; // Battleship - collapse redundant move packets
++        final long battleship$start = dev.cosmoworks.battleship.debug.RegionPhaseTiming.start(dev.cosmoworks.battleship.debug.RegionPhaseTiming.Phase.PACKETS); // Battleship - region phase timing
+         task.handle();
++        dev.cosmoworks.battleship.debug.RegionPhaseTiming.packet(task.packet().getClass(), battleship$start); // Battleship - region phase timing
+         return true;
+     }
+     // Paper end - improve tick loop
+@@ -67,10 +_,36 @@
+     public void processQueuedPackets() {
+         if (!this.closed) {
+             while (!this.packetsToBeHandled.isEmpty()) {
+-                this.packetsToBeHandled.poll().handle();
++                // Battleship start - collapse redundant move packets
++                final PacketProcessor.ListenerAndPacket<?> task = this.packetsToBeHandled.poll();
++                if (!this.battleship$collapsed(task)) {
++                    task.handle();
++                }
++                // Battleship end - collapse redundant move packets
+             }
+         }
+     }
++
++    // Battleship start - collapse redundant move packets
++    private boolean battleship$collapsed(final PacketProcessor.ListenerAndPacket<?> task) {
++        if (!(task.listener() instanceof net.minecraft.server.network.ServerGamePacketListenerImpl listener)
++            || !(task.packet() instanceof net.minecraft.network.protocol.game.ServerboundMovePlayerPacket packet)
++            || packet.hasPosition()
++            || !dev.cosmoworks.battleship.BattleshipServerConfig.movement().collapseRedundantMovePackets) {
++            return false;
++        }
++        final PacketProcessor.ListenerAndPacket<?> next = this.packetsToBeHandled.peek();
++        if (next == null || next.listener() != listener
++            || !(next.packet() instanceof net.minecraft.network.protocol.game.ServerboundMovePlayerPacket later)
++            || (packet.hasRotation() && !later.hasRotation())
++            || packet.isOnGround() != later.isOnGround()
++            || packet.horizontalCollision() != later.horizontalCollision()
++            || !listener.shouldHandleMessage(packet)) {
++            return false;
++        }
++        return listener.battleship$skipRedundantMove(packet);
++    }
++    // Battleship end - collapse redundant move packets
+ 
+     @Override
+     public void close() {

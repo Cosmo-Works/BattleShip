@@ -1,0 +1,10 @@
+--- a/net/minecraft/world/item/enchantment/EnchantmentHelper.java
++++ b/net/minecraft/world/item/enchantment/EnchantmentHelper.java
+@@ -156,6 +_,7 @@
+     }
+ 
+     private static void runIterationOnEquipment(final LivingEntity owner, final EnchantmentHelper.EnchantmentInSlotVisitor method) {
++        if (owner.equipmentEmpty) return; // Battleship - cache attribute and equipment changes
+         for (EquipmentSlot slot : EquipmentSlot.VALUES) {
+             runIterationOnItem(owner.getItemBySlot(slot), slot, owner, method);
+         }

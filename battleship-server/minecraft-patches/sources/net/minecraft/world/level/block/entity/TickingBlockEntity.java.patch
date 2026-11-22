@@ -1,0 +1,13 @@
+--- a/net/minecraft/world/level/block/entity/TickingBlockEntity.java
++++ b/net/minecraft/world/level/block/entity/TickingBlockEntity.java
+@@ -14,4 +_,10 @@
+ 
+     BlockEntity getTileEntity();
+     // Folia end - region threading
++
++    // Battleship start - optimise hopper ticking
++    default boolean sakura$isActive() {
++        return true;
++    }
++    // Battleship end - optimise hopper ticking
+ }

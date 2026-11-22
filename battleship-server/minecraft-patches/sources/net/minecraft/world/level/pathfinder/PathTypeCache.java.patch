@@ -1,0 +1,25 @@
+--- a/net/minecraft/world/level/pathfinder/PathTypeCache.java
++++ b/net/minecraft/world/level/pathfinder/PathTypeCache.java
+@@ -6,6 +_,7 @@
+ import org.jspecify.annotations.Nullable;
+ 
+ public class PathTypeCache {
++    private static final PathType[] PATH_TYPES = PathType.values(); // Battleship - faster pathfinding
+     private static final int SIZE = 4096;
+     private static final int MASK = 4095;
+     private final long[] positions = new long[4096];
+@@ -23,7 +_,13 @@
+     }
+ 
+     private PathType compute(final BlockGetter level, final BlockPos pos, final int index, final long key) {
+-        PathType pathType = WalkNodeEvaluator.getPathTypeFromState(level, pos);
++        // Battleship start - faster pathfinding: never cache a read from an unloaded chunk or from outside
++        net.minecraft.world.level.block.state.BlockState state = level.getBlockStateIfLoaded(pos);
++        if (state == null) {
++            return PathType.BLOCKED;
++        }
++        PathType pathType = PATH_TYPES[state.pathType];
++        // Battleship end - faster pathfinding
+         this.positions[index] = key;
+         this.pathTypes[index] = pathType;
+         return pathType;

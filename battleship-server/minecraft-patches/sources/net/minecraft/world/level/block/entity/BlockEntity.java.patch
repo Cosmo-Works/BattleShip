@@ -1,0 +1,33 @@
+--- a/net/minecraft/world/level/block/entity/BlockEntity.java
++++ b/net/minecraft/world/level/block/entity/BlockEntity.java
+@@ -53,6 +_,30 @@
+     private BlockState blockState;
+     private DataComponentMap components = DataComponentMap.EMPTY;
+     public boolean canvas$isValid; // Canvas - optimize block entities
++    // Battleship start - optimise hopper ticking
++    private boolean blockEntityTicking = true;
++    private int idleTickCount = 0;
++
++    public final boolean sakura$isActive() {
++        if (!this.blockEntityTicking && this.idleTickCount >= 1200) {
++            this.sakura$setActive(true);
++        }
++
++        this.idleTickCount++;
++        return this.blockEntityTicking;
++    }
++
++    public final void sakura$setActive(final boolean blockEntityTicking) {
++        if (blockEntityTicking) {
++            this.catchupTicks(this.idleTickCount);
++        }
++
++        this.idleTickCount = 0;
++        this.blockEntityTicking = blockEntityTicking;
++    }
++
++    protected void catchupTicks(final int ticks) {}
++    // Battleship end - optimise hopper ticking
+ 
+     // Folia start - region threading
+     public void updateTicks(final long fromTickOffset, final long fromRedstoneTimeOffset) {

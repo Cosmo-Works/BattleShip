@@ -1,0 +1,199 @@
+--- a/net/minecraft/world/level/chunk/storage/RegionFileStorage.java
++++ b/net/minecraft/world/level/chunk/storage/RegionFileStorage.java
+@@ -22,7 +_,7 @@
+     private static final org.slf4j.Logger LOGGER = com.mojang.logging.LogUtils.getLogger(); // Paper
+     public static final String ANVIL_EXTENSION = ".mca";
+     private static final int MAX_CACHE_SIZE = 256;
+-    private final Long2ObjectLinkedOpenHashMap<Optional<RegionFile>> regionCache = new Long2ObjectLinkedOpenHashMap<>();
++    private final Long2ObjectLinkedOpenHashMap<Optional<dev.cosmoworks.battleship.region.AbstractRegionFile>> regionCache = new Long2ObjectLinkedOpenHashMap<>(); // Battleship - Linear region format
+     private final RegionStorageInfo info;
+     private final Path folder;
+     private final boolean sync;
+@@ -33,7 +_,7 @@
+     @Nullable
+     public static ChunkPos getRegionFileCoordinates(Path file) {
+         String fileName = file.getFileName().toString();
+-        if (!fileName.startsWith("r.") || !fileName.endsWith(".mca")) {
++        if (!fileName.startsWith("r.") || (!fileName.endsWith(".mca") && !fileName.endsWith(".linear"))) { // Battleship - Linear region format
+             return null;
+         }
+ 
+@@ -57,8 +_,18 @@
+     private static final int REGION_SHIFT = 5;
+     private static final int MAX_NON_EXISTING_CACHE = 1024 * 4;
+     private final it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet nonExistingRegionFiles = new it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet();
+-    private static String getRegionFileName(final int chunkX, final int chunkZ) {
+-        return "r." + (chunkX >> REGION_SHIFT) + "." + (chunkZ >> REGION_SHIFT) + ".mca";
++    private Path resolveRegionPath(final int chunkX, final int chunkZ) { // Battleship - Linear region format
++        final String base = "r." + (chunkX >> REGION_SHIFT) + "." + (chunkZ >> REGION_SHIFT);
++        final Path linear = this.folder.resolve(base + dev.cosmoworks.battleship.region.RegionFileFormat.LINEAR_EXTENSION);
++        final Path anvil = this.folder.resolve(base + ANVIL_EXTENSION);
++        final boolean linearExists = java.nio.file.Files.exists(linear);
++        final boolean anvilExists = java.nio.file.Files.exists(anvil);
++
++        if (linearExists != anvilExists) {
++            return linearExists ? linear : anvil;
++        }
++
++        return dev.cosmoworks.battleship.BattleshipServerConfig.regionFormat() == dev.cosmoworks.battleship.region.RegionFileFormat.LINEAR ? linear : anvil;
+     }
+ 
+     private boolean doesRegionFilePossiblyExist(final long position) {
+@@ -93,13 +_,13 @@
+     }
+ 
+     @Override
+-    public synchronized final RegionFile moonrise$getRegionFileIfLoaded(final int chunkX, final int chunkZ) {
+-        final Optional<RegionFile> ret = this.regionCache.getAndMoveToFirst(ChunkPos.pack(chunkX >> REGION_SHIFT, chunkZ >> REGION_SHIFT));
++    public synchronized final dev.cosmoworks.battleship.region.AbstractRegionFile moonrise$getRegionFileIfLoaded(final int chunkX, final int chunkZ) { // Battleship - Linear region format
++        final Optional<dev.cosmoworks.battleship.region.AbstractRegionFile> ret = this.regionCache.getAndMoveToFirst(ChunkPos.pack(chunkX >> REGION_SHIFT, chunkZ >> REGION_SHIFT));
+         return ret == null || ret.isEmpty() ? null : ret.get();
+     }
+ 
+     @Override
+-    public synchronized final RegionFile moonrise$getRegionFileIfExists(final int chunkX, final int chunkZ) throws IOException {
++    public synchronized final dev.cosmoworks.battleship.region.AbstractRegionFile moonrise$getRegionFileIfExists(final int chunkX, final int chunkZ) throws IOException { // Battleship - Linear region format
+         return this.getRegionFile(new ChunkPos(chunkX, chunkZ), false);
+     }
+ 
+@@ -115,7 +_,7 @@
+         }
+ 
+         final ChunkPos pos = new ChunkPos(chunkX, chunkZ);
+-        final RegionFile regionFile = this.getRegionFile(pos, true);
++        final dev.cosmoworks.battleship.region.AbstractRegionFile regionFile = this.getRegionFile(pos, true); // Battleship - Linear region format
+ 
+         // note: not required to keep regionfile loaded after this call, as the write param takes a regionfile as input
+         // (and, the regionfile parameter is unused for writing until the write call)
+@@ -149,7 +_,7 @@
+     ) throws IOException {
+         final ChunkPos pos = new ChunkPos(chunkX, chunkZ);
+         if (writeData.result() == ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO.RegionDataController.WriteData.WriteResult.DELETE) {
+-            final RegionFile regionFile = this.moonrise$getRegionFileIfExists(chunkX, chunkZ);
++            final dev.cosmoworks.battleship.region.AbstractRegionFile regionFile = this.moonrise$getRegionFileIfExists(chunkX, chunkZ); // Battleship - Linear region format
+             if (regionFile != null) {
+                 regionFile.clear(pos);
+             } // else: didn't exist
+@@ -164,7 +_,7 @@
+     public final ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO.RegionDataController.ReadData moonrise$readData(
+         final int chunkX, final int chunkZ
+     ) throws IOException {
+-        final RegionFile regionFile = this.moonrise$getRegionFileIfExists(chunkX, chunkZ);
++        final dev.cosmoworks.battleship.region.AbstractRegionFile regionFile = this.moonrise$getRegionFileIfExists(chunkX, chunkZ); // Battleship - Linear region format
+ 
+         final DataInputStream input = regionFile == null ? null : regionFile.getChunkDataInputStream(new ChunkPos(chunkX, chunkZ));
+ 
+@@ -209,7 +_,7 @@
+ 
+             final ChunkPos pos = new ChunkPos(chunkX, chunkZ);
+             final ChunkPos headerChunkPos = SerializableChunkData.getChunkCoordinate(ret);
+-            final RegionFile regionFile = this.getRegionFile(pos, true);
++            final dev.cosmoworks.battleship.region.AbstractRegionFile regionFile = this.getRegionFile(pos, true); // Battleship - Linear region format
+ 
+             if (regionFile.getRecalculateCount() != readData.recalculateCount()) {
+                 return null;
+@@ -240,12 +_,12 @@
+         this.isChunkData = info.dfuType()[0] == net.minecraft.util.datafix.DataFixTypes.CHUNK; // Paper - recalculate region file headers
+     }
+ 
+-    private @Nullable RegionFile getRegionFile(final ChunkPos pos, final boolean create) throws IOException {
++    private dev.cosmoworks.battleship.region.@Nullable AbstractRegionFile getRegionFile(final ChunkPos pos, final boolean create) throws IOException { // Battleship - Linear region format
+         // Paper start - rewrite chunk system
+         synchronized (this) {
+             final long key = ChunkPos.pack(pos.x() >> REGION_SHIFT, pos.z() >> REGION_SHIFT);
+ 
+-            final Optional<RegionFile> cached = this.regionCache.getAndMoveToFirst(key);
++            final Optional<dev.cosmoworks.battleship.region.AbstractRegionFile> cached = this.regionCache.getAndMoveToFirst(key);
+             if (cached != null) {
+                 if (cached.isPresent()) {
+                     return cached.get();
+@@ -260,7 +_,7 @@
+                 return null;
+             }
+ 
+-            final Path regionPath = this.folder.resolve(getRegionFileName(pos.x(), pos.z()));
++            final Path regionPath = this.resolveRegionPath(pos.x(), pos.z()); // Battleship - Linear region format
+ 
+             if (!create && !Files.isRegularFile(regionPath)) {
+                 // unlike vanilla, do not cache Optional.empty() here: missing regions are tracked in
+@@ -272,7 +_,7 @@
+             final int cacheSize = io.papermc.paper.configuration.GlobalConfiguration.get() == null ? 256 : io.papermc.paper.configuration.GlobalConfiguration.get().misc.regionFileCacheSize; // Paper - Sanitise RegionFileCache and make configurable - Config not available during initial FileFixerUpper run
+ 
+             if (this.regionCache.size() >= cacheSize) {
+-                final Optional<RegionFile> evicted = this.regionCache.removeLast();
++                final Optional<dev.cosmoworks.battleship.region.AbstractRegionFile> evicted = this.regionCache.removeLast();
+                 if (evicted.isPresent()) {
+                     evicted.get().close();
+                 }
+@@ -282,7 +_,7 @@
+ 
+             FileUtil.createDirectoriesSafe(this.folder);
+ 
+-            final RegionFile ret = new RegionFile(this.info, regionPath, this.folder, this.sync);
++            final dev.cosmoworks.battleship.region.AbstractRegionFile ret = dev.cosmoworks.battleship.region.AbstractRegionFileFactory.open(this.info, regionPath, this.folder, this.sync); // Battleship - Linear region format
+ 
+             this.regionCache.putAndMoveToFirst(key, Optional.of(ret));
+ 
+@@ -291,7 +_,7 @@
+         // Paper end - rewrite chunk system
+     }
+ 
+-    private RegionFile getOrCreateRegionFile(final ChunkPos pos) throws IOException {
++    private dev.cosmoworks.battleship.region.AbstractRegionFile getOrCreateRegionFile(final ChunkPos pos) throws IOException { // Battleship - Linear region format
+         return Objects.requireNonNull(this.getRegionFile(pos, true));
+     }
+ 
+@@ -300,7 +_,7 @@
+         LOGGER.error("{} ({} - {},{}) Go clean it up to remove this message. /minecraft:tp {} 128 {} - DO NOT REPORT THIS TO {} - You may ask for help on Discord, but do not file an issue. These error messages can not be removed.", msg, file.toString().replaceAll(".+[\\\\/]", ""), x, z, x << 4, z << 4, io.papermc.paper.ServerBuildInfo.buildInfo().brandName().toUpperCase()); // Canvas - Rebrand
+     }
+ 
+-    private static CompoundTag readOversizedChunk(RegionFile regionfile, ChunkPos chunkCoordinate) throws IOException {
++    private static CompoundTag readOversizedChunk(dev.cosmoworks.battleship.region.AbstractRegionFile regionfile, ChunkPos chunkCoordinate) throws IOException { // Battleship - Linear region format
+         synchronized (regionfile) {
+             try (DataInputStream datainputstream = regionfile.getChunkDataInputStream(chunkCoordinate)) {
+                 CompoundTag oversizedData = regionfile.getOversizedData(chunkCoordinate.x(), chunkCoordinate.z());
+@@ -333,7 +_,7 @@
+     // Paper end
+ 
+     public @Nullable CompoundTag read(final ChunkPos pos) throws IOException {
+-        RegionFile region = this.getRegionFile(pos, false);
++        dev.cosmoworks.battleship.region.AbstractRegionFile region = this.getRegionFile(pos, false); // Battleship - Linear region format
+         if (region == null) {
+             return null;
+         }
+@@ -368,7 +_,7 @@
+     }
+ 
+     public void scanChunk(final ChunkPos pos, final StreamTagVisitor scanner) throws IOException {
+-        RegionFile region = this.getRegionFile(pos, false);
++        dev.cosmoworks.battleship.region.AbstractRegionFile region = this.getRegionFile(pos, false); // Battleship - Linear region format
+         if (region != null) {
+             try (DataInputStream regionChunkInputStream = region.getChunkDataInputStream(pos)) {
+                 if (regionChunkInputStream != null) {
+@@ -386,7 +_,7 @@
+         }
+         // Paper end - rewrite chunk system
+         if (!SharedConstants.DEBUG_DONT_SAVE_WORLD) {
+-            RegionFile region = this.getOrCreateRegionFile(pos);
++            dev.cosmoworks.battleship.region.AbstractRegionFile region = this.getOrCreateRegionFile(pos); // Battleship - Linear region format
+             if (value == null) {
+                 region.clear(pos);
+             } else {
+@@ -412,7 +_,7 @@
+         // Paper start - rewrite chunk system
+         synchronized (this) {
+             final ExceptionCollector<IOException> exceptionCollector = new ExceptionCollector<>();
+-            for (final Optional<RegionFile> entry : this.regionCache.values()) {
++            for (final Optional<dev.cosmoworks.battleship.region.AbstractRegionFile> entry : this.regionCache.values()) {
+                 if (entry.isEmpty()) {
+                     continue;
+                 }
+@@ -431,7 +_,7 @@
+         // Paper start - rewrite chunk system
+         synchronized (this) {
+             final ExceptionCollector<IOException> exceptionCollector = new ExceptionCollector<>();
+-            for (final Optional<RegionFile> entry : this.regionCache.values()) {
++            for (final Optional<dev.cosmoworks.battleship.region.AbstractRegionFile> entry : this.regionCache.values()) {
+                 if (entry.isEmpty()) {
+                     continue;
+                 }

@@ -1,0 +1,331 @@
+--- a/net/minecraft/network/Connection.java
++++ b/net/minecraft/network/Connection.java
+@@ -74,7 +_,7 @@
+     // Spigot end
+     private volatile @Nullable PacketListener disconnectListener;
+     private volatile @Nullable PacketListener packetListener;
+-    private @Nullable DisconnectionDetails disconnectionDetails;
++    private volatile @Nullable DisconnectionDetails disconnectionDetails; // Battleship - do not block ticking threads on disconnect - volatile
+     private final java.util.concurrent.atomic.AtomicBoolean disconnectionHandled = new java.util.concurrent.atomic.AtomicBoolean(false); // Folia - region threading - may be called concurrently during configuration stage
+     private int receivedPackets;
+     private int sentPackets;
+@@ -349,6 +_,21 @@
+     }
+ 
+     private static void syncAfterConfigurationChange(final ChannelFuture future) {
++        // Battleship start - do not block ticking threads on protocol switches
++        if (!future.channel().eventLoop().inEventLoop()) {
++            future.addListener((ChannelFutureListener) done -> {
++                if (!done.isSuccess()) {
++                    if (done.cause() instanceof ClosedChannelException) {
++                        LOGGER.info("Connection closed during protocol change");
++                    } else {
++                        LOGGER.error("Failed to change protocol for {}", done.channel().remoteAddress(), done.cause());
++                        done.channel().close();
++                    }
++                }
++            });
++            return;
++        }
++        // Battleship end - do not block ticking threads on protocol switches
+         try {
+             future.syncUninterruptibly();
+         } catch (Exception e) {
+@@ -391,7 +_,23 @@
+         }
+ 
+         boolean isLoginProtocol = protocol.id() == ConnectionProtocol.LOGIN;
+-        syncAfterConfigurationChange(this.channel.writeAndFlush(configMessage.andThen(ctx -> this.sendLoginDisconnect = isLoginProtocol)));
++        // Battleship start - batch writes to the event loop - only while the outbound protocol is PLAY
++        final boolean toPlay = protocol.id() == ConnectionProtocol.PLAY;
++        if (!toPlay) {
++            this.battleship$batchable = false;
++        }
++        final long nextEpoch = this.battleship$epoch + 1;
++        final ChannelFuture switched = this.channel.writeAndFlush(configMessage.andThen(ctx -> {
++            dev.cosmoworks.battleship.network.OutboundOrder.reset(ctx.channel()); // Battleship - write order: the pipeline changed
++            this.sendLoginDisconnect = isLoginProtocol;
++            this.battleship$loopEpoch = nextEpoch;
++        }));
++        if (toPlay) {
++            this.battleship$epoch = nextEpoch;
++            this.battleship$batchable = true;
++        }
++        syncAfterConfigurationChange(switched);
++        // Battleship end - batch writes to the event loop - only while the outbound protocol is PLAY
+     }
+ 
+     public void setListenerForServerboundHandshake(final PacketListener packetListener) {
+@@ -451,6 +_,28 @@
+         }
+ 
+         packet.onPacketDispatch(this.getPlayer());
++        final dev.cosmoworks.battleship.network.SharedFrames.Broadcast battleship$broadcast = dev.cosmoworks.battleship.network.SharedFrames.current(packet); // Battleship - shared broadcast frames
++        // Battleship start - fast send path
++        if (connected && dev.cosmoworks.battleship.BattleshipServerConfig.network().fastSendPath && this.pendingActions.isEmpty() && packet.isReady()
++            && (packet.getExtraPackets() == null || packet.getExtraPackets().isEmpty())
++            && !this.flushingQueue.get() && this.flushingQueue.compareAndSet(false, true)) {
++            boolean sent = false;
++            try {
++                if (this.pendingActions.isEmpty()) {
++                    this.sendPacket(packet, listener, flush, battleship$broadcast); // Battleship - shared broadcast frames
++                    sent = true;
++                }
++            } finally {
++                this.flushingQueue.set(false);
++            }
++            if (sent) {
++                if (!this.pendingActions.isEmpty()) {
++                    this.flushQueue();
++                }
++                return;
++            }
++        }
++        // Battleship end - fast send path
+         if (false && connected && (InnerUtil.canSendImmediate(this, packet) // Folia - region threading - connection fixes
+             || (io.papermc.paper.util.MCUtil.isMainThread() && packet.isReady() && this.pendingActions.isEmpty()
+             && (packet.getExtraPackets() == null || packet.getExtraPackets().isEmpty())))) {
+@@ -460,7 +_,7 @@
+             final java.util.List<Packet<?>> extraPackets = InnerUtil.buildExtraPackets(packet);
+             final boolean hasExtraPackets = extraPackets != null && !extraPackets.isEmpty();
+             if (!hasExtraPackets) {
+-                this.pendingActions.add(new PacketSendAction(packet, listener, flush));
++                this.pendingActions.add(new PacketSendAction(packet, listener, flush, battleship$broadcast)); // Battleship - shared broadcast frames
+             } else {
+                 final java.util.List<PacketSendAction> actions = new java.util.ArrayList<>(1 + extraPackets.size());
+                 actions.add(new PacketSendAction(packet, null, false)); // Delay the future listener until the end of the extra packets
+@@ -530,33 +_,190 @@
+     }
+     // Paper end - Add netty task scheduling helper
+ 
++    // Battleship start - batch writes to the event loop
++    //
++    private record QueuedWrite(Packet<?> packet, @Nullable ChannelFutureListener listener, boolean flush, long epoch, dev.cosmoworks.battleship.network.SharedFrames.@Nullable Broadcast broadcast) { // Battleship - shared broadcast frames
++    }
++
++    private final class Drain implements Runnable {
++        private final long epoch;
++        private volatile boolean lazy;
++
++        private Drain(final long epoch, final boolean lazy) {
++            this.epoch = epoch;
++            this.lazy = lazy;
++        }
++
++        @Override
++        public void run() {
++            this.lazy = false;
++            for (;;) {
++                Connection.this.battleship$drainUpTo(this.epoch);
++                if (!Connection.this.battleship$drain.compareAndSet(this, null)) {
++                    return;
++                }
++                final QueuedWrite head = Connection.this.battleship$writes.peek();
++                if (head == null || head.epoch() != this.epoch || !Connection.this.battleship$drain.compareAndSet(null, this)) {
++                    return;
++                }
++            }
++        }
++    }
++
++    private static final Runnable WAKE_UP = () -> {};
++    private final ca.spottedleaf.concurrentutil.collection.MultiThreadedQueue<QueuedWrite> battleship$writes = new ca.spottedleaf.concurrentutil.collection.MultiThreadedQueue<>();
++    private final java.util.concurrent.atomic.AtomicReference<Drain> battleship$drain = new java.util.concurrent.atomic.AtomicReference<>();
++    private volatile boolean battleship$batchable;
++    private volatile long battleship$epoch;
++    private long battleship$loopEpoch;
++
++    private void battleship$queueWrite(final Packet<?> packet, final @Nullable ChannelFutureListener listener, final boolean flush, final dev.cosmoworks.battleship.network.SharedFrames.@Nullable Broadcast broadcast) {
++        final long epoch = this.battleship$epoch;
++        this.battleship$writes.add(new QueuedWrite(packet, listener, flush, epoch, broadcast));
++        final io.netty.channel.EventLoop eventLoop = this.channel.eventLoop();
++        final Drain current = this.battleship$drain.get();
++        if (current == null || current.epoch != epoch) {
++            final boolean lazy = !flush && dev.cosmoworks.battleship.BattleshipServerConfig.network().useLazyExecuteWhenNotFlushing
++                && eventLoop instanceof io.netty.util.concurrent.AbstractEventExecutor;
++            final Drain drain = new Drain(epoch, lazy);
++            if (this.battleship$drain.compareAndSet(current, drain)) {
++                if (lazy) {
++                    ((io.netty.util.concurrent.AbstractEventExecutor) eventLoop).lazyExecute(drain);
++                } else {
++                    eventLoop.execute(drain);
++                }
++                return;
++            }
++        }
++        final Drain scheduled = this.battleship$drain.get();
++        if (flush && scheduled != null && scheduled.lazy) {
++            scheduled.lazy = false;
++            eventLoop.execute(WAKE_UP);
++        }
++    }
++
++    private void battleship$drainUpTo(final long epoch) {
++        final boolean flushOnce = dev.cosmoworks.battleship.BattleshipServerConfig.network().flushOncePerBatch; // Battleship - flush once per batch
++        boolean flushNeeded = false;
++        QueuedWrite write;
++        while ((write = this.battleship$writes.peek()) != null && write.epoch() <= epoch) {
++            this.battleship$writes.poll();
++            // Battleship start - flush once per batch
++            if (flushOnce) {
++                this.doSendPacket(write.packet(), write.listener(), false, write.broadcast());
++                flushNeeded |= write.flush();
++                continue;
++            }
++            // Battleship end - flush once per batch
++            this.doSendPacket(write.packet(), write.listener(), write.flush(), write.broadcast());
++        }
++        if (flushNeeded) this.channel.flush(); // Battleship - flush once per batch
++    }
++    // Battleship end - batch writes to the event loop
++
+     private void sendPacket(final Packet<?> packet, final @Nullable ChannelFutureListener listener, final boolean flush) {
++        this.sendPacket(packet, listener, flush, null); // Battleship - shared broadcast frames
++    }
++
++    private void sendPacket(final Packet<?> packet, final @Nullable ChannelFutureListener listener, final boolean flush, final dev.cosmoworks.battleship.network.SharedFrames.@Nullable Broadcast broadcast) { // Battleship - shared broadcast frames
+         this.sentPackets++;
++        (flush ? dev.cosmoworks.battleship.network.NetworkStats.SENT_FLUSH : dev.cosmoworks.battleship.network.NetworkStats.SENT_NO_FLUSH).increment(); // Battleship - network stats
+         if (this.channel.eventLoop().inEventLoop()) {
+-            this.doSendPacket(packet, listener, flush);
++            if (!this.battleship$writes.isEmpty()) this.battleship$drainUpTo(this.battleship$loopEpoch); // Battleship - batch writes to the event loop - keep order
++            this.doSendPacket(packet, listener, flush, broadcast); // Battleship - shared broadcast frames
+         } else {
+-            this.channel.eventLoop().execute(() -> this.doSendPacket(packet, listener, flush));
++            // Battleship start - batch writes to the event loop
++            if (this.battleship$batchable && dev.cosmoworks.battleship.BattleshipServerConfig.network().batchWrites) {
++                this.battleship$queueWrite(packet, listener, flush, broadcast); // Battleship - shared broadcast frames
++                return;
++            }
++            // Battleship end - batch writes to the event loop
++            // Battleship start - lazy execute when not flushing (from ShreddedPaper)
++            if (!flush && dev.cosmoworks.battleship.BattleshipServerConfig.network().useLazyExecuteWhenNotFlushing
++                && this.channel.eventLoop() instanceof io.netty.util.concurrent.AbstractEventExecutor executor) {
++                executor.lazyExecute(() -> this.doSendPacket(packet, listener, flush, broadcast)); // Battleship - shared broadcast frames
++                return;
++            }
++            // Battleship end - lazy execute when not flushing (from ShreddedPaper)
++            this.channel.eventLoop().execute(() -> this.doSendPacket(packet, listener, flush, broadcast)); // Battleship - shared broadcast frames
+         }
+     }
+ 
+-    private void doSendPacket(final Packet<?> packet, final @Nullable ChannelFutureListener listener, final boolean flush) {
++    private void doSendPacket(final Packet<?> packet, final @Nullable ChannelFutureListener listener, final boolean flush, final dev.cosmoworks.battleship.network.SharedFrames.@Nullable Broadcast broadcast) { // Battleship - shared broadcast frames
+         // Paper start - Optimize network
+         final net.minecraft.server.level.ServerPlayer player = this.getPlayer();
+         if (!this.isConnected()) {
+             packet.onPacketDispatchFinish(player, null);
+             return;
+         }
++        dev.cosmoworks.battleship.network.NetworkStats.CURRENT_PACKET.set(packet.getClass()); // Battleship - network stats
++        if (dev.cosmoworks.battleship.network.NetworkStats.enabled()) dev.cosmoworks.battleship.network.NetworkStats.sent(packet.getClass()); // Battleship - network stats
++        // Battleship start - shared chunk frames
++        Object battleship$message = packet;
++        CompressionEncoder battleship$capture = null;
++        net.minecraft.network.protocol.game.ClientboundLevelChunkPacketData battleship$chunkData = null;
++        final boolean battleship$maySkip = (packet instanceof net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket || broadcast != null)
++            && dev.cosmoworks.battleship.network.OutboundOrder.maySkipPluginHandlers(this.channel); // Battleship - write order: never past a handler holding packets
++        if (packet instanceof net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket chunkPacket
++            && battleship$maySkip
++            && dev.cosmoworks.battleship.network.SharedFrames.enabled()
++            && !chunkPacket.chunkData().battleship$isFilteredCopy()
++            && this.channel.pipeline().get(HandlerNames.COMPRESS) instanceof CompressionEncoder encoder) {
++            battleship$chunkData = chunkPacket.chunkData();
++            final dev.cosmoworks.battleship.network.SharedFrames.Frame frame = battleship$chunkData.battleship$frame;
++            if (frame != null && frame.matches(packet, encoder.getThreshold(), encoder.battleship$nativeCompressor())) {
++                battleship$message = new dev.cosmoworks.battleship.network.SharedFrames.Message(frame.body());
++                dev.cosmoworks.battleship.network.NetworkStats.SHARED_FRAMES.increment();
++            } else {
++                battleship$capture = encoder;
++                encoder.battleship$beginCapture();
++            }
++        }
++        // Battleship end - shared chunk frames
++        // Battleship start - shared broadcast frames
++        java.util.Locale battleship$locale = null;
++        if (broadcast != null && battleship$maySkip && battleship$capture == null && battleship$message == packet
++            && this.channel.pipeline().get(HandlerNames.COMPRESS) instanceof CompressionEncoder encoder
++            && this.channel.pipeline().get(HandlerNames.ENCODER) instanceof PacketEncoder<?> packetEncoder && packetEncoder.battleship$isPlay()) {
++            battleship$locale = this.channel.attr(io.papermc.paper.adventure.PaperAdventure.LOCALE_ATTRIBUTE).get();
++            final byte[] body = broadcast.find(encoder.getThreshold(), encoder.battleship$nativeCompressor(), battleship$locale);
++            if (body != null) {
++                battleship$message = new dev.cosmoworks.battleship.network.SharedFrames.Message(body);
++                dev.cosmoworks.battleship.network.NetworkStats.SHARED_FRAMES.increment();
++            } else {
++                battleship$capture = encoder;
++                encoder.battleship$beginCapture();
++            }
++        }
++        // Battleship end - shared broadcast frames
+         try {
+         final ChannelFuture future;
+         // Paper end - Optimize network
++        try { // Battleship - shared chunk frames
+         if (listener != null) {
+-            future = flush ? this.channel.writeAndFlush(packet) : this.channel.write(packet); // Paper - Optimize network
++            future = flush ? this.channel.writeAndFlush(battleship$message) : this.channel.write(battleship$message); // Paper - Optimize network // Battleship - shared chunk frames
+             future.addListener(listener);
+         } else if (flush) {
+-            future = this.channel.writeAndFlush(packet, this.channel.voidPromise()); // Paper - Optimize network
++            future = this.channel.writeAndFlush(battleship$message, this.channel.voidPromise()); // Paper - Optimize network // Battleship - shared chunk frames
+         } else {
+-            future = this.channel.write(packet, this.channel.voidPromise()); // Paper - Optimize network
+-        }
++            future = this.channel.write(battleship$message, this.channel.voidPromise()); // Paper - Optimize network // Battleship - shared chunk frames
++        }
++        // Battleship start - shared chunk frames
++        } finally {
++            dev.cosmoworks.battleship.network.NetworkStats.CURRENT_PACKET.set(null); // Battleship - network stats
++            if (battleship$capture != null) {
++                final byte[] body = battleship$capture.battleship$endCapture();
++                if (body != null) {
++                    dev.cosmoworks.battleship.network.NetworkStats.CAPTURED_FRAMES.increment();
++                    if (battleship$chunkData != null) {
++                        battleship$chunkData.battleship$frame = new dev.cosmoworks.battleship.network.SharedFrames.Frame(packet, battleship$capture.getThreshold(), battleship$capture.battleship$nativeCompressor(), body);
++                    } else if (broadcast != null) { // Battleship - shared broadcast frames
++                        broadcast.store(battleship$capture.getThreshold(), battleship$capture.battleship$nativeCompressor(), battleship$locale, body);
++                    }
++                }
++            }
++        }
++        // Battleship end - shared chunk frames
+ 
+         // Paper start - Optimize network
+         if (packet.hasFinishListener()) {
+@@ -582,6 +_,7 @@
+ 
+     private void flush() {
+         if (this.channel.eventLoop().inEventLoop()) {
++            if (!this.battleship$writes.isEmpty()) this.battleship$drainUpTo(this.battleship$loopEpoch); // Battleship - batch writes to the event loop - keep order
+             this.channel.flush();
+         } else {
+             this.channel.eventLoop().execute(() -> this.channel.flush());
+@@ -743,8 +_,15 @@
+         }
+ 
+         if (this.isConnected()) {
++            // Battleship start - do not block ticking threads on disconnect
++            if (this.channel.eventLoop().inEventLoop()) {
+             this.channel.close().awaitUninterruptibly();
+             this.disconnectionDetails = details;
++            } else {
++                this.disconnectionDetails = details;
++                this.channel.close();
++            }
++            // Battleship end - do not block ticking threads on disconnect
+         }
+         this.becomeActive = true; // Folia - region threading
+     }
+@@ -1102,7 +_,11 @@
+         private final Packet<?> packet;
+ 
+         private PacketSendAction(final Packet<?> packet, @Nullable final ChannelFutureListener channelFutureListener, final boolean flush) {
+-            super(connection -> connection.sendPacket(packet, channelFutureListener, flush));
++            this(packet, channelFutureListener, flush, null); // Battleship - shared broadcast frames
++        }
++
++        private PacketSendAction(final Packet<?> packet, @Nullable final ChannelFutureListener channelFutureListener, final boolean flush, final dev.cosmoworks.battleship.network.SharedFrames.@Nullable Broadcast broadcast) { // Battleship - shared broadcast frames
++            super(connection -> connection.sendPacket(packet, channelFutureListener, flush, broadcast));
+             this.packet = packet;
+         }
+     }

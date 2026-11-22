@@ -1,0 +1,23 @@
+--- a/net/minecraft/world/Container.java
++++ b/net/minecraft/world/Container.java
+@@ -16,7 +_,19 @@
+ import net.minecraft.world.level.block.entity.BlockEntity;
+ import org.jspecify.annotations.Nullable;
+ 
+-public interface Container extends Clearable, Iterable<ItemStack>, SlotProvider {
++public interface Container extends Clearable, Iterable<ItemStack>, SlotProvider, me.samsuik.sakura.tracking.Watchable<Container> { // Battleship - state watchers
++    // Battleship start - state watchers
++    @Override
++    default void watch(final me.samsuik.sakura.tracking.ChangeListener<Container> listener) {}
++
++    @Override
++    default void unwatch(final me.samsuik.sakura.tracking.ChangeListener<Container> listener) {}
++
++    default boolean sakura$isRemoved() {
++        return false;
++    }
++    // Battleship end - state watchers
++
+     float DEFAULT_DISTANCE_BUFFER = 4.0F;
+ 
+     int getContainerSize();

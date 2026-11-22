@@ -1,0 +1,15 @@
+--- a/net/minecraft/world/level/block/HopperBlock.java
++++ b/net/minecraft/world/level/block/HopperBlock.java
+@@ -117,6 +_,12 @@
+     private void checkPoweredState(final Level level, final BlockPos pos, final BlockState state) {
+         boolean shouldBeOn = !level.hasNeighborSignal(pos);
+         if (shouldBeOn != state.getValue(ENABLED)) {
++            // Battleship start - optimise hopper ticking
++            final BlockEntity blockEntity = level.getBlockEntity(pos);
++            if (blockEntity instanceof HopperBlockEntity hopper && level.battleshipConfig().technical.optimiseIdleHopperTicking) {
++                hopper.sakura$setActive(shouldBeOn);
++            }
++            // Battleship end - optimise hopper ticking
+             level.setBlock(pos, state.setValue(ENABLED, shouldBeOn), Block.UPDATE_CLIENTS);
+         }
+     }

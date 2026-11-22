@@ -1,0 +1,26 @@
+--- a/src/main/java/io/canvasmc/canvas/configuration/Token.java
++++ b/src/main/java/io/canvasmc/canvas/configuration/Token.java
+@@ -18,8 +_,13 @@
+ 
+ // note: if parent is null, it is in root
+ public record Token(
+-    @Nullable Token parent, List<Token> children, String name, @Nullable Style style
++    @Nullable Token parent, List<Token> children, String name, @Nullable Style style, boolean freeform
+ ) {
++    // Battleship start - user-keyed maps
++    public Token(final @Nullable Token parent, final List<Token> children, final String name, final @Nullable Style style) {
++        this(parent, children, name, style, false);
++    }
++    // Battleship end - user-keyed maps
+ 
+     // note: this is a linked list ordered by class field order
+     public static List<Token> buildTree(final Class<?> clazz) {
+@@ -84,7 +_,7 @@
+         final Class<?> fieldType = field.getType();
+ 
+         // create the head token first
+-        final Token token = new Token(parent, children, name, definition.commentStyle());
++        final Token token = new Token(parent, children, name, definition.commentStyle(), java.util.Map.class.isAssignableFrom(fieldType)); // Battleship - user-keyed maps
+ 
+         // check if the field type is a nested Part subclass
+         for (final Class<?> nested : insideClass.getDeclaredClasses()) {

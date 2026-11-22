@@ -1,0 +1,20 @@
+--- a/net/minecraft/world/level/block/IceBlock.java
++++ b/net/minecraft/world/level/block/IceBlock.java
+@@ -43,7 +_,7 @@
+     public void afterDestroy(Level level, BlockPos pos, ItemStack destroyedWith) {
+         // Paper end - Improve Block#breakNaturally API
+         if (!EnchantmentHelper.hasTag(destroyedWith, EnchantmentTags.PREVENTS_ICE_MELTING)) {
+-            if (level.environmentAttributes().getValue(EnvironmentAttributes.WATER_EVAPORATES, pos)) {
++            if (!level.battleshipConfig().environment.allowWaterInTheNether && level.environmentAttributes().getValue(EnvironmentAttributes.WATER_EVAPORATES, pos)) {
+                 level.removeBlock(pos, false);
+                 return;
+             }
+@@ -68,7 +_,7 @@
+         if (org.bukkit.craftbukkit.event.CraftEventFactory.callBlockFadeEvent(level, pos, waterEvaporates ? Blocks.AIR.defaultBlockState() : Blocks.WATER.defaultBlockState()).isCancelled()) {
+             return;
+         }
+-        if (waterEvaporates) {
++        if (!level.battleshipConfig().environment.allowWaterInTheNether && waterEvaporates) {
+             // Paper end - call BlockFadeEvent
+             level.removeBlock(pos, false);
+         } else {

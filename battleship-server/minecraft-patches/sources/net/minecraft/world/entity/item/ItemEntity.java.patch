@@ -1,0 +1,12 @@
+--- a/net/minecraft/world/entity/item/ItemEntity.java
++++ b/net/minecraft/world/entity/item/ItemEntity.java
+@@ -373,6 +_,9 @@
+ 
+     @Override
+     public boolean ignoreExplosion(final Explosion explosion) {
++        if (this.level().battleshipConfig().entities.items.blastResistant.ignoresExplosions(this.getItem().getItem())) {
++            return true;
++        }
+         return !explosion.shouldAffectBlocklikeEntities() || super.ignoreExplosion(explosion);
+     }
+ 

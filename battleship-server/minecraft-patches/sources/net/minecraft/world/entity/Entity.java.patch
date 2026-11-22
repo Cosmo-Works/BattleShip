@@ -1,0 +1,796 @@
+--- a/net/minecraft/world/entity/Entity.java
++++ b/net/minecraft/world/entity/Entity.java
+@@ -118,6 +_,7 @@
+ import net.minecraft.world.level.block.SoundType;
+ import net.minecraft.world.level.block.state.BlockState;
+ import net.minecraft.world.level.border.WorldBorder;
++import net.minecraft.world.level.chunk.ChunkAccess;
+ import net.minecraft.world.level.entity.EntityAccess;
+ import net.minecraft.world.level.entity.EntityInLevelCallback;
+ import net.minecraft.world.level.gameevent.DynamicGameEventListener;
+@@ -366,6 +_,10 @@
+     protected static final int FLAG_ONFIRE = 0;
+     private static final int FLAG_SHIFT_KEY_DOWN = 1;
+     private static final int FLAG_SPRINTING = 3;
++    // Battleship start - spawn crowd
++    public static final EntityDataAccessor<Byte> BATTLESHIP_SHARED_FLAGS = DATA_SHARED_FLAGS_ID;
++    public static final byte BATTLESHIP_SPRINTING_FLAG_MASK = 1 << FLAG_SPRINTING;
++    // Battleship end - spawn crowd
+     private static final int FLAG_SWIMMING = 4;
+     public static final int FLAG_INVISIBLE = 5;
+     protected static final int FLAG_GLOWING = 6;
+@@ -445,6 +_,9 @@
+     public long activatedTick = Integer.MIN_VALUE;
+     public boolean isTemporarilyActive;
+     public long activatedImmunityTick = Integer.MIN_VALUE;
++    public boolean activatedPriorityReset = false;
++    public int activatedPriority = 1;
++    public int brainActivationTick;
+ 
+     public void inactiveTick() {
+     }
+@@ -624,6 +_,50 @@
+     }
+     // Folia end - region threading
+ 
++    public boolean pushedByFluid = true; // Battleship - entity pushed by fluid api
++    public boolean cannonEntity = false; // Battleship - cannon entity identity
++    public void sakura$addedToWorld() {} // Battleship - added to world helper method
++    public net.minecraft.world.phys.Vec3 sakura$stuckSpeed() { return this.stuckSpeedMultiplier; } // Battleship - entity state snapshot
++    public net.minecraft.world.phys.Vec3 sakura$position() { return this.position; } // Battleship - cannon entity merge
++    public net.minecraft.world.phys.Vec3 sakura$deltaMovement() { return this.deltaMovement; } // Battleship - cannon entity merge
++    public void sakura$notifyMoved() { this.levelCallback.onMove(); } // Battleship - cannon entity merge
++    // Battleship start - configure server mechanics
++    protected me.samsuik.sakura.mechanics.MinecraftMechanicsTarget mechanicsTarget = me.samsuik.sakura.mechanics.MinecraftMechanicsTarget.latest();
++
++    public final me.samsuik.sakura.mechanics.MinecraftMechanicsTarget mechanicsTarget() {
++        return this.mechanicsTarget;
++    }
++    // Battleship end - configure server mechanics
++    // Battleship start - cannon movement across chunks and regions
++    protected boolean loadChunks = false;
++
++    private int extraCollisionFlags() {
++        return this.chunkLoadCollisionFlags() | this.fullBlockCollisionFlags();
++    }
++
++    private int chunkLoadCollisionFlags() {
++        if (!this.loadChunks) {
++            return 0;
++        }
++        return ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.COLLISION_FLAG_LOAD_CHUNKS
++            | ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.COLLISION_FLAG_ADD_TICKET;
++    }
++
++    private int fullBlockCollisionFlags() {
++        if (!this.cannonEntity || !this.level.battleshipConfig().cannons.collideWithNonFullBlocks) {
++            return 0;
++        }
++        if (this.getDeltaMovement().horizontalDistanceSqr() <= 64.0 * 64.0) {
++            return 0;
++        }
++        return ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.COLLISION_FLAG_FULL_BLOCKS;
++    }
++
++    public boolean canCrossRegions() {
++        return this.cannonEntity && this.level.battleshipConfig().cannons.crossRegions;
++    }
++    // Battleship end - cannon movement across chunks and regions
++
+     public Entity(final EntityType<?> type, final Level level) {
+         this.type = type;
+         this.level = level;
+@@ -635,6 +_,7 @@
+         // Paper start - EAR 2
+         if (level != null) {
+             this.defaultActivationState = io.papermc.paper.entity.activation.ActivationRange.initializeEntityActivationState(this, level.spigotConfig);
++            this.mechanicsTarget = level.mechanicsTarget(); // Battleship - configure server mechanics
+         } else {
+             this.defaultActivationState = false;
+         }
+@@ -762,10 +_,21 @@
+     }
+ 
+     // CraftBukkit start
++    // Battleship start - entity packets only to its trackers
++    public boolean battleship$isTrackedBy(final ServerPlayer player) {
++        if (player == this) {
++            return true;
++        }
++        final net.minecraft.server.level.ChunkMap.TrackedEntity tracker = this.moonrise$getTrackedEntity();
++        return tracker != null && player.connection != null && tracker.seenBy.contains(player.connection);
++    }
++    // Battleship end - entity packets only to its trackers
++
+     public void refreshEntityData(ServerPlayer to) {
+         List<SynchedEntityData.DataValue<?>> values = this.entityData.packAll(); // Paper - Update EVERYTHING not just not default
++        if (to != this) values = dev.cosmoworks.battleship.spawn.BattleshipSpawnCrowd.dataForOthers(this, values); // Battleship - spawn crowd
+ 
+-        if (to.getBukkitEntity().canSee(this.getBukkitEntity())) { // Paper
++        if (to.getBukkitEntity().canSee(this.getBukkitEntity()) && this.battleship$isTrackedBy(to)) { // Paper // Battleship - entity packets only to its trackers
+             to.connection.send(new net.minecraft.network.protocol.game.ClientboundSetEntityDataPacket(this.getId(), values));
+         }
+     }
+@@ -774,7 +_,7 @@
+     // This method should only be used if the data of an entity could have become desynced
+     // due to interactions on the client.
+     public void resendPossiblyDesyncedEntityData(ServerPlayer player) {
+-        if (player.getBukkitEntity().canSee(this.getBukkitEntity())) {
++        if (player.getBukkitEntity().canSee(this.getBukkitEntity()) && this.battleship$isTrackedBy(player)) { // Battleship - entity packets only to its trackers (a spawn sent to a non-tracker is never removed)
+             ServerLevel level = (ServerLevel) this.level();
+             net.minecraft.server.level.ChunkMap.TrackedEntity tracker = this.moonrise$getTrackedEntity(); // Folia - region threading
+             if (tracker == null) {
+@@ -784,12 +_,13 @@
+             final List<Packet<? super ClientGamePacketListener>> list = new ArrayList<>();
+             serverEntity.sendPairingData(player, list::add);
+             player.connection.send(new net.minecraft.network.protocol.game.ClientboundBundlePacket(list));
++            serverEntity.battleship$syncEquipmentAfterPairing(); // Battleship - entity packets only after the spawn
+         }
+     }
+ 
+     // This method allows you to specifically resend certain data accessors to the client
+     public void resendPossiblyDesyncedDataValues(List<EntityDataAccessor<?>> accessors, ServerPlayer to) {
+-        if (!to.getBukkitEntity().canSee(this.getBukkitEntity())) {
++        if (!to.getBukkitEntity().canSee(this.getBukkitEntity()) || !this.battleship$isTrackedBy(to)) { // Battleship - entity packets only to its trackers
+             return;
+         }
+ 
+@@ -1194,11 +_,76 @@
+         return this.mainSupportingBlockPos.isPresent() && this.mainSupportingBlockPos.get().equals(pos);
+     }
+ 
++    // Battleship start - cache the supporting block check
++    private @Nullable AABB battleship$supportBox;
++    private long battleship$supportChunkVersion;
++    private @Nullable Object battleship$supportChunk;
++    private boolean battleship$supportDescending;
++    private @Nullable ItemStack battleship$supportMainHand;
++    private long battleship$supportMainHandVersion;
++    private @Nullable ItemStack battleship$supportFeet;
++    private long battleship$supportFeetVersion;
++    private double battleship$supportFallDistance;
++    private Optional<BlockPos> battleship$supportResult = Optional.empty();
++
++    private boolean battleship$supportCached(final AABB box, final net.minecraft.world.level.chunk.@Nullable ChunkAccess chunk) {
++        if (chunk == null || this.battleship$supportBox == null || !this.battleship$supportBox.equals(box) || this.battleship$supportChunk != chunk
++            || this.battleship$supportChunkVersion != chunk.battleship$packetVersion() || this.battleship$supportDescending != this.isDescending()
++            || this.battleship$supportFallDistance != this.fallDistance || !(this instanceof LivingEntity living)) {
++            return false;
++        }
++        final ItemStack mainHand = living.getMainHandItem();
++        final ItemStack feet = living.getItemBySlot(EquipmentSlot.FEET);
++        return mainHand == this.battleship$supportMainHand && mainHand.battleship$version() == this.battleship$supportMainHandVersion
++            && feet == this.battleship$supportFeet && feet.battleship$version() == this.battleship$supportFeetVersion;
++    }
++
++    private void battleship$rememberSupport(final AABB box, final net.minecraft.world.level.chunk.@Nullable ChunkAccess chunk, final Optional<BlockPos> result) {
++        if (chunk == null || !(this instanceof LivingEntity living)) {
++            this.battleship$supportBox = null;
++            return;
++        }
++        this.battleship$supportBox = box;
++        this.battleship$supportChunk = chunk;
++        this.battleship$supportChunkVersion = chunk.battleship$packetVersion();
++        this.battleship$supportDescending = this.isDescending();
++        this.battleship$supportFallDistance = this.fallDistance;
++        this.battleship$supportMainHand = living.getMainHandItem();
++        this.battleship$supportMainHandVersion = this.battleship$supportMainHand.battleship$version();
++        this.battleship$supportFeet = living.getItemBySlot(EquipmentSlot.FEET);
++        this.battleship$supportFeetVersion = this.battleship$supportFeet.battleship$version();
++        this.battleship$supportResult = result;
++    }
++
++    private net.minecraft.world.level.chunk.@Nullable ChunkAccess battleship$supportChunk(final AABB testArea) {
++        if (!(this instanceof net.minecraft.server.level.ServerPlayer) || !dev.cosmoworks.battleship.BattleshipServerConfig.movement().cacheSupportingBlock) {
++            return null;
++        }
++        final int minChunkX = Mth.floor(testArea.minX - 1.0) >> 4;
++        final int maxChunkX = Mth.floor(testArea.maxX + 1.0) >> 4;
++        final int minChunkZ = Mth.floor(testArea.minZ - 1.0) >> 4;
++        final int maxChunkZ = Mth.floor(testArea.maxZ + 1.0) >> 4;
++        if (minChunkX != maxChunkX || minChunkZ != maxChunkZ) {
++            return null;
++        }
++        return this.level.getChunkIfLoadedImmediately(minChunkX, minChunkZ);
++    }
++    // Battleship end - cache the supporting block check
++
+     protected void checkSupportingBlock(final boolean onGround, final @Nullable Vec3 movement) {
+-        if (onGround) {
++        if (onGround && this.mechanicsTarget.atLeast(me.samsuik.sakura.mechanics.MechanicVersion.v1_20)) { // Battleship - configure server mechanics
+             AABB boundingBox = this.getBoundingBox();
+             AABB testArea = new AABB(boundingBox.minX, boundingBox.minY - 1.0E-6, boundingBox.minZ, boundingBox.maxX, boundingBox.minY, boundingBox.maxZ);
+-            Optional<BlockPos> supportingBlock = this.level.findSupportingBlock(this, testArea);
++            // Battleship start - cache the supporting block check
++            final net.minecraft.world.level.chunk.ChunkAccess supportChunk = this.battleship$supportChunk(testArea);
++            Optional<BlockPos> supportingBlock;
++            if (this.battleship$supportCached(testArea, supportChunk)) {
++                supportingBlock = this.battleship$supportResult;
++            } else {
++                supportingBlock = this.level.findSupportingBlock(this, testArea);
++                this.battleship$rememberSupport(testArea, supportChunk, supportingBlock);
++            }
++            // Battleship end - cache the supporting block check
+             if (supportingBlock.isPresent() || this.onGroundNoBlocks) {
+                 this.mainSupportingBlockPos = supportingBlock;
+             } else if (movement != null) {
+@@ -1229,6 +_,28 @@
+ 
+         final Vec3 originalMovement = delta; // Paper - Expose pre-collision velocity
+         ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread("Cannot move an entity off-main");
++        // Battleship start - skip zero player moves (idea from Gale/VMP, MIT; made exact)
++        if (moverType == MoverType.PLAYER && delta.x == 0.0 && delta.y == 0.0 && delta.z == 0.0
++            && this instanceof net.minecraft.server.level.ServerPlayer && !this.noPhysics
++            && this.stuckSpeedMultiplier.lengthSqr() <= 1.0E-7
++            && this.getDeltaMovement().equals(Vec3.ZERO)
++            && this.moveDist <= this.nextStep
++            && !this.isLocalInstanceAuthoritative()
++            && this.mechanicsTarget.atLeast(me.samsuik.sakura.mechanics.MechanicVersion.v26_2)
++            && dev.cosmoworks.battleship.BattleshipServerConfig.movement().skipZeroPlayerMoves) {
++            final Vec3 pos = this.position();
++            final Vec3 newPosition = pos.add(delta);
++            this.addMovementThisTick(new Entity.Movement(pos, newPosition, delta));
++            this.setPos(newPosition);
++            this.recordMovement(moverType, delta);
++            this.horizontalCollision = false;
++            this.minorHorizontalCollision = false;
++            if (!this.isRemoved()) {
++                this.setDeltaMovement(new Vec3(0.0, 0.0, 0.0));
++            }
++            return;
++        }
++        // Battleship end - skip zero player moves
+         if (this.noPhysics) {
+             // Canvas start - region threading
+             Vec3 pos = this.position();
+@@ -1248,7 +_,10 @@
+             this.verticalCollisionBelow = false;
+             this.minorHorizontalCollision = false;
+         } else {
+-            if (moverType == MoverType.PISTON) {
++            // Battleship start - configure server mechanics
++            final me.samsuik.sakura.mechanics.MinecraftMechanicsTarget mechanicsTarget = this.mechanicsTarget;
++            if (moverType == MoverType.PISTON && mechanicsTarget.atLeast(me.samsuik.sakura.mechanics.MechanicVersion.v1_11)) {
++                // Battleship end - configure server mechanics
+                 delta = this.limitPistonMovement(delta);
+                 // Paper start - EAR 2
+                 this.activatedTick = Math.max(this.activatedTick, io.papermc.paper.threadedregions.RegionizedServer.getCurrentTick() + 20); // Folia - region threading
+@@ -1260,7 +_,7 @@
+             }
+ 
+             if (this.stuckSpeedMultiplier.lengthSqr() > 1.0E-7) {
+-                if (moverType != MoverType.PISTON) {
++                if (moverType != MoverType.PISTON || mechanicsTarget.before(me.samsuik.sakura.mechanics.MechanicVersion.v1_21_10)) { // Battleship - configure server mechanics
+                     delta = delta.multiply(this.stuckSpeedMultiplier);
+                 }
+ 
+@@ -1277,6 +_,7 @@
+             delta = this.maybeBackOffFromEdge(delta, moverType);
+             // Canvas start - region threading
+             if (
++                !this.canCrossRegions() && // Battleship - cannon region transfer
+                 io.canvasmc.canvas.GlobalConfiguration.getInstance().regionScheduler.preventExcessiveVelocityMoveOutOfRegion &&
+                 delta.lengthSqr() >= (30.0D * 30.0D) &&
+                 !ca.spottedleaf.moonrise.common.util.TickThread.isTickThreadFor(level(), position(), delta, 16)
+@@ -1288,34 +_,46 @@
+             // Canvas end - region threading
+             Vec3 movement = this.collide(delta);
+             double movementLength = movement.lengthSqr();
+-            if (movementLength > 1.0E-7 || delta.lengthSqr() - movementLength < 1.0E-7) {
+-                if (this.fallDistance != 0.0 && movementLength >= 1.0) {
+-                    double checkDistance = Math.min(movement.length(), 8.0);
+-                    Vec3 checkTo = this.position().add(movement.normalize().scale(checkDistance));
+-                    BlockHitResult hitResult = this.level()
+-                        .clip(new ClipContext(this.position(), checkTo, ClipContext.Block.FALLDAMAGE_RESETTING, ClipContext.Fluid.WATER, this));
+-                    if (hitResult.getType() != HitResult.Type.MISS) {
+-                        this.resetFallDistance();
+-                    }
+-                }
+-
++            // Battleship start - configure server mechanics
++            if (me.samsuik.sakura.mechanics.EntityBehaviour.canMoveEntity(movementLength, movement, mechanicsTarget)) {
+                 Vec3 pos = this.position();
+                 Vec3 newPosition = pos.add(movement);
+                 // Canvas start - region threading
+-                // This is after collide(movement) so we evaluate resolved displacement, not raw input.
+-                // Moonrise collision lookups treat out-of-region/unloaded chunks as blocking, so this point avoids
+-                // applying a large cross-region setPos while preserving normal collision resolution first.
+-                if (movement.lengthSqr() >= (30.0D * 30.0D)
+-                    && !Double.isNaN(newPosition.x) && !Double.isNaN(newPosition.y) && !Double.isNaN(newPosition.z)
+-                    && !this.isVehicle()
+-                    && !this.isPassenger()
+-                    && !ca.spottedleaf.moonrise.common.util.TickThread.isTickThreadFor(this.level(), pos, movement, 0)) {
++                if (this.leavesThisRegion(pos, movement, newPosition)) {
++                    this.unmergeForRegionTransfer(); // Battleship - cannon region transfer
+                     throw new io.canvasmc.canvas.threadedregions.world.entities.EntityMoveOutOfRegionException(this, moverType, movement);
+                 }
+                 // Canvas end - region threading
+-                this.addMovementThisTick(new Entity.Movement(pos, newPosition, delta));
+-                this.setPos(newPosition);
++                if (this.fallDistance != 0.0 && movementLength >= 1.0 && mechanicsTarget.atLeast(me.samsuik.sakura.mechanics.MechanicVersion.v1_18_2)) {
++                    final Vec3 checkTo;
++                    if (mechanicsTarget.atLeast(me.samsuik.sakura.mechanics.MechanicVersion.v1_21_9)) {
++                        final double movementDist = Math.sqrt(movementLength);
++                        final double checkDistance = Math.min(movementDist, 8.0);
++                        final double checkX = (movement.x() / movementDist) * checkDistance;
++                        final double checkY = (movement.y() / movementDist) * checkDistance;
++                        final double checkZ = (movement.z() / movementDist) * checkDistance;
++
++                        checkTo = this.position().add(checkX, checkY, checkZ);
++                    } else {
++                        checkTo = this.position().add(movement);
++                    }
++                    // Battleship end - configure server mechanics
++                    BlockHitResult hitResult = this.level()
++                        .clip(new ClipContext(this.position(), checkTo, ClipContext.Block.FALLDAMAGE_RESETTING, ClipContext.Fluid.WATER, this));
++                    if (hitResult.getType() != HitResult.Type.MISS) {
++                        this.resetFallDistance();
++                    }
++                }
++
++                // Battleship start - configure server mechanics
++                if (mechanicsTarget.before(me.samsuik.sakura.mechanics.MechanicVersion.v1_21_6)) {
++                    me.samsuik.sakura.mechanics.EntityBehaviour.changeEntityPosition(this, pos, movement, mechanicsTarget);
++                } else {
++                    this.addMovementThisTick(new Entity.Movement(pos, newPosition, delta));
++                    this.setPos(newPosition);
++                }
+                 this.recordMovement(moverType, movement);
++                // Battleship end - configure server mechanics
+             }
+ 
+             boolean xCollision = !Mth.equal(delta.x, movement.x);
+@@ -1342,9 +_,17 @@
+ 
+             if (this.isRemoved()) {
+             } else {
+-                if (this.canSimulateMovement() && (movedVertically && this.verticalCollision || this.horizontalCollision)) {
+-                    this.restituteMovementAfterCollisions(effectState, xCollision, zCollision, movement);
++                // Battleship start - configure server mechanics
++                if (mechanicsTarget.atLeast(me.samsuik.sakura.mechanics.MechanicVersion.v26_2)) {
++                    if (this.canSimulateMovement() && (movedVertically && this.verticalCollision || this.horizontalCollision)) {
++                        this.restituteMovementAfterCollisions(effectState, xCollision, zCollision, movement);
++                    }
++                } else {
++                    me.samsuik.sakura.mechanics.EntityBehaviour.handleCollisions(
++                        this, effectState, xCollision, zCollision, delta, movement, mechanicsTarget
++                    );
+                 }
++                // Battleship end - configure server mechanics
+                 // CraftBukkit start
+                 if (this.horizontalCollision && this.getBukkitEntity() instanceof org.bukkit.entity.Vehicle) {
+                     org.bukkit.entity.Vehicle vehicle = (org.bukkit.entity.Vehicle) this.getBukkitEntity();
+@@ -1386,6 +_,25 @@
+         }
+     }
+ 
++    private boolean leavesThisRegion(final Vec3 pos, final Vec3 movement, final Vec3 newPosition) {
++        if (Double.isNaN(newPosition.x) || Double.isNaN(newPosition.y) || Double.isNaN(newPosition.z)) {
++            return false;
++        }
++        if (this.isVehicle() || this.isPassenger()) {
++            return false;
++        }
++        if (ca.spottedleaf.moonrise.common.util.TickThread.isTickThreadFor(this.level(), pos, movement, 0)) {
++            return false;
++        }
++        return this.canCrossRegions() || movement.lengthSqr() >= 30.0 * 30.0;
++    }
++
++    private void unmergeForRegionTransfer() {
++        if (this instanceof final me.samsuik.sakura.entity.SakuraEntity sakuraEntity) {
++            sakuraEntity.getSakuraEntityController().unmergeAll();
++        }
++    }
++
+     private void restituteMovementAfterCollisions(final BlockState effectState, final boolean xCollision, final boolean zCollision, final Vec3 movement) {
+         double restitution = this.isSuppressingBounce() ? 0.0 : this.getEntityBounciness();
+         Vec3 currentMovement = this.getDeltaMovement();
+@@ -1494,7 +_,7 @@
+         this.finalMovementsThisTick.clear();
+         this.finalMovementsThisTick.addAll(this.movementThisTick);
+         this.movementThisTick.clear();
+-        if (this.finalMovementsThisTick.isEmpty()) {
++        if (this.finalMovementsThisTick.isEmpty() || this.mechanicsTarget.before(me.samsuik.sakura.mechanics.MechanicVersion.v1_21_5)) { // Battleship - configure server mechanics
+             this.finalMovementsThisTick.add(new Entity.Movement(this.oldPosition(), this.position()));
+         } else if (this.finalMovementsThisTick.getLast().to.distanceToSqr(this.position()) > 9.9999994E-11F) {
+             this.finalMovementsThisTick.add(new Entity.Movement(this.finalMovementsThisTick.getLast().to, this.position()));
+@@ -1507,7 +_,7 @@
+         this.applyEffectsFromBlocks(this.finalMovementsThisTick);
+     }
+ 
+-    private void addMovementThisTick(final Entity.Movement movement) {
++    public void addMovementThisTick(final Entity.Movement movement) {
+         if (this.movementThisTick.size() >= 100) {
+             Entity.Movement first = this.movementThisTick.removeFirst();
+             Entity.Movement second = this.movementThisTick.removeFirst();
+@@ -1728,7 +_,153 @@
+         return colliders.isEmpty() ? maxDistance : -Shapes.collide(Direction.Axis.Y, aabb, colliders, -maxDistance);
+     }
+ 
+-    private Vec3 collide(final Vec3 movement) {
++    // Battleship start - optimise cannon entity movement
++    protected final Vec3 sakura$collide(final Vec3 movement) {
++        if (movement.x == 0.0 && movement.y == 0.0 && movement.z == 0.0) {
++            return movement;
++        }
++
++        final List<VoxelShape> collisionsVoxel = new ObjectArrayList<>(0);
++        final List<AABB> collisionsBB = new ObjectArrayList<>(4);
++        final AABB currentBox = this.getBoundingBox();
++
++        if (movement.lengthSqr() >= 12.0) {
++            return this.collideAxisScan(movement, currentBox, collisionsVoxel, collisionsBB);
++        } else {
++            return this.collideCube(movement, currentBox, collisionsVoxel, collisionsBB);
++        }
++    }
++
++    private Vec3 collideCube(
++        final Vec3 movement,
++        final AABB currentBox,
++        final List<VoxelShape> collisionsVoxel,
++        final List<AABB> collisionsBB
++    ) {
++        final AABB bb;
++        if (movement.x() == 0.0 && movement.z() == 0.0) {
++            if (movement.y > 0.0) {
++                bb = ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.cutUpwards(currentBox, movement.y);
++            } else {
++                bb = ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.cutDownwards(currentBox, movement.y);
++            }
++        } else {
++            bb = currentBox.expandTowards(movement.x, movement.y, movement.z);
++        }
++
++        this.collectCollisions(bb, collisionsVoxel, collisionsBB, ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.COLLISION_FLAG_CHECK_BORDER);
++        return ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.performCollisions(movement, currentBox, collisionsVoxel, collisionsBB, this.mechanicsTarget);
++    }
++
++    private Vec3 collideAxisScan(
++        final Vec3 movement,
++        AABB currentBox,
++        final List<VoxelShape> collisionsVoxel,
++        final List<AABB> collisionsBB
++    ) {
++        double x = movement.x;
++        double y = movement.y;
++        double z = movement.z;
++
++        final boolean xSmaller = me.samsuik.sakura.mechanics.EntityBehaviour.prioritiseXFirst(x, z, this.mechanicsTarget);
++        if (y != 0.0) {
++            y = this.scanY(currentBox, y, collisionsVoxel, collisionsBB);
++            if (y != 0.0) {
++                currentBox = ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.offsetY(currentBox, y);
++            }
++        }
++
++        if (xSmaller && z != 0.0) {
++            me.samsuik.sakura.entity.CannonMovementLimits.limitAdjustMovement(this, currentBox, z, false, collisionsVoxel);
++            z = this.scanZ(currentBox, z, collisionsVoxel, collisionsBB);
++            if (z != 0.0) {
++                currentBox = ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.offsetZ(currentBox, z);
++            }
++        }
++
++        if (x != 0.0) {
++            if (!xSmaller) {
++                me.samsuik.sakura.entity.CannonMovementLimits.limitAdjustMovement(this, currentBox, x, true, collisionsVoxel);
++            }
++            x = this.scanX(currentBox, x, collisionsVoxel, collisionsBB);
++            if (x != 0.0) {
++                currentBox = ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.offsetX(currentBox, x);
++            }
++        }
++
++        if (!xSmaller && z != 0.0) {
++            z = this.scanZ(currentBox, z, collisionsVoxel, collisionsBB);
++        }
++
++        return new Vec3(x, y, z);
++    }
++
++    private void collectCollisions(
++        final AABB collisionBox,
++        final List<VoxelShape> collisionsVoxel,
++        final List<AABB> collisionsBB,
++        final int collisionFlags
++    ) {
++        ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.getCollisionsForBlocksOrWorldBorder(
++            this.level,
++            this,
++            collisionBox,
++            collisionsVoxel,
++            collisionsBB,
++            collisionFlags | this.extraCollisionFlags(),
++            null
++        );
++
++        ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.getEntityHardCollisions(this.level, this, collisionBox, collisionsBB, 0, null);
++    }
++
++    private double scanX(final AABB currentBox, double x, final List<VoxelShape> collisionsVoxel, final List<AABB> collisionsBB) {
++        final AABB collisionBox = cutBoundingBoxX(currentBox, x);
++        this.collectCollisions(collisionBox, collisionsVoxel, collisionsBB, ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.COLLISION_FLAG_CHECK_BORDER);
++        x = ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.performAABBCollisionsX(currentBox, x, collisionsBB);
++        return ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.performVoxelCollisionsX(currentBox, x, collisionsVoxel);
++    }
++
++    private double scanY(final AABB currentBox, double y, final List<VoxelShape> collisionsVoxel, final List<AABB> collisionsBB) {
++        final AABB collisionBox = cutBoundingBoxY(currentBox, y);
++        this.collectCollisions(collisionBox, collisionsVoxel, collisionsBB, 0);
++        y = ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.performAABBCollisionsY(currentBox, y, collisionsBB);
++        return ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.performVoxelCollisionsY(currentBox, y, collisionsVoxel);
++    }
++
++    private double scanZ(final AABB currentBox, double z, final List<VoxelShape> collisionsVoxel, final List<AABB> collisionsBB) {
++        final AABB collisionBox = cutBoundingBoxZ(currentBox, z);
++        this.collectCollisions(collisionBox, collisionsVoxel, collisionsBB, ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.COLLISION_FLAG_CHECK_BORDER);
++        z = ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.performAABBCollisionsZ(currentBox, z, collisionsBB);
++        return ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.performVoxelCollisionsZ(currentBox, z, collisionsVoxel);
++    }
++
++    private static AABB cutBoundingBoxX(final AABB currentBox, final double x) {
++        if (x > 0.0) {
++            return ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.cutRight(currentBox, x);
++        } else {
++            return ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.cutLeft(currentBox, x);
++        }
++    }
++
++    private static AABB cutBoundingBoxY(final AABB currentBox, final double y) {
++        if (y > 0.0) {
++            return ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.cutUpwards(currentBox, y);
++        } else {
++            return ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.cutDownwards(currentBox, y);
++        }
++    }
++
++    private static AABB cutBoundingBoxZ(final AABB currentBox, final double z) {
++        if (z > 0.0) {
++            return ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.cutForwards(currentBox, z);
++        } else {
++            return ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.cutBackwards(currentBox, z);
++        }
++    }
++    // Battleship end - optimise cannon entity movement
++
++    protected Vec3 collide(final Vec3 movement) {
+         // Paper start - optimise collisions
+         final boolean xZero = movement.x == 0.0;
+         final boolean yZero = movement.y == 0.0;
+@@ -1764,10 +_,10 @@
+ 
+         ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.getCollisionsForBlocksOrWorldBorder(
+             this.level, (Entity)(Object)this, initialCollisionBox, potentialCollisionsVoxel, potentialCollisionsBB,
+-            ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.COLLISION_FLAG_CHECK_BORDER, null
++            ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.COLLISION_FLAG_CHECK_BORDER | this.extraCollisionFlags(), null
+         );
+         potentialCollisionsBB.addAll(entityAABBs);
+-        final Vec3 collided = ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.performCollisions(movement, currentBox, potentialCollisionsVoxel, potentialCollisionsBB);
++        final Vec3 collided = ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.performCollisions(movement, currentBox, potentialCollisionsVoxel, potentialCollisionsBB, this.mechanicsTarget); // Battleship - configure server mechanics
+ 
+         final boolean collidedX = collided.x != movement.x;
+         final boolean collidedY = collided.y != movement.y;
+@@ -1796,7 +_,7 @@
+         );
+ 
+         for (final float step : calculateStepHeights(collidedYBox, stepVoxels, stepAABBs, (float)stepHeight, (float)collided.y)) {
+-            final Vec3 stepResult = ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.performCollisions(new Vec3(movement.x, (double)step, movement.z), collidedYBox, stepVoxels, stepAABBs);
++            final Vec3 stepResult = ca.spottedleaf.moonrise.patches.collisions.CollisionUtil.performCollisions(new Vec3(movement.x, (double)step, movement.z), collidedYBox, stepVoxels, stepAABBs, this.mechanicsTarget);
+             if (stepResult.horizontalDistanceSqr() > collided.horizontalDistanceSqr()) {
+                 return stepResult.add(0.0, collidedYBox.minY - currentBox.minY, 0.0);
+             }
+@@ -1915,26 +_,38 @@
+     private void checkInsideBlocks(final List<Entity.Movement> movements, final InsideBlockEffectApplier.StepBasedCollector effectCollector) {
+         if (this.isAffectedByBlocks()) {
+             LongSet visitedBlocks = this.visitedBlocks;
++            final me.samsuik.sakura.mechanics.MinecraftMechanicsTarget mechanicsTarget = this.mechanicsTarget; // Battleship - configure server mechanics
++            final ChunkAccess[] chunkCache = new ChunkAccess[4]; // Battleship - optimise check inside blocks
+ 
+             for (Entity.Movement movement : movements) {
+                 Vec3 pos = movement.from;
+                 Vec3 delta = movement.to().subtract(movement.from());
+                 int maxMovementIterations = 16;
+-                if (movement.axisDependentOriginalMovement().isPresent() && delta.lengthSqr() > 0.0) {
+-                    for (Direction.Axis axis : Direction.axisStepOrder(movement.axisDependentOriginalMovement().get())) {
++                // Battleship start - configure server mechanics
++                final java.util.Optional<Vec3> axisDependentMovement = movement.axisDependentOriginalMovement();
++                if (axisDependentMovement.isPresent() && delta.lengthSqr() > 0.0 && mechanicsTarget.atLeast(me.samsuik.sakura.mechanics.MechanicVersion.v1_21_5)) {
++                    final Vec3 stepOrderVec = mechanicsTarget.atLeast(me.samsuik.sakura.mechanics.MechanicVersion.v1_21_9)
++                        ? axisDependentMovement.get()
++                        : delta;
++
++                    for (Direction.Axis axis : Direction.axisStepOrder(stepOrderVec)) {
+                         double axisMove = delta.get(axis);
+                         if (axisMove != 0.0) {
+                             Vec3 to = pos.relative(axis.getPositive(), axisMove);
+-                            maxMovementIterations -= this.checkInsideBlocks(pos, to, effectCollector, visitedBlocks, maxMovementIterations);
++                            final int stepsTaken = this.checkInsideBlocks(pos, to, effectCollector, visitedBlocks, maxMovementIterations, chunkCache);
++                            if (mechanicsTarget.atLeast(me.samsuik.sakura.mechanics.MechanicVersion.v1_21_9)) {
++                                maxMovementIterations -= stepsTaken;
++                            }
+                             pos = to;
+                         }
+                     }
+-                } else {
+-                    maxMovementIterations -= this.checkInsideBlocks(movement.from(), movement.to(), effectCollector, visitedBlocks, 16);
++                } else if (mechanicsTarget.atLeast(me.samsuik.sakura.mechanics.MechanicVersion.v1_21_2)) {
++                    maxMovementIterations -= this.checkInsideBlocks(movement.from(), movement.to(), effectCollector, visitedBlocks, 16, chunkCache);
+                 }
+ 
+-                if (maxMovementIterations <= 0) {
+-                    this.checkInsideBlocks(movement.to(), movement.to(), effectCollector, visitedBlocks, 1);
++                if (maxMovementIterations <= 0 || mechanicsTarget.before(me.samsuik.sakura.mechanics.MechanicVersion.v1_21_2)) {
++                    // Battleship end - configure server mechanics
++                    this.checkInsideBlocks(movement.to(), movement.to(), effectCollector, visitedBlocks, 1, chunkCache);
+                 }
+             }
+ 
+@@ -1947,22 +_,31 @@
+         final Vec3 to,
+         final InsideBlockEffectApplier.StepBasedCollector effectCollector,
+         final LongSet visitedBlocks,
+-        final int maxMovementIterations
++        final int maxMovementIterations,
++        final ChunkAccess[] chunkCache
+     ) {
+-        AABB deflatedBoundingBoxAtTarget = this.makeBoundingBox(to).deflate(1.0E-5F);
+-        boolean movedFar = from.distanceToSqr(to) > Mth.square(0.9999900000002526);
++        // Battleship start - configure server mechanics
++        final me.samsuik.sakura.mechanics.MinecraftMechanicsTarget mechanicsTarget = this.mechanicsTarget;
++        final double margin;
++        if (mechanicsTarget.atLeast(me.samsuik.sakura.mechanics.MechanicVersion.v1_21_2)) {
++            margin = 1.0e-5f;
++        } else if (mechanicsTarget.atLeast(me.samsuik.sakura.mechanics.MechanicVersion.v1_19_3)) {
++            margin = 1.0e-7f;
++        } else {
++            margin = 0.001;
++        }
++        AABB deflatedBoundingBoxAtTarget = this.makeBoundingBox(to).deflate(margin);
++        boolean movedFar = mechanicsTarget.before(me.samsuik.sakura.mechanics.MechanicVersion.v1_21_10)
++            || from.distanceToSqr(to) > Mth.square(0.9999900000002526);
++        // Battleship end - configure server mechanics
+         boolean debugEntityBlockIntersections = this.level instanceof ServerLevel serverLevel
+             && serverLevel.getServer().debugSubscribers().hasAnySubscriberFor(DebugSubscriptions.ENTITY_BLOCK_INTERSECTIONS);
+         AtomicInteger iterations = new AtomicInteger();
+-        // Canvas start - optimize checkInsideBlocks
+-        // use element array for lambdas
+-        final net.minecraft.world.level.chunk.ChunkAccess[] cachedChunk = new  net.minecraft.world.level.chunk.ChunkAccess[] { null };
+-        final long[] lastChunkPos = { Long.MIN_VALUE };
+-        // Canvas end - optimize checkInsideBlocks
+         BlockGetter.forEachBlockIntersectedBetween(
+             from,
+             to,
+             deflatedBoundingBoxAtTarget,
++            mechanicsTarget, // Battleship - configure server mechanics
+             (blockIntersection, iteration) -> {
+                 if (!this.isAlive()) {
+                     return false;
+@@ -1972,25 +_,12 @@
+                     return false;
+                 }
+ 
+-                // Canvas start - optimize checkInsideBlocks
+-                // remove thread check here, as if the chunk is loaded, and we are NEXT TO IT, then it
+-                // should always be inside the current region
+                 iterations.set(iteration);
+-                final int chunkX = blockIntersection.getX() >> 4;
+-                final int chunkZ = blockIntersection.getZ() >> 4;
+-                final long chunkLongPos = ((long) chunkZ << 32) | (chunkX & 0xFFFFFFFFL);
+-                if (lastChunkPos[0] != chunkLongPos) {
+-                    // update cache, this is a different chunk than previous
+-                    lastChunkPos[0] = chunkLongPos;
+-                    cachedChunk[0] = this.level.getChunkIfLoaded(chunkX, chunkZ);
+-                }
+-                net.minecraft.world.level.chunk.ChunkAccess chunk = cachedChunk[0];
++                final ChunkAccess chunk = this.cachedChunkAt(blockIntersection, chunkCache);
+                 if (chunk == null) {
+-                    // return as if it were air
+                     return true;
+                 }
+                 BlockState state = chunk.getBlockState(blockIntersection);
+-                // Canvas end - optimize checkInsideBlocks
+                 if (state.isAir()) {
+                     if (debugEntityBlockIntersections) {
+                         this.debugBlockIntersection((ServerLevel)this.level(), blockIntersection.immutable(), false, false);
+@@ -2002,7 +_,7 @@
+                     boolean insideBlock = intersectShape == Shapes.block()
+                         || this.collidedWithShapeMovingFrom(from, to, intersectShape.move(new Vec3(blockIntersection)).toAabbs());
+                     boolean insideFluid = (state.tagFlag & io.canvasmc.canvas.world.block.BlockTags.FLUID) != 0 && this.collidedWithFluid(state.getFluidState(), blockIntersection, from, to); // Canvas - optimize checkInsideBlocks
+-                    if ((insideBlock || insideFluid) && visitedBlocks.add(blockIntersection.asLong())) {
++                    if (me.samsuik.sakura.mechanics.EntityBehaviour.canCheckInsideBlock(blockIntersection, insideBlock || insideFluid, visitedBlocks, mechanicsTarget)) { // Battleship - configure server mechanics
+                         if (insideBlock) {
+                             try {
+                                 boolean isPrecise = movedFar || deflatedBoundingBoxAtTarget.intersects(blockIntersection);
+@@ -2038,6 +_,18 @@
+         return iterations.get() + 1;
+     }
+ 
++    private @Nullable ChunkAccess cachedChunkAt(final BlockPos pos, final ChunkAccess[] chunkCache) {
++        final int chunkX = pos.getX() >> 4;
++        final int chunkZ = pos.getZ() >> 4;
++        final int slot = ((chunkX << 2) | chunkZ) & 3;
++        ChunkAccess chunk = chunkCache[slot];
++        if (chunk == null || chunk.locX != chunkX || chunk.locZ != chunkZ) {
++            chunk = this.level().getChunkIfLoadedImmediately(chunkX, chunkZ);
++            chunkCache[slot] = chunk;
++        }
++        return chunk;
++    }
++
+     private void debugBlockIntersection(final ServerLevel level, final BlockPos pos, final boolean insideBlock, final boolean insideFluid) {
+         DebugEntityBlockIntersection type;
+         if (insideFluid) {
+@@ -2082,6 +_,7 @@
+     }
+ 
+     private void walkingStepSound(final BlockPos onPos, final BlockState onState) {
++        if (dev.cosmoworks.battleship.spawn.BattleshipSpawnCrowd.hidesMovementSounds(this)) return; // Battleship - spawn crowd
+         this.playStepSound(onPos, onState);
+         if (this.shouldPlayAmethystStepSound(onState)) {
+             this.playAmethystStepSound();
+@@ -2089,6 +_,7 @@
+     }
+ 
+     protected void waterSwimSound() {
++        if (dev.cosmoworks.battleship.spawn.BattleshipSpawnCrowd.hidesMovementSounds(this)) return; // Battleship - spawn crowd
+         Entity entity = Objects.requireNonNullElse(this.getControllingPassenger(), this);
+         float volumeModifier = entity == this ? 0.35F : 0.4F;
+         Vec3 deltaMovement = entity.getDeltaMovement();
+@@ -3994,7 +_,7 @@
+             }
+             return;
+         }
+-        this.entityData.set(DATA_AIR_SUPPLY_ID, event.getAmount());
++        this.entityData.set(DATA_AIR_SUPPLY_ID, event.getAmount(), this.getMaxAirSupply()); // Battleship - packet obfuscation and reduction
+         // CraftBukkit end
+     }
+ 
+@@ -6024,7 +_,7 @@
+     }
+ 
+     public boolean isPushedByFluid() {
+-        return true;
++        return this.pushedByFluid; // Battleship - entity pushed by fluid api
+     }
+ 
+     public static double getViewScale() {
+@@ -6885,6 +_,12 @@
+             this.stopRiding();
+         }
+ 
++        // Battleship start - cannon entity merge
++        if (!alreadyRemoved && this instanceof final me.samsuik.sakura.entity.SakuraEntity sakuraEntity) {
++            sakuraEntity.getSakuraEntityController().removeEntity();
++        }
++        // Battleship end - cannon entity merge
++
+         if (this.removalReason != Entity.RemovalReason.UNLOADED_TO_CHUNK) { this.getPassengers().forEach(Entity::stopRiding); } // Paper - rewrite chunk system
+         this.levelCallback.onRemove(reason);
+         this.onRemoval(reason);
+@@ -6931,13 +_,14 @@
+     @Override
+     public boolean shouldBeSaved() {
+         return (this.removalReason == null || this.removalReason.shouldSave())
++            && !this.loadChunks // Battleship - load chunks on movement
+             && !this.isPassenger()
+             && (!this.isVehicle() || !((ca.spottedleaf.moonrise.patches.chunk_system.entity.ChunkSystemEntity)this).moonrise$hasAnyPlayerPassengers()); // Paper - rewrite chunk system
+     }
+ 
+     @Override
+     public boolean isAlwaysTicking() {
+-        return false;
++        return this.loadChunks; // Battleship - load chunks on movement
+     }
+ 
+     public boolean mayInteract(final ServerLevel level, final BlockPos pos) {
+@@ -7092,7 +_,7 @@
+         void accept(Entity target, double x, double y, double z);
+     }
+ 
+-    private record Movement(Vec3 from, Vec3 to, Optional<Vec3> axisDependentOriginalMovement) {
++    public record Movement(Vec3 from, Vec3 to, Optional<Vec3> axisDependentOriginalMovement) {
+         public Movement(final Vec3 from, final Vec3 to, final Vec3 axisDependentOriginalMovement) {
+             this(from, to, Optional.of(axisDependentOriginalMovement));
+         }

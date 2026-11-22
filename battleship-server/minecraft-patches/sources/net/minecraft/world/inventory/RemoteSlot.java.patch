@@ -1,0 +1,48 @@
+--- a/net/minecraft/world/inventory/RemoteSlot.java
++++ b/net/minecraft/world/inventory/RemoteSlot.java
+@@ -27,10 +_,22 @@
+ 
+     boolean matches(ItemStack local);
+ 
++    // Battleship start - skip unchanged slots
++    default int battleship$version() {
++        return 0;
++    }
++    // Battleship end - skip unchanged slots
++
+     class Synchronized implements RemoteSlot {
+         private final HashedPatchMap.HashGenerator hasher;
+         private @Nullable ItemStack remoteStack = null;
+         private @Nullable HashedStack remoteHash = null;
++        private int battleship$version; // Battleship - skip unchanged slots
++
++        @Override
++        public int battleship$version() { // Battleship - skip unchanged slots
++            return this.battleship$version;
++        }
+ 
+         public Synchronized(final HashedPatchMap.HashGenerator hasher) {
+             this.hasher = hasher;
+@@ -38,12 +_,14 @@
+ 
+         @Override
+         public void force(final ItemStack outgoing) {
++            this.battleship$version++; // Battleship - skip unchanged slots
+             this.remoteStack = outgoing.copy();
+             this.remoteHash = null;
+         }
+ 
+         @Override
+         public void receive(final HashedStack incoming) {
++            this.battleship$version++; // Battleship - skip unchanged slots
+             this.remoteStack = null;
+             this.remoteHash = incoming;
+         }
+@@ -61,6 +_,7 @@
+         }
+ 
+         public void copyFrom(final RemoteSlot.Synchronized other) {
++            this.battleship$version++; // Battleship - skip unchanged slots
+             this.remoteStack = other.remoteStack;
+             this.remoteHash = other.remoteHash;
+         }

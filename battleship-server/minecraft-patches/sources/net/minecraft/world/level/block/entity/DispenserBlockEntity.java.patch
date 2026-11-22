@@ -1,0 +1,15 @@
+--- a/net/minecraft/world/level/block/entity/DispenserBlockEntity.java
++++ b/net/minecraft/world/level/block/entity/DispenserBlockEntity.java
+@@ -71,8 +_,11 @@
+         int replaceSlot = -1;
+         int replaceOdds = 1;
+ 
++        // Battleship start - configure random item dispensing
++        final boolean randomItemSelection = this.level.battleshipConfig().technical.dispenserRandomItemSelection || this instanceof DropperBlockEntity;
+         for (int i = 0; i < this.items.size(); i++) {
+-            if (!this.items.get(i).isEmpty() && random.nextInt(replaceOdds++) == 0) {
++            if (!this.items.get(i).isEmpty() && (!randomItemSelection && replaceSlot == -1 || randomItemSelection && random.nextInt(replaceOdds++) == 0)) {
++                // Battleship end - configure random item dispensing
+                 replaceSlot = i;
+             }
+         }

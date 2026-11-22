@@ -1,0 +1,30 @@
+--- a/net/minecraft/world/level/block/WebBlock.java
++++ b/net/minecraft/world/level/block/WebBlock.java
+@@ -16,6 +_,27 @@
+     }
+ 
+     @Override
++    protected final net.minecraft.world.phys.shapes.VoxelShape getCollisionShape(
++        final BlockState state,
++        final net.minecraft.world.level.BlockGetter blockGetter,
++        final BlockPos pos,
++        final net.minecraft.world.phys.shapes.CollisionContext context
++    ) {
++        if (blockGetter instanceof final Level gameLevel
++            && gameLevel.battleshipConfig().players.collideWithCobwebs
++            && context instanceof net.minecraft.world.phys.shapes.EntityCollisionContext entityContext
++            && entityContext.getEntity() instanceof net.minecraft.world.entity.player.Player) {
++            final BlockPos blockPosAbove = pos.above();
++            final BlockState stateAbove = gameLevel.getBlockState(blockPosAbove);
++            if (stateAbove.getCollisionShape(gameLevel, blockPosAbove, context).moonrise$isFullBlock()) {
++                return net.minecraft.world.phys.shapes.Shapes.block();
++            }
++        }
++
++        return super.getCollisionShape(state, blockGetter, pos, context);
++    }
++
++    @Override
+     protected void entityInside(
+         final BlockState state,
+         final Level level,

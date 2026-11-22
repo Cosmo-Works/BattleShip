@@ -1,0 +1,52 @@
+--- a/net/minecraft/server/level/ServerPlayer.java
++++ b/net/minecraft/server/level/ServerPlayer.java
+@@ -353,7 +_,7 @@
+         // Paper start - Sync offhand slot in menus
+         @Override
+         public void sendOffHandSlotChange() {
+-            this.sendSlotChange(ServerPlayer.this.inventoryMenu, net.minecraft.world.inventory.InventoryMenu.SHIELD_SLOT, ServerPlayer.this.inventoryMenu.getSlot(net.minecraft.world.inventory.InventoryMenu.SHIELD_SLOT).getItem().copy());
++            this.sendSlotChange(ServerPlayer.this.inventoryMenu, net.minecraft.world.inventory.InventoryMenu.SHIELD_SLOT, ServerPlayer.this.inventoryMenu.getSlot(net.minecraft.world.inventory.InventoryMenu.SHIELD_SLOT).getItem().copyForPacket());
+         }
+         // Paper end - Sync offhand slot in menus
+ 
+@@ -519,6 +_,15 @@
+         return this.viewDistanceHolder;
+     }
+     // Paper end - rewrite chunk system
++    // Battleship - client visibility settings
++    public final me.samsuik.sakura.player.visibility.PlayerVisibilitySettings visibilitySettings = new me.samsuik.sakura.player.visibility.PlayerVisibilitySettings();
++    public final me.samsuik.sakura.player.knockback.KnockbackSyncState knockbackSync = new me.samsuik.sakura.player.knockback.KnockbackSyncState();
++    // Battleship start - spawn crowd
++    public final dev.cosmoworks.battleship.spawn.CrowdView battleshipCrowdView = new dev.cosmoworks.battleship.spawn.CrowdView();
++    public boolean battleshipSprintHidden;
++    public boolean battleshipTrackerBypass; // Battleship - per-entity tracker cap
++    public int battleshipTrackerBypassCheckedAt = -1_000_000; // Battleship - per-entity tracker cap
++    // Battleship end - spawn crowd
+ 
+     public ServerPlayer(final MinecraftServer server, final ServerLevel level, final GameProfile gameProfile, final ClientInformation clientInformation) {
+         super(level, gameProfile);
+@@ -3119,12 +_,21 @@
+ 
+     @Override
+     public void crit(final Entity entity) {
+-        this.level().getChunkSource().sendToTrackingPlayersAndSelf(this, new ClientboundAnimatePacket(entity, ClientboundAnimatePacket.CRITICAL_HIT));
+-    }
++        this.battleship$sendAboutTarget(entity, new ClientboundAnimatePacket(entity, ClientboundAnimatePacket.CRITICAL_HIT)); // Battleship - entity packets only to its trackers
++    }
++
++    // Battleship start - entity packets only to its trackers
++    private void battleship$sendAboutTarget(final Entity target, final ClientboundAnimatePacket packet) {
++        this.level().getChunkSource().chunkMap.sendToTrackingPlayersFiltered(this, packet, target::battleship$isTrackedBy);
++        if (target.battleship$isTrackedBy(this)) {
++            this.connection.send(packet);
++        }
++    }
++    // Battleship end - entity packets only to its trackers
+ 
+     @Override
+     public void magicCrit(final Entity entity) {
+-        this.level().getChunkSource().sendToTrackingPlayersAndSelf(this, new ClientboundAnimatePacket(entity, ClientboundAnimatePacket.MAGIC_CRITICAL_HIT));
++        this.battleship$sendAboutTarget(entity, new ClientboundAnimatePacket(entity, ClientboundAnimatePacket.MAGIC_CRITICAL_HIT)); // Battleship - entity packets only to its trackers
+     }
+ 
+     @Override

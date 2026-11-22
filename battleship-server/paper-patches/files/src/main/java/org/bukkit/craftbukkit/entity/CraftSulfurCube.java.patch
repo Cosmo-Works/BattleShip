@@ -1,0 +1,21 @@
+--- a/src/main/java/org/bukkit/craftbukkit/entity/CraftSulfurCube.java
++++ b/src/main/java/org/bukkit/craftbukkit/entity/CraftSulfurCube.java
+@@ -19,6 +_,18 @@
+         super(server, entity);
+     }
+ 
++    // Battleship start - height parity api
++    @Override
++    public final void setHeightParity(final boolean heightParity) {
++        this.getHandle().heightParity = heightParity;
++    }
++
++    @Override
++    public final boolean getHeightParity() {
++        return this.getHandle().heightParity;
++    }
++    // Battleship end - height parity api
++
+     @Override
+     public net.minecraft.world.entity.monster.cubemob.SulfurCube getHandle() {
+         ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread(this.entity, "Accessing entity state off owning region's thread"); // Folia - region threading

@@ -1,8 +1,8 @@
-<p align="center"><img src="shrek-icon.png" width="128" alt="Shrek"></p>
+<p align="center"><img src="battleship-icon.png" width="128" alt="Battleship"></p>
 
-## Shrek - a cannoning-focused fork of Canvas
+## Battleship - a cannoning-focused fork of Canvas
 
-Shrek is a fork of [Canvas](https://github.com/CraftCanvasMC/Canvas) (Folia-based, region-threaded)
+Battleship is a fork of [Canvas](https://github.com/CraftCanvasMC/Canvas) (Folia-based, region-threaded)
 for Minecraft 26.3. It ports the cannoning mechanics and tooling of
 [Sakura](https://github.com/Samsuik/Sakura) to a region-threaded server and adds optimisations for
 large player counts.
@@ -29,9 +29,9 @@ large player counts.
 
 ### Configuration and commands
 
-- `shrek-server.yml` holds the server-wide switches, `shrek-worlds.yml` the per-world settings
+- `battleship-server.yml` holds the server-wide switches, `battleship-worlds.yml` the per-world settings
   (mechanics, redstone, cannons, entities, chunks)
-- `/shrek` has subcommands for cannon testing and inspection: tick freeze and `fps`, TNT and sand
+- `/battleship` has subcommands for cannon testing and inspection: tick freeze and `fps`, TNT and sand
   visibility toggles, mechanics and config inspection, region and TPS overview, reload
 
 ### API
@@ -52,7 +52,7 @@ scaffolded from the [Baguette](https://github.com/CraftCanvasMC/Baguette) templa
 Familiarity with paperweight-style forking helps: see [Paper's CONTRIBUTING](https://github.com/PaperMC/Paper/blob/HEAD/CONTRIBUTING.md).
 
 *Weaver adds an additional patch set `base` which is applied before the fork's source and feature
-patches. See the [example base patch](shrek-server/minecraft-patches/base/0001-Appreciate-base-patches-more.patch)
+patches. See the [example base patch](battleship-server/minecraft-patches/base/0001-Appreciate-base-patches-more.patch)
 and `build.gradle.kts` for details.*
 
 ---

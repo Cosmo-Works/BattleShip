@@ -1,0 +1,77 @@
+--- a/net/minecraft/world/entity/projectile/throwableitemprojectile/ThrownEnderpearl.java
++++ b/net/minecraft/world/entity/projectile/throwableitemprojectile/ThrownEnderpearl.java
+@@ -20,6 +_,7 @@
+ import net.minecraft.world.item.Item;
+ import net.minecraft.world.item.ItemStack;
+ import net.minecraft.world.item.Items;
++import net.minecraft.world.level.ClipContext;
+ import net.minecraft.world.level.Level;
+ import net.minecraft.world.level.block.Blocks;
+ import net.minecraft.world.level.block.state.BlockState;
+@@ -33,6 +_,32 @@
+ public class ThrownEnderpearl extends ThrowableItemProjectile {
+     private long ticketTimer = 0L;
+ 
++    @Override
++    protected final ClipContext.Block getClipType() {
++        return this.level().battleshipConfig().entities.enderPearl.useOutlineForCollision
++            ? ClipContext.Block.OUTLINE
++            : super.getClipType();
++    }
++
++    @Override
++    public boolean isInWater() {
++        return super.isInWater() && this.level().battleshipConfig().entities.enderPearl.slowedDownByWater;
++    }
++
++    @Override
++    public Vec3 getMovementToShoot(
++        final double x,
++        final double y,
++        final double z,
++        final float velocity,
++        final float inaccuracy
++    ) {
++        final float randomness = this.level().battleshipConfig().entities.enderPearl.randomSpreadWhenThrown
++            ? inaccuracy
++            : 0.0f;
++        return super.getMovementToShoot(x, y, z, velocity, randomness);
++    }
++
+     public ThrownEnderpearl(final EntityType<? extends ThrownEnderpearl> type, final Level level) {
+         super(type, level);
+     }
+@@ -94,6 +_,17 @@
+                 }
+ 
+                 // source is now an invalid reference, do not use it, use the entity parameter
++                Vec3 teleportPos = to;
++                if (entity instanceof final ServerPlayer player
++                    && entity.level() == checkWorld
++                    && checkWorld.battleshipConfig().entities.enderPearl.preventTeleportingInsideBlocks
++                    && player.insideAnyCollisionAt(checkWorld, teleportPos)) {
++                    teleportPos = Vec3.atBottomCenterOf(BlockPos.containing(teleportPos.subtract(0, 1, 0)));
++                    if (player.insideAnyCollisionAt(checkWorld, teleportPos)) {
++                        entityPearl.discard(org.bukkit.event.entity.EntityRemoveEvent.Cause.HIT);
++                        return;
++                    }
++                }
+                 final Vec3 endermitePos = entity.position();
+ 
+                 // dismount from any vehicles, so we can teleport and to prevent desync
+@@ -106,13 +_,14 @@
+                 }
+ 
+                 entity.teleportAsync(
+-                    checkWorld, to, null, null, null,
++                    checkWorld, teleportPos, null, null, null,
+                     org.bukkit.event.player.PlayerTeleportEvent.TeleportCause.ENDER_PEARL,
+                     // chunk could have been unloaded
+                     Entity.TELEPORT_FLAG_TELEPORT_PASSENGERS | Entity.TELEPORT_FLAG_LOAD_CHUNK,
+                     (Entity teleported) -> {
+                         // entity is now an invalid reference, do not use it, instead use teleported
+                         if (teleported instanceof ServerPlayer player) {
++                            player.updatePlayerPose();
+                             // connection teleport is already done
+                             final ServerLevel world = player.level();
+ 

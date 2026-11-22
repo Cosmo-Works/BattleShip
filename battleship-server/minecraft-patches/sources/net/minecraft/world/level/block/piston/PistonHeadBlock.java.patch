@@ -1,0 +1,25 @@
+--- a/net/minecraft/world/level/block/piston/PistonHeadBlock.java
++++ b/net/minecraft/world/level/block/piston/PistonHeadBlock.java
+@@ -98,6 +_,11 @@
+     @Override
+     protected boolean canSurvive(final BlockState state, final LevelReader level, final BlockPos pos) {
+         BlockState base = level.getBlockState(pos.relative(state.getValue(FACING).getOpposite()));
++        // Battleship start - configure server mechanics
++        if (level instanceof Level gameLevel && gameLevel.mechanicsTarget().before(me.samsuik.sakura.mechanics.MechanicVersion.v1_9)) {
++            return this.isFittingBase(state, base);
++        }
++        // Battleship end - configure server mechanics
+         return this.isFittingBase(state, base) || base.is(Blocks.MOVING_PISTON) && base.getValue(FACING) == state.getValue(FACING);
+     }
+ 
+@@ -111,6 +_,10 @@
+                 block,
+                 ExperimentalRedstoneUtils.withFront(orientation, state.getValue(FACING).getOpposite())
+             );
++            // Battleship start - configure server mechanics
++        } else if (level.mechanicsTarget().before(me.samsuik.sakura.mechanics.MechanicVersion.v1_9)) {
++            level.setBlock(pos, Blocks.AIR.defaultBlockState(), 19);
++            // Battleship end - configure server mechanics
+         }
+     }
+ 

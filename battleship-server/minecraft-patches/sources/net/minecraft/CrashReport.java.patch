@@ -1,0 +1,10 @@
+--- a/net/minecraft/CrashReport.java
++++ b/net/minecraft/CrashReport.java
+@@ -237,6 +_,6 @@
+ 
+     public static void preload() {
+         //MemoryReserve.allocate(); // Paper - Disable memory reserve allocating
+-        new CrashReport("Don't panic!", new Throwable()).getFriendlyReport(ReportType.CRASH);
++        new CrashReport("Do panic!", new Throwable()).getFriendlyReport(ReportType.CRASH); // Battleship - panic.
+     }
+ }

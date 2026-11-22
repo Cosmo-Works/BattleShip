@@ -1,0 +1,78 @@
+--- a/net/minecraft/world/level/BlockGetter.java
++++ b/net/minecraft/world/level/BlockGetter.java
+@@ -207,9 +_,24 @@
+     }
+ 
+     static boolean forEachBlockIntersectedBetween(final Vec3 from, final Vec3 to, final AABB aabbAtTarget, final BlockGetter.BlockStepVisitor visitor) {
++        // Battleship start - configure server mechanics
++        return forEachBlockIntersectedBetween(from, to, aabbAtTarget, me.samsuik.sakura.mechanics.MinecraftMechanicsTarget.latest(), visitor);
++    }
++
++    static boolean forEachBlockIntersectedBetween(
++        final Vec3 from,
++        final Vec3 to,
++        final AABB aabbAtTarget,
++        final me.samsuik.sakura.mechanics.MinecraftMechanicsTarget mechanicsTarget,
++        final BlockGetter.BlockStepVisitor visitor
++    ) {
+         Vec3 travel = to.subtract(from);
+-        if (travel.lengthSqr() < Mth.square(1.0E-5F)) {
+-            for (BlockPos blockPos : BlockPos.betweenClosed(aabbAtTarget)) {
++        final double movedThreshold = mechanicsTarget.atLeast(me.samsuik.sakura.mechanics.MechanicVersion.v1_21_9)
++            ? 1.0E-5F
++            : 0.99999F;
++        if (travel.lengthSqr() < Mth.square(movedThreshold) || mechanicsTarget.before(me.samsuik.sakura.mechanics.MechanicVersion.v1_21_2)) {
++            // Battleship end - configure server mechanics
++            for (final BlockPos blockPos : me.samsuik.sakura.utils.SimpleBlockPosIterator.iterable(aabbAtTarget)) { // Battleship - optimise check inside blocks
+                 if (!visitor.visit(blockPos, 0)) {
+                     return false;
+                 }
+@@ -217,22 +_,42 @@
+ 
+             return true;
+         } else {
++            // Battleship start - optimise check inside blocks
++            final boolean xZero = travel.x() == 0.0;
++            final boolean yZero = travel.y() == 0.0;
++            final boolean zZero = travel.z() == 0.0;
++            if (xZero && yZero || yZero && zZero || xZero && zZero) {
++                for (final BlockPos blockPos : me.samsuik.sakura.utils.SimpleBlockPosIterator.traverseBoundsInDirection(travel, aabbAtTarget, 16.0)) {
++                    if (!visitor.visit(blockPos, 0)) {
++                        return false;
++                    }
++                }
++                return true;
++            }
++            // Battleship end - optimise check inside blocks
+             LongSet visitedBlocks = new LongOpenHashSet();
+ 
+-            for (BlockPos blockPos : BlockPos.betweenCornersInDirection(aabbAtTarget.move(travel.scale(-1.0)), travel)) {
+-                if (!visitor.visit(blockPos, 0)) {
+-                    return false;
+-                }
++            // Battleship start - configure server mechanics
++            if (mechanicsTarget.atLeast(me.samsuik.sakura.mechanics.MechanicVersion.v1_21_9)) {
++                for (BlockPos blockPos : me.samsuik.sakura.utils.SimpleBlockPosIterator.iterable(aabbAtTarget.move(travel.scale(-1.0)))) { // Battleship - optimise check inside blocks
++                    if (!visitor.visit(blockPos, 0)) {
++                        return false;
++                    }
+ 
+-                visitedBlocks.add(blockPos.asLong());
++                    visitedBlocks.add(blockPos.asLong());
++                }
+             }
+ 
+             int iterations = addCollisionsAlongTravel(visitedBlocks, travel, aabbAtTarget, visitor);
++            if (mechanicsTarget.before(me.samsuik.sakura.mechanics.MechanicVersion.v1_21_5)) {
++                iterations = 0;
++            }
++            // Battleship end - configure server mechanics
+             if (iterations < 0) {
+                 return false;
+             }
+ 
+-            for (BlockPos blockPos : BlockPos.betweenCornersInDirection(aabbAtTarget, travel)) {
++            for (BlockPos blockPos : me.samsuik.sakura.utils.SimpleBlockPosIterator.iterable(aabbAtTarget)) { // Battleship - optimise check inside blocks
+                 if (visitedBlocks.add(blockPos.asLong()) && !visitor.visit(blockPos, iterations + 1)) {
+                     return false;
+                 }

@@ -1,0 +1,30 @@
+--- a/net/minecraft/world/level/block/ChestBlock.java
++++ b/net/minecraft/world/level/block/ChestBlock.java
+@@ -148,6 +_,15 @@
+         }
+     };
+ 
++    // Battleship start - state watchers
++    private void changedBlockState(final LevelReader level, final BlockPos pos) {
++        final BlockEntity blockEntity = level.getBlockEntity(pos);
++        if (blockEntity instanceof final ChestBlockEntity chestBlockEntity) {
++            chestBlockEntity.sakura$removed();
++        }
++    }
++    // Battleship end - state watchers
++
+     protected ChestBlock(
+         final Supplier<BlockEntityType<? extends ChestBlockEntity>> blockEntityType,
+         final SoundEvent openSound,
+@@ -190,9 +_,11 @@
+                 && neighbourType != ChestType.SINGLE
+                 && state.getValue(FACING) == neighbourState.getValue(FACING)
+                 && getConnectedDirection(neighbourState) == directionToNeighbour.getOpposite()) {
++                this.changedBlockState(level, pos); // Battleship - state watchers
+                 return state.setValue(TYPE, neighbourType.getOpposite());
+             }
+         } else if (getConnectedDirection(state) == directionToNeighbour) {
++            this.changedBlockState(level, pos); // Battleship - state watchers
+             return state.setValue(TYPE, ChestType.SINGLE);
+         }
+ 

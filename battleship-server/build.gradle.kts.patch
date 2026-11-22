@@ -1,0 +1,85 @@
+--- a/canvas-server/build.gradle.kts
++++ b/canvas-server/build.gradle.kts
+@@ -20,8 +_,8 @@ dependencies {
+ }
+ 
+ val mergeMinecraftATs = tasks.register<MergeAccessTransforms>("mergeMinecraftATs") {
+-    firstFile.set(paperweight.activeFork.flatMap { it.buildDataDir.file("${it.name}.at") })
+-    secondFile.set(paperweight.activeFork.flatMap { it.buildDataDir.file("folia.at") })
++    firstFile.set(paperweight.forks.named("canvas").flatMap { it.buildDataDir.file("${it.name}.at") })
++    secondFile.set(paperweight.forks.named("canvas").flatMap { it.buildDataDir.file("folia.at") })
+ }
+ 
+ paperweight {
+@@ -40,7 +_,22 @@ paperweight {
+         }
+     }
+ 
+-    activeFork = canvas
++    val battleship = forks.register("battleship") {
++        forks = canvas
++        upstream.patchRepo("paperServer") {
++             upstreamRepo = canvas.patchedRepo("paperServer")
++             patchesDir = rootDirectory.dir("battleship-server/paper-patches")
++             outputDir = rootDirectory.dir("paper-server")
++         }
++        upstream.patchDir("canvasServer") {
++            upstreamPath = "canvas-server"
++            excludes = setOf("src/minecraft", "paper-patches", "minecraft-patches", "build.gradle.kts", "build.gradle.kts.patch")
++            patchesDir = rootDirectory.dir("battleship-server/canvas-patches")
++            outputDir = rootDirectory.dir("canvas-server")
++        }
++    }
++
++    activeFork = battleship
+ 
+     updatingMinecraft {
+         // oldForkCommit = "4a0ed14a386f20d8f7992103dc71130bc2641209"
+
+@@ -110,10 +_,14 @@ sourceSets {
+     main {
+         java { srcDir("../paper-server/src/main/java"); srcDir("../paper-server/src/generated/java") }
+         resources { srcDir("../paper-server/src/main/resources") }
++        java { srcDir("../canvas-server/src/main/java") }
++        resources { srcDir("../canvas-server/src/main/resources") }
+     }
+     test {
+         java { srcDir("../paper-server/src/test/java") }
+         resources { srcDir("../paper-server/src/test/resources") }
++        java { srcDir("../canvas-server/src/test/java") }
++        resources { srcDir("../canvas-server/src/test/resources") }
+     }
+ }
+ val log4jPlugins = sourceSets.create("log4jPlugins") {
+@@ -141,7 +_,8 @@ abstract class MockitoAgentProvider : CommandLineArgumentProvider {
+ }
+ 
+ dependencies {
+-    implementation(projects.canvasApi)
++    implementation(projects.battleshipApi)
++    implementation("com.github.luben:zstd-jni:1.5.7-4") // Battleship - Linear region format
+     implementation(platform("ca.spottedleaf.leafpile:bom:1.2.4"))
+     implementation("ca.spottedleaf.leafpile:common")
+     implementation("ca.spottedleaf.leafpile:concurrentutil")
+@@ -215,15 +_,15 @@ tasks.jar {
+         )
+         attributes(
+             "Main-Class" to "org.bukkit.craftbukkit.Main",
+-            "Implementation-Title" to "Canvas",
++            "Implementation-Title" to "Battleship",
+             "Implementation-Version" to implementationVersion,
+             "Implementation-Vendor" to date,
+-            "Specification-Title" to "Canvas",
++            "Specification-Title" to "Battleship",
+             "Specification-Version" to project.version,
+-            "Specification-Vendor" to "Canvas Team",
+-            "Brand-Id" to "canvasmc:canvas",
+-            "Brand-Name" to "Canvas",
+-            "Brand-Vendor" to "Canvas Team",
++            "Specification-Vendor" to "Battleship Team",
++            "Brand-Id" to "cosmoworks:battleship",
++            "Brand-Name" to "Battleship",
++            "Brand-Vendor" to "Battleship Team",
+             "Brand-Website" to "https://canvasmc.io",
+             "Build-Number" to (build ?: ""),
+             "Build-Time" to buildTime.toString(),

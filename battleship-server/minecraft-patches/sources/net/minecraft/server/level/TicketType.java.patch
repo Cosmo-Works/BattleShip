@@ -1,0 +1,12 @@
+--- a/net/minecraft/server/level/TicketType.java
++++ b/net/minecraft/server/level/TicketType.java
+@@ -68,6 +_,9 @@
+     public static final TicketType PLUGIN_TICKET = register("plugin_ticket", NO_TIMEOUT, FLAG_LOADING | FLAG_SIMULATION); static { ((TicketType<org.bukkit.plugin.Plugin>)PLUGIN_TICKET).moonrise$setIdentifierComparator((org.bukkit.plugin.Plugin p1, org.bukkit.plugin.Plugin p2) -> p1.getName().compareTo(p2.getName())); } // Paper // Paper - rewrite chunk system
+     public static final TicketType FUTURE_AWAIT = register("future_await", NO_TIMEOUT, FLAG_LOADING | FLAG_SIMULATION); // Paper
+     public static final TicketType CHUNK_LOAD = register("chunk_load", NO_TIMEOUT, FLAG_LOADING); // Paper - moonrise
++    public static final TicketType ENTITY_MOVEMENT = register("entity_movement", 200L, FLAG_LOADING | FLAG_SIMULATION); // Battleship - load chunks on movement
++    public static final TicketType BATTLESHIP_KEEP_LOADED = register("battleship:keep_loaded", NO_TIMEOUT, FLAG_LOADING | FLAG_SIMULATION | FLAG_KEEP_DIMENSION_ACTIVE);
++    public static final TicketType BATTLESHIP_SIMULATION = register("battleship:simulation", NO_TIMEOUT, FLAG_LOADING | FLAG_SIMULATION | FLAG_KEEP_DIMENSION_ACTIVE); // Battleship - player-simulated chunks
+     // Folia start - region threading
+     public static final TicketType DELAYED = register("folia:delay", 5L, FLAG_LOADING | FLAG_SIMULATION);
+     public static final TicketType<Long> END_GATEWAY_EXIT_SEARCH = ca.spottedleaf.moonrise.patches.chunk_system.ticket.ChunkSystemTicketType.create("folia:end_gateway_exit_search", Long::compareTo);
