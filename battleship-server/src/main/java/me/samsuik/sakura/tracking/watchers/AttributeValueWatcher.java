@@ -26,6 +26,14 @@ public final class AttributeValueWatcher implements ChangeListener<AttributeInst
         this.changed = true;
     }
 
+    @Override
+    public void removed(final AttributeInstance watchable) {
+        if (this.instance != null) {
+            this.instance.unwatch(this);
+            this.changed = true;
+        }
+    }
+
     public double getValue() {
         if (!this.changed) {
             return this.value;
@@ -34,6 +42,10 @@ public final class AttributeValueWatcher implements ChangeListener<AttributeInst
         final AttributeInstance instance = this.attributes.getInstance(this.holder);
         if (instance == null) {
             return this.attributes.supplyDefaultValue(this.holder);
+        }
+
+        if (this.instance != null) {
+            this.instance.unwatch(this);
         }
 
         this.instance = instance;

@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/entity/projectile/hurtingprojectile/windcharge/AbstractWindCharge.java
 +++ b/net/minecraft/world/entity/projectile/hurtingprojectile/windcharge/AbstractWindCharge.java
-@@ -26,15 +_,42 @@
+@@ -26,15 +_,54 @@
  import net.minecraft.world.phys.Vec3;
  import org.jspecify.annotations.Nullable;
  
@@ -22,6 +22,18 @@
 +    @Override
 +    public final boolean canLink(final Entity entity, final int tickDifference) {
 +        return true;
++    }
++
++    @Override
++    public boolean deflect(
++        final net.minecraft.world.entity.projectile.ProjectileDeflection deflection,
++        final @Nullable Entity deflectingEntity,
++        final net.minecraft.world.entity.EntityReference<Entity> newOwner,
++        final boolean byAttack,
++        final Vec3 power
++    ) {
++        this.level().entityManager().decouple(this.sakuraEntityController);
++        return super.deflect(deflection, deflectingEntity, newOwner, byAttack, power);
 +    }
 +
 +    @Override

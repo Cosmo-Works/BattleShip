@@ -6,7 +6,7 @@ import it.unimi.dsi.fastutil.ints.IntArrayFIFOQueue;
 import me.samsuik.sakura.player.gui.FeatureGui;
 import me.samsuik.sakura.player.gui.FeatureGuiInventory;
 import me.samsuik.sakura.player.gui.components.ItemButton;
-import me.samsuik.sakura.player.gui.components.ItemSwitch;
+import me.samsuik.sakura.player.gui.components.ItemList;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -54,7 +54,7 @@ public final class VisibilityGui extends FeatureGui {
             final int index = type.states().indexOf(state);
             final int slot = slots.dequeueInt();
 
-            final ItemSwitch itemSwitch = new ItemSwitch(
+            final ItemList itemList = new ItemList(
                 VisibilityGuiItems.GUI_ITEMS.get(type),
                 slot, index,
                 (_, clickedInventory) -> {
@@ -63,7 +63,7 @@ public final class VisibilityGui extends FeatureGui {
                 }
             );
 
-            inventory.addComponent(itemSwitch, MENU_ITEMS_KEY);
+            inventory.addComponent(itemList, MENU_ITEMS_KEY);
         }
     }
 

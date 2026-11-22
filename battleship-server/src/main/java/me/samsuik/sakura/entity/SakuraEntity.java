@@ -18,11 +18,11 @@ public interface SakuraEntity {
     default boolean samePropertiesAndState(final SakuraEntity otherSakuraEntity, final int tickDifference) {
         final SakuraEntityController otherController = otherSakuraEntity.getSakuraEntityController();
         return this.sameProperties(otherSakuraEntity.asEntity(), tickDifference)
-            && this.isInSimilarState(otherController.getEntityState());
+            && this.isInSimilarState(otherController.getPreTickState());
     }
 
     default boolean isInSimilarState(final EntityState state) {
-        return this.getSakuraEntityController().getEntityState().isInSimilarState(state);
+        return this.getSakuraEntityController().getPreTickState().isInSimilarState(state);
     }
 
     default boolean sameProperties(final Entity otherEntity, final int tickDifference) {

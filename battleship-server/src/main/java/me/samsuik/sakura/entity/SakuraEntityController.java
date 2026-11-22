@@ -3,7 +3,6 @@ package me.samsuik.sakura.entity;
 import ca.spottedleaf.moonrise.common.util.TickThread;
 import ca.spottedleaf.moonrise.patches.chunk_system.level.entity.ChunkEntitySlices;
 import ca.spottedleaf.moonrise.patches.chunk_system.level.entity.EntityLookup;
-import java.util.Objects;
 import me.samsuik.sakura.entity.data.EntityData;
 import me.samsuik.sakura.entity.data.PersistentEntityData;
 import me.samsuik.sakura.entity.merge.MergeLevel;
@@ -18,7 +17,7 @@ public final class SakuraEntityController {
     public final SakuraEntity sakuraEntity;
     public final Entity entity;
     private int sleepTimer = 0;
-    private LinkedEntityControllers links = new LinkedEntityControllers(this);
+    private LinkedControllers links = new LinkedControllers(this);
     private @Nullable EntityData entityData;
     private EntityState entityState = EntityState.unknown();
     private long blockStateRevision;
@@ -29,130 +28,176 @@ public final class SakuraEntityController {
         this.entity = sakuraEntity.asEntity();
     }
 
-    public void tickEntity() {
-        this.updateTickingState(true);
-        if (!this.isSleeping()) {
-            if (this.entityData == null) {
-                this.entityData = this.manager().getEntityData(this.entity);
-            }
+    public long encodedSpawnPosition() {
+        final EntityData entityData = this.entityData;
+        if (entityData == null) {
+            return Long.MIN_VALUE;
+        }
+        return entityData.spawnPosition().encodedPosition();
+    }
 
-            final EntityState currentState = EntityState.of(this.entity);
-            this.entityState = currentState;
-            this.tickAwakeEntity(currentState);
+    public LinkedControllers getLinks() {
+        return this.links;
+    }
+
+    public void updateLinks(final LinkedControllers newLinks) {
+        this.links = newLinks;
+    }
+
+    public EntityState getPreTickState() {
+        return this.entityState;
+    }
+
+    public void restoreEntityState() {
+        this.entityState.apply(this.entity);
+    }
+
+    public void storeEntityState() {
+        this.entityState = EntityState.of(this.entity);
+    }
+
+    public boolean haveBlocksChangedSinceTicking(final Level level) {
+        return this.blockStateRevision != level.getBlockStateRevisionCount();
+    }
+
+    public void tickEntity() {
+        // The manager belongs to the region ticking this entity
+        final SakuraEntityManager manager = this.manager();
+        manager.updateTickingStatus(this.links, true);
+
+        if (!this.isSleeping()) {
+            this.tickAwakeEntity(manager);
         }
 
         this.sleepTimer++;
     }
 
-    private void tickAwakeEntity(final EntityState currentState) {
-        if (this.attemptToLinkEntities(currentState)) {
-            return;
+    private void tickAwakeEntity(final SakuraEntityManager manager) {
+        final Entity entity = this.entity;
+        final Level level = entity.level();
+
+        if (this.entityData == null) {
+            this.entityData = manager.getEntityData(entity);
         }
 
-        final Level level = this.entity.level();
         this.blockStateRevision = level.getBlockStateRevisionCount();
-        this.entity.tick();
+        this.storeEntityState();
 
-        if (!TickThread.isTickThreadFor(this.entity)) {
+        if (manager.tryLinkEntities(this, entity, this.sakuraEntity, this.entityState, this.entityData)) {
             return;
         }
-        if (this.entity.handlePortal()) {
+
+        entity.tick();
+
+        // The entity can leave this region while ticking
+        if (!TickThread.isTickThreadFor(entity)) {
             return;
         }
-        if (this.entity.isRemoved() || this.blockStateRevision != level.getBlockStateRevisionCount()) {
-            this.manager().decoupleAllTickingEntities();
+        if (entity.handlePortal()) {
+            return;
+        }
+        if (entity.isRemoved() || this.haveBlocksChangedSinceTicking(level)) {
+            manager.decoupleTickingEntities(entity);
         }
     }
 
-    private boolean attemptToLinkEntities(final EntityState currentState) {
-        final MergeLevel mergeLevel = this.getEntityData().mergeLevel();
-        final SakuraEntity otherSakuraEntity = this.manager().getEntityToLinkWith(
-            this.entity,
-            this.sakuraEntity,
-            this,
-            currentState,
-            mergeLevel
-        );
-        if (otherSakuraEntity == null) {
-            return false;
+    public void removeEntity() {
+        final EntityData entityData = this.entityData;
+        if (this.entity.level().getCurrentWorldData() == null) {
+            // Removed outside of a ticking region, there is no entity manager to update
+            this.decouple(this.entity.sakura$getTickOrder());
+            return;
         }
 
-        final SakuraEntityController otherController = otherSakuraEntity.getSakuraEntityController();
-        if (!this.canLinkWith(otherSakuraEntity, otherController)) {
-            return false;
+        final SakuraEntityManager manager = this.manager();
+        if (entityData != null && entityData.mergeLevel() == MergeLevel.SPAWN) {
+            final PersistentEntityData persistentEntityData = new PersistentEntityData();
+            this.links.save(persistentEntityData);
+            manager.saveEntityData(entityData, persistentEntityData);
         }
 
-        otherController.links.link(this, this.links);
-        this.setSleeping(true);
-        return true;
-    }
-
-    private boolean canLinkWith(final SakuraEntity otherSakuraEntity, final SakuraEntityController otherController) {
-        final SakuraEntityController tailController = otherController.links.getTail();
-        final Entity tailEntity = tailController.sakuraEntity.asEntity();
-        final Entity otherEntity = otherSakuraEntity.asEntity();
-
-        return this.entity.getType() == otherEntity.getType()
-            && this.entity.isAlive()
-            && otherEntity.isAlive()
-            && otherEntity.getId() < this.entity.getId()
-            && this.entity.moonrise$getSectionY() != Integer.MIN_VALUE
-            && this.isFullyAwake()
-            && this.sakuraEntity.canLink(tailEntity, tailController.sleepTicks());
+        manager.decouple(this);
     }
 
     public boolean canLinkOnSpawn(final SakuraEntity otherSakuraEntity) {
-        if (this.entity.tickCount < 2 || this.entity.tickCount != otherSakuraEntity.asEntity().tickCount) {
+        final Entity entity = this.entity;
+        if (entity.tickCount < 2 || entity.tickCount != otherSakuraEntity.asEntity().tickCount) {
             return false;
         }
 
-        final EntityData data = this.getEntityData();
-        if (!data.hasSavedBefore() || !this.attemptLinkingOnSpawn() || data.randomChanceToSpawn()) {
+        final EntityData entityData = this.entityData;
+        if (entityData == null
+            || !entityData.hasSavedBefore()
+            || !this.canTryToLinkOnSpawn()
+            || entityData.randomChanceToSpawn()) {
             return false;
         }
 
-        final boolean isFallingBlock = this.entity.getType() == EntityTypes.FALLING_BLOCK;
-        return data.hasLinkedInThePast(otherSakuraEntity, isFallingBlock ? 100 : 0);
+        final boolean isFallingBlock = entity.getType() == EntityTypes.FALLING_BLOCK;
+        return entityData.hasLinkedInThePast(otherSakuraEntity, isFallingBlock ? 100 : 0);
     }
 
-    private boolean attemptLinkingOnSpawn() {
+    public boolean canLinkWith(
+        final SakuraEntity sakuraEntity,
+        final SakuraEntity otherSakuraEntity,
+        final SakuraEntityController otherController
+    ) {
+        final Entity otherEntity = otherSakuraEntity.asEntity();
+        final Entity entity = this.entity;
+
+        if (entity.getType() != otherEntity.getType()
+            || !entity.isAlive()
+            || !otherEntity.isAlive()
+            || otherEntity.sakura$getTickOrder() >= entity.sakura$getTickOrder()) {
+            return false;
+        }
+
+        return sakuraEntity.canLink(otherController.links.getHead().entity, 1);
+    }
+
+    public boolean canTryToLinkOnSpawn() {
         final boolean triedLinkingOnSpawn = this.triedLinkingOnSpawn;
         this.triedLinkingOnSpawn = true;
         return !triedLinkingOnSpawn;
     }
 
-    public void setSleeping(final boolean sleeping) {
-        if (this.isSleeping() == sleeping) {
-            return;
-        }
-
-        if (sleeping) {
-            this.sleepTimer = Integer.MIN_VALUE;
-        } else {
-            this.sakuraEntity.catchupOnTicks(this.sleepTimer - Integer.MIN_VALUE);
-            this.sleepTimer = 0;
-        }
-
-        this.updateCollisionPresence(sleeping);
+    public void linkWith(final SakuraEntityController otherController) {
+        otherController.getLinks().link(this, this.getLinks());
+        this.setSleeping(true);
     }
 
-    private void updateCollisionPresence(final boolean sleeping) {
-        final Entity entity = this.entity;
-        if (entity.moonrise$getSectionY() == Integer.MIN_VALUE) {
-            return;
+    /**
+     * Separates the linked entities that tick after {@code tickOrder} from the ones that have already ticked.
+     *
+     * @return the head of the entities that were separated and woken up
+     */
+    public @Nullable SakuraEntityController decouple(final int tickOrder) {
+        final LinkedControllers.Controllers decoupled = this.links.decouple(tickOrder);
+        if (decoupled == null) {
+            return null;
         }
 
-        final EntityLookup lookup = entity.level().moonrise$getEntityLookup();
-        final ChunkEntitySlices slices = lookup.getOrCreateChunk(entity.moonrise$getSectionX(), entity.moonrise$getSectionZ());
-        if (sleeping) {
-            slices.removeEntityFromSections(entity);
-        } else {
-            slices.addEntityToSections(entity);
-        }
+        final SakuraEntityController oldestHead = decoupled.oldest().getHead();
+        final SakuraEntityController decoupledHead = decoupled.newest().getHead();
+
+        decoupledHead.entityState = oldestHead.getPreTickState();
+        decoupledHead.restoreEntityState();
+
+        // Update the entity position then wake up the entity
+        decoupledHead.entity.sakura$notifyMoved();
+        decoupledHead.setSleeping(false);
+        return decoupledHead;
     }
 
-    public int sleepTicks() {
-        return this.isSleeping() ? this.sleepTimer - Integer.MIN_VALUE : 0;
+    /**
+     * Wakes up every linked entity, used before the linked entities can end up in different regions.
+     * This only touches the linked entities and never the entity manager of a region.
+     */
+    public void unmergeAll() {
+        SakuraEntityController head = this.links.getHead();
+        while (head != null) {
+            head = head.decouple(head.entity.sakura$getTickOrder());
+        }
     }
 
     public boolean isFullyAwake() {
@@ -163,105 +208,37 @@ public final class SakuraEntityController {
         return this.sleepTimer < 0;
     }
 
-    public void unmergeAll() {
-        this.unmergeFromHead(this.links.getHead().entityState);
+    public int sleepTicks() {
+        return this.isSleeping() ? this.sleepTimer - Integer.MIN_VALUE : 0;
     }
 
-    private void unmergeFromHead(final EntityState headState) {
-        if (this.links.getHead() != this) {
-            this.links.getHead().unmergeFromHead(headState);
+    public void setSleeping(final boolean sleeping) {
+        if (this.isSleeping() == sleeping) {
             return;
         }
 
-        if (this.links.count() <= 1) {
+        final Entity entity = this.entity;
+        if (sleeping) {
+            this.sleepTimer = Integer.MIN_VALUE;
+        } else {
+            final int ticksToCatchupOn = this.sleepTimer - Integer.MIN_VALUE;
+            this.sakuraEntity.catchupOnTicks(ticksToCatchupOn);
+            this.sleepTimer = 0;
+        }
+
+        // It's not safe to wake up an entity that has already been removed
+        if (entity.isRemoved() || entity.moonrise$getSectionY() == Integer.MIN_VALUE) {
             return;
         }
 
-        final SakuraEntityController remainingHead = this.links.decouple(this);
-        if (remainingHead == null) {
-            return;
-        }
+        final EntityLookup lookup = entity.level().moonrise$getEntityLookup();
+        final ChunkEntitySlices slices = lookup.getOrCreateChunk(entity.moonrise$getSectionX(), entity.moonrise$getSectionZ());
 
-        remainingHead.wakeFrom(headState);
-        remainingHead.unmergeFromHead(headState);
-    }
-
-    public void decoupleTicking() {
-        final SakuraEntityController ticking = this.links.lastToTick;
-        if (ticking != null) {
-            this.decouple(ticking);
-            this.links.lastToTick = null;
-        }
-    }
-
-    public void decouple() {
-        this.decouple(this);
-    }
-
-    public void decouple(final SakuraEntityController otherController) {
-        final SakuraEntityController remainingHead = this.links.decouple(otherController);
-        if (remainingHead != null) {
-            remainingHead.wakeFrom(this.entityState);
-        }
-    }
-
-    private void wakeFrom(final EntityState headState) {
-        this.entityState = headState;
-        this.restoreEntityState();
-        this.entity.sakura$notifyMoved();
-        this.setSleeping(false);
-        this.updateTickingState(false);
-    }
-
-    public void removeEntity() {
-        if (this.entityData != null && this.entityData.mergeLevel() == MergeLevel.SPAWN) {
-            final PersistentEntityData persistentEntityData = new PersistentEntityData();
-            this.links.save(persistentEntityData);
-            this.manager().saveEntityData(this, persistentEntityData);
-        }
-    }
-
-    public long encodedSpawnPosition() {
-        return this.getEntityData().spawnPosition().encodedPosition();
-    }
-
-    public LinkedEntityControllers getLinks() {
-        return this.links;
-    }
-
-    public void updateLinks(final LinkedEntityControllers newLinks) {
-        this.links = newLinks;
-    }
-
-    public EntityData getEntityData() {
-        return Objects.requireNonNull(this.entityData);
-    }
-
-    public EntityState getEntityState() {
-        return this.entityState;
-    }
-
-    public void restoreEntityState() {
-        this.entityState.apply(this.entity);
-    }
-
-    public boolean haveBlocksChangedSinceTicking(final Level level) {
-        return this.blockStateRevision != level.getBlockStateRevisionCount();
-    }
-
-    private void updateTickingState(final boolean newTick) {
-        final LinkedEntityControllers links = this.links;
-        if (newTick) {
-            links.lastToTick = this;
-        }
-
-        final SakuraEntityController head = links.getHead();
-        final SakuraEntityController tail = links.getTail();
-        if (head != tail && head == this) {
-            this.manager().updateTickingStatus(links, true);
-        }
-        if (tail == this) {
-            this.manager().updateTickingStatus(links, false);
+        // Remove sleeping entities from the chunk map and add them back when woken up
+        if (sleeping) {
+            slices.removeEntityFromSections(entity);
+        } else {
+            slices.addEntityToSections(entity);
         }
     }
 

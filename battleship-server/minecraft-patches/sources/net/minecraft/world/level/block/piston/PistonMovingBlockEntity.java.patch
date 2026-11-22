@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/level/block/piston/PistonMovingBlockEntity.java
 +++ b/net/minecraft/world/level/block/piston/PistonMovingBlockEntity.java
-@@ -55,6 +_,52 @@
+@@ -55,6 +_,63 @@
      }
  
      // Folia end - region threading
@@ -45,14 +45,34 @@
 +
 +        final boolean isPushingSlime = movedState.is(Blocks.SLIME_BLOCK) && this.extending;
 +        me.samsuik.sakura.mechanics.PistonBehaviour.moveEntitiesWithProgress(
-+            level, movingBlockBox, direction, relativeProgress, isPushingSlime
++            level, movingBlockBox, direction, relativeProgress, isPushingSlime, this
 +        );
 +    }
 +    // Battleship end - configure server mechanics
++    // Battleship start - optimise piston entity movement
++    public me.samsuik.sakura.utils.@org.jspecify.annotations.Nullable SharedEntities sharedEntities = null;
++
++    public final List<Entity> getEntities(final Level level, final AABB aabb, final java.util.function.@org.jspecify.annotations.Nullable Predicate<? super Entity> selector) {
++        if (this.sharedEntities == null) {
++            return level.getEntities((Entity) null, aabb, selector);
++        } else {
++            return this.sharedEntities.getEntities(level, aabb, selector);
++        }
++    }
++    // Battleship end - optimise piston entity movement
 +
      public PistonMovingBlockEntity(final BlockPos worldPosition, final BlockState blockState) {
          super(BlockEntityTypes.PISTON, worldPosition, blockState);
      }
+@@ -131,7 +_,7 @@
+         VoxelShape shape = self.getCollisionRelatedBlockState().getCollisionShape(level, pos);
+         if (!shape.isEmpty()) {
+             AABB aabb = moveByPositionAndProgress(pos, shape.bounds(), self);
+-            List<Entity> entities = level.getEntities(null, PistonMath.getMovementArea(aabb, movement, deltaProgress).minmax(aabb));
++            List<Entity> entities = self.getEntities(level, PistonMath.getMovementArea(aabb, movement, deltaProgress).minmax(aabb), null); // Battleship - optimise piston entity movement
+             if (!entities.isEmpty()) {
+                 List<AABB> shapeAabbs = shape.toAabbs();
+                 boolean causeBounce = self.movedState.is(Blocks.SLIME_BLOCK);
 @@ -163,6 +_,12 @@
  
                          double delta = 0.0;
@@ -93,6 +113,15 @@
          NOCLIP.set(null);
      }
  
+@@ -204,7 +_,7 @@
+                 AABB aabb = moveByPositionAndProgress(pos, new AABB(0.0, stickyTop, 0.0, 1.0, 1.5000010000000001, 1.0), self);
+                 double deltaProgress = newProgress - self.progress;
+ 
+-                for (Entity entity : level.getEntities((Entity)null, aabb, entityx -> matchesStickyCritera(aabb, entityx, pos))) {
++                for (Entity entity : self.getEntities(level, aabb, entityx -> matchesStickyCritera(aabb, entityx, pos))) { // Battleship - optimise piston entity movement
+                     moveEntityByPiston(movement, entity, deltaProgress, movement);
+                 }
+             }
 @@ -306,12 +_,21 @@
      }
  

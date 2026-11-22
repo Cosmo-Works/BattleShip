@@ -6,7 +6,7 @@
  
 +    public <T> void sakura$patchComponent(final DataComponentType<T> prototype, final @org.jspecify.annotations.Nullable T newValue) {
 +        this.ensureMapOwnership();
-+        this.patch.put(prototype, java.util.Optional.ofNullable(newValue));
++        this.patch.put(prototype, Removed.nullToRemoved(newValue));
 +    }
 +
      public PatchedDataComponentMap(final DataComponentMap prototype) {

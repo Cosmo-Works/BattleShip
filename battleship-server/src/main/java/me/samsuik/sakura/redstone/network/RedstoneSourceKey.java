@@ -14,9 +14,7 @@ public record RedstoneSourceKey(
     @Nullable Orientation orientation,
     int updateDepth,
     int oldPower,
-    int newPower
+    int newPower,
+    boolean deduplicate
 ) {
-    public boolean isVanilla() {
-        return this.redstoneImplementation == WorldConfiguration.Misc.RedstoneImplementation.VANILLA;
-    }
 }

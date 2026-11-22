@@ -71,9 +71,22 @@ From `battleship-server.yml` to `sakura-global.yml`, same paths: `messages.fps-s
 
 `cannons.sand.despawn-inside-moving-pistons` now defaults to `true` (Sakura's default; it was `false`).
 
+#### Sakura update (up to `0a1a01b`)
+
+- New option `technical.optimise-auto-farms` (default `false`) in `sakura-world-defaults.yml` / `sakura-world.yml`.
+  It reduces redstone and piston updates in chunk sections where melon or pumpkin stems grew in the
+  last five minutes. It changes the redstone update order there, and pistons that only break a
+  block skip the piston extend and retract events
+- `technical.redstone.redstone-cache` no longer skips repeated wire updates by itself. That now
+  only happens around tracked auto farms, with `technical.optimise-auto-farms` enabled
+- Sulfur cubes no longer take `cannons.mechanics.height-parity` when they spawn. Battleship's own
+  `cannons.sulfur.height-parity` in `battleship-worlds.yml` still applies
+
 ### API
 
 - `BlockPreGrowEvent`, plus the Sakura API (durable materials, visibility, local config)
+- Sakura renamed `BlockPreDispenseEvent` to `DispenserPreTickEvent`. The old event is deprecated for
+  removal and still fires first; listen to `DispenserPreTickEvent` instead
 
 #### Useful Links
 

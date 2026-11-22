@@ -1,0 +1,14 @@
+--- a/net/minecraft/world/level/block/StemBlock.java
++++ b/net/minecraft/world/level/block/StemBlock.java
+@@ -84,6 +_,11 @@
+                                 return;
+                             }
+                             // CraftBukkit end
++                            // Battleship start - optimise redstone and pistons around auto farms
++                            if (level.sakuraConfig().technical.optimiseAutoFarms) {
++                                level.autoFarmTracker().newGrowth(pos);
++                            }
++                            // Battleship end - optimise redstone and pistons around auto farms
+                             level.setBlockAndUpdate(pos, stem.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, direction));
+                         }
+                     }

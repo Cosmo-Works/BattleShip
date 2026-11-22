@@ -1,5 +1,69 @@
 --- a/net/minecraft/world/level/block/piston/PistonBaseBlock.java
 +++ b/net/minecraft/world/level/block/piston/PistonBaseBlock.java
+@@ -91,9 +_,63 @@
+         return this.defaultBlockState().setValue(FACING, context.getNearestLookingDirection().getOpposite()).setValue(EXTENDED, false);
+     }
+ 
++    // Battleship start - optimise redstone and pistons around auto farms
++    private boolean destroyBlockAndMoveItems(final Level level, final BlockPos pos, final BlockState state) {
++        final Direction facing = state.getValue(FACING);
++        final BlockPos posFacingTowards = pos.relative(facing);
++        final BlockState blockToDestroy = level.getBlockState(posFacingTowards);
++        final BlockPos airGapPos = pos.relative(facing, 2);
++        final BlockState blockWithoutCollision = level.getBlockState(airGapPos);
++
++        if ((blockToDestroy.isAir() || blockToDestroy.getPistonPushReaction() == PushReaction.POPPED)
++            && blockWithoutCollision.moonrise$emptyCollisionShape()) {
++            // drop items
++            final BlockEntity blockEntity = blockToDestroy.hasBlockEntity()
++                ? level.getBlockEntity(posFacingTowards)
++                : null;
++
++            dropResources(blockToDestroy, level, airGapPos, blockEntity, pos, true);
++
++            // update piston
++            level.setBlock(pos, state.setValue(EXTENDED, true), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
++            level.setBlock(posFacingTowards, Blocks.PISTON_HEAD.defaultBlockState().setValue(FACING, facing), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
++            level.gameEvent(GameEvent.BLOCK_ACTIVATE, pos, GameEvent.Context.of(state));
++            return true;
++        }
++
++        return false;
++    }
++
++    private boolean retractNonSticky(final Level level, final BlockPos pos, final BlockState state) {
++        final Direction facing = state.getValue(FACING);
++        final BlockPos pistonHeadPos = pos.relative(facing);
++
++        if (level.getBlockState(pistonHeadPos).is(Blocks.PISTON_HEAD)) {
++            level.setBlock(pos, state.setValue(EXTENDED, false), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
++            level.setBlock(pistonHeadPos, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
++            level.gameEvent(GameEvent.BLOCK_DEACTIVATE, pos, GameEvent.Context.of(state));
++            return true;
++        }
++
++        return false;
++    }
++    // Battleship end - optimise redstone and pistons around auto farms
++
+     private void checkIfExtend(final Level level, final BlockPos pos, final BlockState state) {
+         Direction direction = state.getValue(FACING);
+         boolean extend = this.getNeighborSignal(level, pos, direction);
++        // Battleship start - optimise redstone and pistons around auto farms
++        if (extend != state.getValue(EXTENDED) && level.sakuraConfig().technical.optimiseAutoFarms && level.autoFarmTracker().isTrackedAutoFarm(pos)) {
++            if (extend && this.destroyBlockAndMoveItems(level, pos, state)) {
++                return;
++            }
++
++            if (!extend && state.is(Blocks.PISTON) && this.retractNonSticky(level, pos, state)) {
++                return;
++            }
++        }
++        // Battleship end - optimise redstone and pistons around auto farms
++
+         if (extend && !state.getValue(EXTENDED)) {
+             if (new PistonStructureResolver(level, pos, direction, true).resolve()) {
+                 level.blockEvent(pos, this, TRIGGER_EXTEND, direction.get3DDataValue());
 @@ -110,6 +_,11 @@
                  event = 2;
              }
@@ -12,6 +76,91 @@
              level.blockEvent(pos, this, event, direction.get3DDataValue());
          }
      }
+@@ -184,11 +_,15 @@
+             }
+             // Paper end - Fix sticky pistons and BlockPistonRetractEvent
+             level.setBlock(pos, movingPistonState, Block.UPDATE_NONE | Block.UPDATE_KNOWN_SHAPE);
+-            level.setBlockEntity(
+-                MovingPistonBlock.newMovingBlockEntity(
++            // Battleship start - optimise piston entity movement
++            final List<BlockEntity> movingBlockEntities = Lists.newArrayList();
++            final BlockEntity pistonBaseBlockEntity = MovingPistonBlock.newMovingBlockEntity(
+                     pos, movingPistonState, this.defaultBlockState().setValue(FACING, Direction.from3DDataValue(b1 & 7)), direction, false, true // Paper - Protect Bedrock and End Portal/Frames from being destroyed; diff on change
+-                )
+             );
++
++            movingBlockEntities.add(pistonBaseBlockEntity);
++            level.setBlockEntity(pistonBaseBlockEntity);
++            // Battleship end - optimise piston entity movement
+             level.updateNeighborsAt(pos, movingPistonState.getBlock());
+             movingPistonState.updateNeighbourShapes(level, pos, Block.UPDATE_CLIENTS);
+             if (this.isSticky) {
+@@ -219,7 +_,7 @@
+                         // Paper end - Fix sticky pistons and BlockPistonRetractEvent
+                         level.removeBlock(pos.relative(direction), false);
+                     } else {
+-                        this.moveBlocks(level, pos, direction, false);
++                        this.sakura$moveBlocks(level, pos, direction, false, movingBlockEntities); // Battleship - optimise piston entity movement
+                     }
+                 }
+             } else {
+@@ -284,7 +_,56 @@
+         return !state.hasBlockEntity();
+     }
+ 
++    // Battleship start - optimise piston entity movement
++    private void shareMovingBlockEntities(final List<BlockEntity> movingBlockEntities, final Direction direction) {
++        int minX = Integer.MAX_VALUE;
++        int minY = Integer.MAX_VALUE;
++        int minZ = Integer.MAX_VALUE;
++
++        int maxX = Integer.MIN_VALUE;
++        int maxY = Integer.MIN_VALUE;
++        int maxZ = Integer.MIN_VALUE;
++
++        for (final BlockEntity blockEntity : movingBlockEntities) {
++            final BlockPos blockPos = blockEntity.getBlockPos();
++            minX = Math.min(minX, blockPos.getX());
++            minY = Math.min(minY, blockPos.getY());
++            minZ = Math.min(minZ, blockPos.getZ());
++            maxX = Math.max(maxX, blockPos.getX());
++            maxY = Math.max(maxY, blockPos.getY());
++            maxZ = Math.max(maxZ, blockPos.getZ());
++        }
++
++        if (direction.getAxisDirection() == Direction.AxisDirection.POSITIVE) {
++            maxX += direction.getStepX();
++            maxY += direction.getStepY();
++            maxZ += direction.getStepZ();
++        } else {
++            minX += direction.getStepX();
++            minY += direction.getStepY();
++            minZ += direction.getStepZ();
++        }
++
++        final net.minecraft.world.phys.AABB sharedBounds = new net.minecraft.world.phys.AABB(minX, minY, minZ, maxX + 1.0, maxY + 1.50001, maxZ + 1.0);
++        final me.samsuik.sakura.utils.SharedEntities entities = new me.samsuik.sakura.utils.SharedEntities(sharedBounds);
++
++        for (final BlockEntity blockEntity : movingBlockEntities) {
++            ((PistonMovingBlockEntity) blockEntity).sharedEntities = entities;
++        }
++    }
++
+     private boolean moveBlocks(final Level level, final BlockPos pistonPos, final Direction direction, final boolean extending) {
++        return this.sakura$moveBlocks(level, pistonPos, direction, extending, Lists.newArrayList());
++    }
++
++    private boolean sakura$moveBlocks(
++        final Level level,
++        final BlockPos pistonPos,
++        final Direction direction,
++        final boolean extending,
++        final List<BlockEntity> movingBlockEntities
++    ) {
++        // Battleship end - optimise piston entity movement
+         BlockPos armPos = pistonPos.relative(direction);
+         if (!extending && level.getBlockState(armPos).is(Blocks.PISTON_HEAD)) {
+             level.setBlock(armPos, Blocks.AIR.defaultBlockState(), Block.UPDATE_NONE | Block.UPDATE_KNOWN_SHAPE);
 @@ -373,6 +_,14 @@
          for (int i = toPush.size() - 1; i >= 0; i--) {
              // Paper start - fix a variety of piston desync dupes
@@ -27,3 +176,40 @@
              BlockPos oldPos = toPush.get(i);
              BlockPos pos = oldPos;
              BlockState blockState = allowDesync ? level.getBlockState(oldPos) : null;
+@@ -386,9 +_,14 @@
+                 blockState = level.getBlockState(oldPos);
+                 deleteAfterMove.replace(oldPos, blockState);
+             }
+-            level.setBlockEntity(
+-                MovingPistonBlock.newMovingBlockEntity(pos, actualState, allowDesync ? toPushShapes.get(i) : blockState, direction, extending, false)
++            // Battleship start - optimise piston entity movement
++            final BlockEntity movingBlock = MovingPistonBlock.newMovingBlockEntity(
++                pos, actualState, allowDesync ? toPushShapes.get(i) : blockState, direction, extending, false
+             );
++
++            movingBlockEntities.add(movingBlock);
++            level.setBlockEntity(movingBlock);
++            // Battleship end - optimise piston entity movement
+             if (!allowDesync) {
+                 level.setBlock(oldPos, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE | Block.UPDATE_MOVE_BY_PISTON | Block.UPDATE_SKIP_ON_PLACE); // set air to prevent later physics updates from seeing this block
+             }
+@@ -405,8 +_,18 @@
+                 .setValue(MovingPistonBlock.TYPE, this.isSticky ? PistonType.STICKY : PistonType.DEFAULT);
+             deleteAfterMove.remove(armPos);
+             level.setBlock(armPos, blockState, Block.UPDATE_NONE | Block.UPDATE_MOVE_BY_PISTON);
+-            level.setBlockEntity(MovingPistonBlock.newMovingBlockEntity(armPos, blockState, state, direction, true, true));
++
++            // Battleship start - optimise piston entity movement
++            final BlockEntity pistonHeadBlockEntity = MovingPistonBlock.newMovingBlockEntity(
++                armPos, blockState, state, direction, true, true
++            );
++
++            movingBlockEntities.add(pistonHeadBlockEntity);
++            level.setBlockEntity(pistonHeadBlockEntity);
+         }
++
++        this.shareMovingBlockEntities(movingBlockEntities, direction);
++        // Battleship end - optimise piston entity movement
+ 
+         BlockState air = Blocks.AIR.defaultBlockState();
+ 

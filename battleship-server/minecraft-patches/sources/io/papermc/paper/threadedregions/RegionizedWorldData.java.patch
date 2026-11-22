@@ -1,6 +1,20 @@
 --- a/io/papermc/paper/threadedregions/RegionizedWorldData.java
 +++ b/io/papermc/paper/threadedregions/RegionizedWorldData.java
-@@ -178,6 +_,14 @@
+@@ -111,7 +_,12 @@
+                 into.loadedEntities.add(entity);
+             }
+             for (final Iterator<Entity> iterator = from.entityTickList.unsafeIterator(); iterator.hasNext();) {
+-                into.entityTickList.add(iterator.next());
++                // Battleship start - cannon entity merge; keep the tick order in line with the ticking entity list
++                final Entity tickingEntity = iterator.next();
++                if (into.entityTickList.add(tickingEntity)) {
++                    tickingEntity.sakura$updateTickOrder();
++                }
++                // Battleship end - cannon entity merge
+             }
+             for (final Iterator<Mob> iterator = from.navigatingMobs.unsafeIterator(); iterator.hasNext();) {
+                 into.navigatingMobs.add(iterator.next());
+@@ -178,6 +_,15 @@
  
              // chunkHoldersToBroadcast
              into.chunkHoldersToBroadcast.addAll(from.chunkHoldersToBroadcast);
@@ -10,20 +24,49 @@
 +            into.battleshipBlockStateRevision = Math.max(into.battleshipBlockStateRevision, from.battleshipBlockStateRevision);
 +            into.battleshipEntityManager.mergeFrom(from.battleshipEntityManager);
 +            into.battleshipDurableBlockManager.mergeFrom(from.battleshipDurableBlockManager);
++            into.battleshipAutoFarmTracker.mergeFrom(from.battleshipAutoFarmTracker, fromTickOffset); // Battleship - optimise redstone and pistons around auto farms
 +            // Battleship end - per-region tick scheduler and block state watchers
 +            into.battleshipPathCache.clear(); // Battleship - faster pathfinding: section versions are per region
              // Canvas start - region threading
  
              // debug subscribers
-@@ -365,6 +_,15 @@
+@@ -192,6 +_,7 @@
+         public void split(final @NonNull RegionizedWorldData from, final int chunkToRegionShift,
+                           final @NonNull Long2ReferenceOpenHashMap<RegionizedWorldData> regionToData,
+                           final @NonNull ReferenceOpenHashSet<RegionizedWorldData> dataSet) {
++            from.battleshipEntityManager.unmergeGroupsThatWouldSplit(from.allEntities, chunkToRegionShift); // Battleship - cannon entity merge; before the entities are assigned to their new regions
+             // connections
+             for (final Connection conn : from.connections) {
+                 final ServerPlayer player = conn.getPlayer();
+@@ -227,9 +_,7 @@
+                 final RegionizedWorldData into = regionToData.get(CoordinateUtils.getChunkKey(pos.x() >> chunkToRegionShift, pos.z() >> chunkToRegionShift));
+                 into.allEntities.add(entity);
+                 // note: entityTickList is a subset of allEntities
+-                if (from.entityTickList.contains(entity)) {
+-                    into.entityTickList.add(entity);
+-                }
++                // Battleship - cannon entity merge; ticking entities are split below to keep their tick order
+                 // note: loadedEntities is a subset of allEntities
+                 if (from.loadedEntities.contains(entity)) {
+                     into.loadedEntities.add(entity);
+@@ -365,6 +_,24 @@
                      into.chunkHoldersToBroadcast.add(chunkHolder);
                  }
              }
++            // Battleship start - cannon entity merge; split the ticking entities in the order they tick
++            for (final Iterator<Entity> iterator = from.entityTickList.unsafeIterator(); iterator.hasNext();) {
++                final Entity entity = iterator.next();
++                final ChunkPos pos = entity.chunkPosition();
++                regionToData.get(CoordinateUtils.getChunkKey(pos.x() >> chunkToRegionShift, pos.z() >> chunkToRegionShift))
++                    .entityTickList.add(entity);
++            }
++            // Battleship end - cannon entity merge
 +            // Battleship start - per-region tick scheduler and block state watchers
 +            from.battleshipTickScheduler.splitInto(chunkToRegionShift, regionToData, dataSet);
 +            from.battleshipBlockStateChangeTracker.splitInto(chunkToRegionShift, regionToData);
-+            from.battleshipEntityManager.splitInto(from.allEntities, chunkToRegionShift, regionToData);
++            from.battleshipEntityManager.splitInto(chunkToRegionShift, regionToData);
 +            from.battleshipDurableBlockManager.splitInto(chunkToRegionShift, regionToData);
++            from.battleshipAutoFarmTracker.splitInto(chunkToRegionShift, regionToData); // Battleship - optimise redstone and pistons around auto farms
 +            for (final RegionizedWorldData regionizedWorldData : dataSet) {
 +                regionizedWorldData.battleshipBlockStateRevision = from.battleshipBlockStateRevision;
 +            }
@@ -31,7 +74,7 @@
          }
      };
  
-@@ -484,11 +_,24 @@
+@@ -484,11 +_,25 @@
      public int wakeupInactiveRemainingVillagers;
      // Paper end
      public int currentPrimedTnt = 0; // Spigot
@@ -42,6 +85,7 @@
 +    public final me.samsuik.sakura.entity.SakuraEntityManager battleshipEntityManager = new me.samsuik.sakura.entity.SakuraEntityManager();
 +    public final me.samsuik.sakura.explosion.density.ExplosionObstructionCache battleshipObstructionCache = new me.samsuik.sakura.explosion.density.ExplosionObstructionCache();
 +    public final me.samsuik.sakura.explosion.DurableBlockManager battleshipDurableBlockManager;
++    public final me.samsuik.sakura.redstone.AutoFarmTracker battleshipAutoFarmTracker; // Battleship - optimise redstone and pistons around auto farms
 +    public final me.samsuik.sakura.mechanics.sake.DispenseRelocationHandler battleshipDispenseRelocationHandler;
 +    public final me.samsuik.sakura.entity.FallingBlockColumnLimits battleshipFallingBlockColumnLimits = new me.samsuik.sakura.entity.FallingBlockColumnLimits();
 +    public final me.samsuik.sakura.redstone.RedstoneWireCache battleshipRedstoneWireCache = new me.samsuik.sakura.redstone.RedstoneWireCache();
@@ -56,17 +100,31 @@
      public final List<LevelChunk> temporaryChunkTickList = new it.unimi.dsi.fastutil.objects.ObjectArrayList<>(); // Canvas - optimized collection
      public final Set<ChunkHolder> chunkHoldersToBroadcast = new ReferenceLinkedOpenHashSet<>();
  
-@@ -548,6 +_,10 @@
+@@ -548,6 +_,11 @@
          this.wireHandler = new WireHandler(world);
          this.turbo = new RedstoneWireTurbo((RedstoneWireBlock)Blocks.REDSTONE_WIRE);
          this.regionData = regionData;
 +        this.battleshipBlockStateChangeTracker = new me.samsuik.sakura.tracking.block_change.BlockStateChangeTracker(world); // Battleship - per-region block state watchers
 +        this.battleshipDurableBlockManager = new me.samsuik.sakura.explosion.DurableBlockManager(world); // Battleship - explosion durable blocks
++        this.battleshipAutoFarmTracker = new me.samsuik.sakura.redstone.AutoFarmTracker(world); // Battleship - optimise redstone and pistons around auto farms
 +        this.battleshipDispenseRelocationHandler = new me.samsuik.sakura.mechanics.sake.DispenseRelocationHandler(world); // Battleship - dispenser relocation
 +        me.samsuik.sakura.scheduler.ScheduleSakuraTasks.schedule(this.battleshipTickScheduler); // Battleship - per-region tick scheduler
          // Canvas start - region threading
          this.debugSubscribers = new ServerDebugSubscribers(MinecraftServer.getServer());
          this.debugSynchronizers = new LevelDebugSynchronizers(world);
+@@ -746,7 +_,11 @@
+         if (!TickThread.isTickThreadFor(entity)) {
+             throw new IllegalArgumentException("Entity " + entity + " is not under this region's control");
+         }
+-        this.entityTickList.add(entity);
++        // Battleship start - cannon entity merge
++        if (this.entityTickList.add(entity)) {
++            entity.sakura$updateTickOrder();
++        }
++        // Battleship end - cannon entity merge
+         TickRegions.RegionStats.updateCurrentRegion();
+     }
+ 
 @@ -770,6 +_,29 @@
              }
          } finally {

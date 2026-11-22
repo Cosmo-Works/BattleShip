@@ -99,7 +99,9 @@ public class TpsSubCommand implements SubCommand {
         final DetailedTPSGraph graph = new DetailedTPSGraph(GRAPH_WIDTH, GRAPH_HEIGHT, scale, tickHistory);
         final BuiltComponentCanvas canvas = graph.plot();
 
-        canvas.appendLeft(Component.text(":", NamedTextColor.BLACK));
+        // Alternate the side bar character so compact chat does not collapse identical rows
+        final int[] counter = new int[1];
+        canvas.appendLeft(() -> Component.text(counter[0]++ % 2 == 0 ? ":" : ";", NamedTextColor.BLACK));
         canvas.appendRight(Component.text(":", NamedTextColor.BLACK));
         canvas.header(this.createHeaderComponent(tickInformation, identifier));
         canvas.footer(Component.text("*", NamedTextColor.DARK_GRAY)

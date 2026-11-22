@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/level/Level.java
 +++ b/net/minecraft/world/level/Level.java
-@@ -180,6 +_,79 @@
+@@ -180,6 +_,85 @@
          return this.signalsDisabled;
      }
      // Canvas end - per-world redstone toggle
@@ -48,6 +48,12 @@
 +    public long getBlockStateRevisionCount() {
 +        return this.getCurrentWorldData().battleshipBlockStateRevision;
 +    }
++
++    // Battleship start - optimise redstone and pistons around auto farms
++    public me.samsuik.sakura.redstone.AutoFarmTracker autoFarmTracker() {
++        return this.getCurrentWorldData().battleshipAutoFarmTracker;
++    }
++    // Battleship end - optimise redstone and pistons around auto farms
 +
 +    public me.samsuik.sakura.entity.SakuraEntityManager entityManager() {
 +        return this.getCurrentWorldData().battleshipEntityManager;
@@ -159,6 +165,24 @@
                  ticker.tick();
                  if ((++tickedEntities & 7) == 0) {
                      this.moonrise$midTickTasks();
+@@ -1920,7 +_,7 @@
+     public List<Entity> getEntities(final @Nullable Entity except, final AABB bb, final Predicate<? super Entity> selector) {
+         ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread((ServerLevel)this, bb, "Cannot getEntities asynchronously"); // Folia - region threading
+         // Paper start - rewrite chunk system
+-        final List<Entity> ret = new java.util.ArrayList<>();
++        final List<Entity> ret = new it.unimi.dsi.fastutil.objects.ObjectArrayList<>(); // Battleship - use fastutil collections in getEntities
+ 
+         ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemLevel)this).moonrise$getEntityLookup().getEntities(except, bb, ret, selector);
+ 
+@@ -1932,7 +_,7 @@
+ 
+     @Override
+     public <T extends Entity> List<T> getEntities(final EntityTypeTest<Entity, T> type, final AABB bb, final Predicate<? super T> selector) {
+-        List<T> output = Lists.newArrayList();
++        List<T> output = new it.unimi.dsi.fastutil.objects.ObjectArrayList<>(); // Battleship - use fastutil collections in getEntities
+         this.getEntities(type, bb, selector, output);
+         return output;
+     }
 @@ -1947,6 +_,12 @@
      public <T extends Entity> void getEntities(final EntityTypeTest<Entity, T> entityTypeTest,
                                                 final AABB boundingBox, final Predicate<? super T> predicate,

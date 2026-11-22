@@ -19,6 +19,12 @@ public final class AnyChangeWatcher<T extends Watchable<T>> implements ChangeLis
         this.changed = true;
     }
 
+    @Override
+    public void removed(final T watchable) {
+        this.watchable.unwatch(this);
+        this.changed = true;
+    }
+
     public boolean hasChanged() {
         final boolean hasChanges = this.changed;
         this.changed = false;

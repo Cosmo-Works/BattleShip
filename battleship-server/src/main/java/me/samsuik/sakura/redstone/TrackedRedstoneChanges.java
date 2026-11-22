@@ -2,6 +2,7 @@
 package me.samsuik.sakura.redstone;
 
 import ca.spottedleaf.moonrise.common.util.TickThread;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -64,7 +65,7 @@ public final class TrackedRedstoneChanges {
 
     public @Nullable RedstoneNetwork createNetwork() {
         final Level level = this.level;
-        final boolean skipWireUpdates = this.sourceKey.isVanilla();
+        final boolean fullDeduplication = this.sourceKey.deduplicate();
         final Object2IntOpenHashMap<BlockPos> wireIndexes = new Object2IntOpenHashMap<>();
         wireIndexes.defaultReturnValue(-1);
 
@@ -80,7 +81,8 @@ public final class TrackedRedstoneChanges {
                 return null;
             }
 
-            if (skipWireUpdates && redstoneUpdate.isRedundantWireUpdate(this.redstoneChanges.get(wirePos))) {
+            // Filter out wires updates that are not the first and last update
+            if (fullDeduplication && redstoneUpdate.isRedundantWireUpdate(this.redstoneChanges.get(wirePos))) {
                 this.redstoneUpdates.set(wireIndex, redstoneUpdate.skip(true));
             }
             wireIndexes.put(wirePos, wireIndex);
@@ -96,10 +98,11 @@ public final class TrackedRedstoneChanges {
 
             final BlockState state = level.getBlockState(updatePos);
             final Block block = state.getBlock();
-            if (RedstoneBlockUtil.needsRedstoneUpdate(state)) {
+            if (!RedstoneBlockUtil.needsRedstoneUpdate(state)) {
                 redundantUpdates.set(updateIndex);
             }
-            if (state.is(Blocks.REDSTONE_WIRE)) {
+            // Never update redstone wires tracked by the network
+            if (state.is(Blocks.REDSTONE_WIRE) && wireIndexes.containsKey(updatePos)) {
                 this.neighborUpdates.set(updateIndex, null);
                 continue;
             }
@@ -113,6 +116,16 @@ public final class TrackedRedstoneChanges {
                 }
                 final RedstoneWireState neighborWireState = this.redstoneUpdates.get(neighborWireIndex);
                 this.redstoneUpdates.set(neighborWireIndex, neighborWireState.updateShapes(true));
+            }
+        }
+
+        if (fullDeduplication) {
+            final LongOpenHashSet updates = new LongOpenHashSet(wireIndexes.size() * 4);
+            for (int updateIndex = this.neighborUpdates.size() - 1; updateIndex >= 0; --updateIndex) {
+                final BlockPos updatePos = this.neighborUpdates.get(updateIndex);
+                if (updatePos != null && !updates.add(updatePos.asLong())) {
+                    this.neighborUpdates.set(updateIndex, null);
+                }
             }
         }
 

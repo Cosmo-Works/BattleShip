@@ -1,5 +1,5 @@
 // Ported from Sakura (https://github.com/Samsuik/Sakura), licensed under the MIT License.
-package me.samsuik.sakura.container;
+package me.samsuik.sakura.utils;
 
 import ca.spottedleaf.moonrise.common.util.TickThread;
 import java.util.List;
@@ -14,8 +14,8 @@ import org.bukkit.inventory.ItemStack;
 import org.jspecify.annotations.NullMarked;
 
 @NullMarked
-public final class InsertItemsIntoHoppers {
-    public static void onMobDeath(final ServerLevel level, final Entity entity, final List<Entity.DefaultDrop> drops) {
+public final class HopperHelper {
+    public static void insertItemsOnDeath(final ServerLevel level, final Entity entity, final List<Entity.DefaultDrop> drops) {
         if (!hopperOwnedByThisRegion(level, entity)) {
             return;
         }
@@ -69,6 +69,6 @@ public final class InsertItemsIntoHoppers {
         }
     }
 
-    private InsertItemsIntoHoppers() {
+    private HopperHelper() {
     }
 }

@@ -6,7 +6,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.item.FallingBlockEntity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.FallingBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jspecify.annotations.NullMarked;
@@ -32,8 +31,7 @@ public final class FallingBlockBehaviour {
         final BlockPos blockPos = fallingBlock.blockPosition();
         final BlockState state = level.getBlockState(blockPos);
 
-        // todo: Do we need to call the event here? This event is already called in the fall method that spawns the falling block entity.
-        if (state.is(block) && org.bukkit.craftbukkit.event.CraftEventFactory.callEntityChangeBlockEvent(fallingBlock, blockPos, Blocks.AIR.defaultBlockState())) {
+        if (state.is(block)) {
             level.removeBlock(blockPos, false);
         } else {
             if (state.is(block)) {

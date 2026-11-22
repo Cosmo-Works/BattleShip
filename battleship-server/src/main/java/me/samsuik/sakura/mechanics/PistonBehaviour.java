@@ -8,6 +8,7 @@ import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.piston.PistonMovingBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -67,9 +68,10 @@ public final class PistonBehaviour {
         final AABB movingBlockBox,
         final Direction direction,
         final float relativeProgress,
-        final boolean pushingSlime
+        final boolean pushingSlime,
+        final PistonMovingBlockEntity self
     ) {
-        for (final Entity entity : level.getEntities(null, movingBlockBox)) {
+        for (final Entity entity : self.getEntities(level, movingBlockBox, null)) {
             if (pushingSlime) {
                 entity.setDeltaMovement(bounceAlongPiston(direction, entity.getDeltaMovement()));
             } else {

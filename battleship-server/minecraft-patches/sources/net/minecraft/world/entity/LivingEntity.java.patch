@@ -339,7 +339,7 @@
 +            // Battleship start - use maxEntityCollision limit for entity retrieval
 +            final int limit = Math.max(maxCramming, maxEntityCollisions);
 +            final int search = limit * limit;
-+            final List<Entity> found = new java.util.ArrayList<>(4);
++            final List<Entity> found = new it.unimi.dsi.fastutil.objects.ObjectArrayList<>(4);
 +            this.level().getEntities(
 +                net.minecraft.world.level.entity.EntityTypeTest.forClass(Entity.class),
 +                this.getBoundingBox(),

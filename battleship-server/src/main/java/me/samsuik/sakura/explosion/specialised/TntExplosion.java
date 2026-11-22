@@ -1,9 +1,12 @@
 // Ported from Sakura (https://github.com/Samsuik/Sakura), licensed under the MIT License.
 package me.samsuik.sakura.explosion.specialised;
 
+import me.samsuik.sakura.entity.EntityState;
+import me.samsuik.sakura.entity.SakuraEntityController;
 import me.samsuik.sakura.mechanics.ExplosionBehaviour;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.item.PrimedTnt;
 import net.minecraft.world.level.ExplosionDamageCalculator;
 import net.minecraft.world.phys.Vec3;
@@ -42,5 +45,14 @@ public final class TntExplosion extends SpecialisedExplosion<PrimedTnt> {
     @Override
     protected boolean continueExploding(final PrimedTnt explodingEntity) {
         return true;
+    }
+
+    @Override
+    protected EntityState nextEntityState(final SakuraEntityController controller, final PrimedTnt explodingEntity) {
+        final PrimedTnt tempEntity = new PrimedTnt(EntityTypes.TNT, explodingEntity.level());
+        controller.getPreTickState().apply(tempEntity);
+
+        this.impactCannonEntity(tempEntity, this.center, 1, this.radius() * 2.0);
+        return EntityState.of(tempEntity);
     }
 }

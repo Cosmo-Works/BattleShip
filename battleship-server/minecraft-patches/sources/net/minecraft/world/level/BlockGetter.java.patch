@@ -1,11 +1,11 @@
 --- a/net/minecraft/world/level/BlockGetter.java
 +++ b/net/minecraft/world/level/BlockGetter.java
-@@ -207,9 +_,24 @@
+@@ -207,9 +_,25 @@
      }
  
      static boolean forEachBlockIntersectedBetween(final Vec3 from, final Vec3 to, final AABB aabbAtTarget, final BlockGetter.BlockStepVisitor visitor) {
 +        // Battleship start - configure server mechanics
-+        return forEachBlockIntersectedBetween(from, to, aabbAtTarget, me.samsuik.sakura.mechanics.MinecraftMechanicsTarget.latest(), visitor);
++        return forEachBlockIntersectedBetween(from, to, aabbAtTarget, me.samsuik.sakura.mechanics.MinecraftMechanicsTarget.latest(), 16, visitor); // Battleship - optimise check inside blocks
 +    }
 +
 +    static boolean forEachBlockIntersectedBetween(
@@ -13,6 +13,7 @@
 +        final Vec3 to,
 +        final AABB aabbAtTarget,
 +        final me.samsuik.sakura.mechanics.MinecraftMechanicsTarget mechanicsTarget,
++        final int maxMovementIterations, // Battleship - optimise check inside blocks
 +        final BlockGetter.BlockStepVisitor visitor
 +    ) {
          Vec3 travel = to.subtract(from);
@@ -27,7 +28,7 @@
                  if (!visitor.visit(blockPos, 0)) {
                      return false;
                  }
-@@ -217,22 +_,42 @@
+@@ -217,22 +_,43 @@
  
              return true;
          } else {
@@ -36,7 +37,8 @@
 +            final boolean yZero = travel.y() == 0.0;
 +            final boolean zZero = travel.z() == 0.0;
 +            if (xZero && yZero || yZero && zZero || xZero && zZero) {
-+                for (final BlockPos blockPos : me.samsuik.sakura.utils.SimpleBlockPosIterator.traverseBoundsInDirection(travel, aabbAtTarget, 16.0)) {
++                final int maxMovement = Math.max(maxMovementIterations, 1);
++                for (final BlockPos blockPos : me.samsuik.sakura.utils.SimpleBlockPosIterator.traverseBoundsInDirection(travel, aabbAtTarget, maxMovement)) {
 +                    if (!visitor.visit(blockPos, 0)) {
 +                        return false;
 +                    }

@@ -1,0 +1,56 @@
+--- a/net/minecraft/world/level/block/Block.java
++++ b/net/minecraft/world/level/block/Block.java
+@@ -398,6 +_,19 @@
+ 
+     // Paper start - Add BlockBreakBlockEvent
+     public static boolean dropResources(final BlockState state, final Level level, final BlockPos pos, final @Nullable BlockEntity blockEntity, final BlockPos source) {
++        // Battleship start - optimise redstone and pistons around auto farms
++        return dropResources(state, level, pos, blockEntity, source, false);
++    }
++
++    public static boolean dropResources(
++        final BlockState state,
++        final Level level,
++        final BlockPos pos,
++        final @Nullable BlockEntity blockEntity,
++        final BlockPos source,
++        final boolean withoutVelocity
++    ) {
++        // Battleship end - optimise redstone and pistons around auto farms
+         if (level instanceof ServerLevel serverLevel) {
+             List<org.bukkit.inventory.ItemStack> items = new java.util.ArrayList<>();
+             for (ItemStack drop : Block.getDrops(state, serverLevel, pos, blockEntity)) {
+@@ -408,7 +_,14 @@
+             event.setExpToDrop(block.getExpDrop(state, serverLevel, pos, net.minecraft.world.item.ItemStack.EMPTY, true)); // Paper - Properly handle xp dropping
+             event.callEvent();
+             for (org.bukkit.inventory.ItemStack drop : event.getDrops()) {
+-                popResource(serverLevel, pos, org.bukkit.craftbukkit.inventory.CraftItemStack.asNMSCopy(drop));
++                // Battleship start - optimise redstone and pistons around auto farms
++                final ItemStack itemToDrop = org.bukkit.craftbukkit.inventory.CraftItemStack.asNMSCopy(drop);
++                if (withoutVelocity) {
++                    popResourceWithoutVelocity(serverLevel, pos, itemToDrop);
++                } else {
++                    popResource(serverLevel, pos, itemToDrop);
++                }
++                // Battleship end - optimise redstone and pistons around auto farms
+             }
+             state.spawnAfterBreak(serverLevel, pos, ItemStack.EMPTY, false); // Paper - Properly handle xp dropping
+             block.popExperience(serverLevel, pos, event.getExpToDrop()); // Paper - Properly handle xp dropping
+@@ -451,6 +_,17 @@
+             state.spawnAfterBreak(serverLevel, pos, tool, dropExperience); // Paper - Properly handle xp dropping
+         }
+     }
++
++    // Battleship start - optimise redstone and pistons around auto farms
++    public static void popResourceWithoutVelocity(final Level level, final BlockPos pos, final ItemStack itemStack) {
++        double halfHeight = EntityTypes.ITEM.getHeight() / 2.0;
++        RandomSource random = level.getRandom();
++        double x = pos.getX() + 0.5 + Mth.nextDouble(random, -0.25, 0.25);
++        double y = pos.getY() + 0.5 + Mth.nextDouble(random, -0.25, 0.25) - halfHeight;
++        double z = pos.getZ() + 0.5 + Mth.nextDouble(random, -0.25, 0.25);
++        popResource(level, () -> new ItemEntity(level, x, y, z, itemStack, 0.0, 0.2, 0.0), itemStack);
++    }
++    // Battleship end - optimise redstone and pistons around auto farms
+ 
+     public static void popResource(final Level level, final BlockPos pos, final ItemStack itemStack) {
+         double halfHeight = EntityTypes.ITEM.getHeight() / 2.0;

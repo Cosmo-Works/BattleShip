@@ -1,6 +1,8 @@
 // Ported from Sakura (https://github.com/Samsuik/Sakura), licensed under the MIT License.
 package me.samsuik.sakura.explosion.specialised;
 
+import me.samsuik.sakura.entity.EntityState;
+import me.samsuik.sakura.entity.SakuraEntityController;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.projectile.hurtingprojectile.windcharge.AbstractWindCharge;
@@ -37,5 +39,10 @@ public final class WindChargeExplosion extends SpecialisedExplosion<AbstractWind
     @Override
     protected boolean continueExploding(final AbstractWindCharge explodingEntity) {
         return !explodingEntity.getSakuraEntityController().haveBlocksChangedSinceTicking(this.level());
+    }
+
+    @Override
+    protected EntityState nextEntityState(final SakuraEntityController controller, final AbstractWindCharge explodingEntity) {
+        return controller.getPreTickState();
     }
 }

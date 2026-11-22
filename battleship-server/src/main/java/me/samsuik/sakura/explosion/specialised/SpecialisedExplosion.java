@@ -101,31 +101,49 @@ public abstract class SpecialisedExplosion<E extends Entity & SakuraEntity> exte
         this.initialiseBlockCache();
         final double doubleRadius = this.radius() * 2.0;
 
+        EntityState expectedState = this.cause.getSakuraEntityController().getPreTickState();
         E explodingEntity = this.cause;
-        E nextEntity = this.nextEntity(explodingEntity, true);
-        boolean firstExplosion = true;
+        E nextEntity = this.nextEntity(explodingEntity, expectedState, true);
         while (true) {
+            final boolean lastExplosion = nextEntity == null;
             final SakuraEntityController controller = explodingEntity.getSakuraEntityController();
             final List<BlockPos> blocksToExplode = this.collectBlocksAndImpactEntities(
                 explodingEntity,
                 doubleRadius,
                 this.interactWithBlocks && this.swinging < FOUND_ALL_BLOCKS,
-                firstExplosion || nextEntity == null
+                lastExplosion
             );
-            firstExplosion = false;
-            nextEntity = this.keepIfStackedDuplicate(explodingEntity, nextEntity);
 
+            // Calculate the next entity state before destroying blocks
+            final EntityState swingState = this.nextEntityState(controller, explodingEntity);
             final boolean destroyedBlocks = this.finalizeExplosion(blocksToExplode);
-            if (nextEntity == null || !this.continueExploding(explodingEntity)) {
+            if (lastExplosion || !this.continueExploding(explodingEntity)) {
                 break;
             }
 
-            final EntityState entityState = controller.getEntityState();
-            explodingEntity = nextEntity;
-            nextEntity = this.nextEntity(explodingEntity, false);
+            final SakuraEntityController nextController = nextEntity.getSakuraEntityController();
 
-            entityState.apply(explodingEntity);
-            this.impactEntity(explodingEntity, this.center, 1, doubleRadius);
+            // Entities aren't always affected by explosions due to explosion batching.
+            // By keeping track of the expected state we can batch explosions without entity linking
+            if (this.bufferedExplosions.isEmpty()) {
+                expectedState = swingState;
+            }
+
+            expectedState.apply(nextEntity);
+            nextController.storeEntityState();
+
+            // The entity manager of the region ticking this explosion
+            this.level().entityManager().decouple(nextController);
+
+            // Apply the calculated next entity state
+            swingState.apply(nextEntity);
+            nextController.storeEntityState();
+
+            explodingEntity = nextEntity;
+
+            // Find the next entity before the explodingEntity is removed from the ticking entities
+            nextEntity = this.nextEntity(explodingEntity, expectedState, false);
+
             this.nextExplosion(blocksToExplode, destroyedBlocks);
             this.tickExplodableEntity(explodingEntity, doubleRadius, destroyedBlocks);
         }
@@ -133,27 +151,13 @@ public abstract class SpecialisedExplosion<E extends Entity & SakuraEntity> exte
         return 0;
     }
 
-    private @Nullable E keepIfStackedDuplicate(final E exploding, final @Nullable E next) {
-        if (next == null || !next.isAlive()) {
-            return null;
-        }
-
-        if (!next.position().equals(exploding.position())) {
-            return null;
-        }
-
-        if (!next.getDeltaMovement().equals(exploding.getDeltaMovement())) {
-            return null;
-        }
-
-        return next;
-    }
-
     protected abstract Vec3 explosionPosition(final E explodingEntity);
 
     protected abstract void preventEntityExploding(final E explodableEntity);
 
     protected abstract boolean continueExploding(final E explodingEntity);
+
+    protected abstract EntityState nextEntityState(final SakuraEntityController controller, final E explodingEntity);
 
     private List<BlockPos> collectBlocksAndImpactEntities(
         final E explodingEntity,
@@ -223,7 +227,7 @@ public abstract class SpecialisedExplosion<E extends Entity & SakuraEntity> exte
 
     private void tickExplodableEntity(final E explodableEntity, final double doubleRadius, final boolean destroyedBlocks) {
         final SakuraEntityController controller = explodableEntity.getSakuraEntityController();
-        final Vec3 oldMovement = controller.getEntityState().movement();
+        final Vec3 oldMovement = controller.getPreTickState().movement();
         final boolean hasMoved;
 
         if (this.moved) {
@@ -248,14 +252,14 @@ public abstract class SpecialisedExplosion<E extends Entity & SakuraEntity> exte
         explodableEntity.discard();
 
         if (this.moved) {
-            this.updateSwingingState(controller.getEntityState().movement(), oldMovement);
+            this.updateSwingingState(controller.getPreTickState().movement(), oldMovement);
         } else {
             this.swinging = ALL_DIRECTIONS;
         }
     }
 
     @SuppressWarnings("unchecked")
-    private @Nullable E nextEntity(final E explodingEntity, final boolean source) {
+    private @Nullable E nextEntity(final E explodingEntity, final EntityState expectedState, final boolean source) {
         final IteratorSafeOrderedReferenceSet<Entity> entities = this.level().getCurrentWorldData().tickingEntities();
         entities.createRawIterator();
         try {
@@ -279,10 +283,11 @@ public abstract class SpecialisedExplosion<E extends Entity & SakuraEntity> exte
             }
 
             final Entity nextEntity = (Entity) raw[nextIndex];
-            explodingEntity.getSakuraEntityController().decouple();
-            if (nextEntity instanceof final SakuraEntity nextSakuraEntity
-                && nextSakuraEntity.samePropertiesAndState(explodingEntity, source ? 1 : 0)) {
-                return (E) nextEntity;
+            if (nextEntity instanceof final SakuraEntity nextSakuraEntity) {
+                final EntityState currentState = EntityState.of(nextEntity);
+                if (expectedState.isInSimilarState(currentState) && nextSakuraEntity.sameProperties(explodingEntity, source ? 1 : 0)) {
+                    return (E) nextEntity;
+                }
             }
 
             return null;

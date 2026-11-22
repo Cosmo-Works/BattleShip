@@ -106,7 +106,7 @@
                  PathNavigation pathNavigation = navigatingMob.getNavigation();
                  if (pathNavigation.shouldRecomputePath(pos)) {
                      navigationsToUpdate.add(pathNavigation);
-@@ -2157,29 +_,100 @@
+@@ -2157,29 +_,104 @@
              case STANDARD -> Explosion.BlockInteraction.DESTROY; // CraftBukkit - handle custom explosion type
          };
          Vec3 center = new Vec3(x, y, z);
@@ -124,7 +124,11 @@
 +        );
 +        // Battleship end - optimise explosions
          if (configurator != null) configurator.accept(explosion); // Paper - Allow explosions to damage source
-+        this.getCurrentWorldData().battleshipEntityManager.decoupleAllTickingEntities(); // Battleship - cannon entity merge
++        // Battleship start - cannon entity merge
++        if (source != null) {
++            this.getCurrentWorldData().battleshipEntityManager.decoupleTickingEntities(source);
++        }
++        // Battleship end - cannon entity merge
          int blockCount = explosion.explode();
          // CraftBukkit start
          if (explosion.wasCanceled) {

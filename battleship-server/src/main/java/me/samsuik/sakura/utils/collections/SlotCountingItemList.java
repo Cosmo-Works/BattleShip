@@ -1,5 +1,5 @@
 // Ported from Sakura (https://github.com/Samsuik/Sakura), licensed under the MIT License.
-package me.samsuik.sakura.container;
+package me.samsuik.sakura.utils.collections;
 
 import java.util.Arrays;
 import java.util.List;

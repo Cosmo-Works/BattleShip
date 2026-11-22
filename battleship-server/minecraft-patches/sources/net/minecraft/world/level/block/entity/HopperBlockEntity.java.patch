@@ -12,7 +12,7 @@
      private static final int NO_COOLDOWN_TIME = -1;
      private static final Component DEFAULT_NAME = Component.translatable("container.hopper");
 -    private NonNullList<ItemStack> items = NonNullList.withSize(5, ItemStack.EMPTY);
-+    private me.samsuik.sakura.container.SlotCountingItemList items = me.samsuik.sakura.container.SlotCountingItemList.withSize(5, ItemStack.EMPTY); // Battleship - optimise hopper ticking
++    private me.samsuik.sakura.utils.collections.SlotCountingItemList items = me.samsuik.sakura.utils.collections.SlotCountingItemList.withSize(5, ItemStack.EMPTY); // Battleship - optimise hopper ticking
      public int cooldownTime = -1;
      private long tickedGameTime = Long.MIN_VALUE; // Folia - region threading
      private Direction facing;
@@ -162,7 +162,7 @@
      protected void loadAdditional(final ValueInput input) {
          super.loadAdditional(input);
 -        this.items = NonNullList.withSize(this.getContainerSize(), ItemStack.EMPTY);
-+        this.items = me.samsuik.sakura.container.SlotCountingItemList.withSize(this.getContainerSize(), ItemStack.EMPTY); // Battleship - optimise hopper ticking
++        this.items = me.samsuik.sakura.utils.collections.SlotCountingItemList.withSize(this.getContainerSize(), ItemStack.EMPTY); // Battleship - optimise hopper ticking
          if (!this.tryLoadLootTable(input)) {
              ContainerHelper.loadAllItems(input, this.items);
          }
@@ -276,7 +276,7 @@
      @Override
      protected void setItems(final NonNullList<ItemStack> items) {
 -        this.items = items;
-+        this.items = me.samsuik.sakura.container.SlotCountingItemList.copy(items); // Battleship - optimise hopper ticking
++        this.items = me.samsuik.sakura.utils.collections.SlotCountingItemList.copy(items); // Battleship - optimise hopper ticking
          canvas$recomputeFullState(this); // Canvas - optimize hoppers
      }
  

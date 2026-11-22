@@ -14,9 +14,7 @@ public final class RedstoneBlockUtil {
     }
 
     public static boolean needsRedstoneUpdate(final BlockState state) {
-        return state.isAir()
-            || state.liquid()
-            || !state.isSpecialBlock();
+        return !state.isAir() && state.isSpecialBlock();
     }
 
     public static boolean needsShapeUpdate(final BlockState state, final Block block) {

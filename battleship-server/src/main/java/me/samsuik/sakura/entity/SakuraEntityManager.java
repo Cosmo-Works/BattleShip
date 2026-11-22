@@ -1,6 +1,7 @@
 package me.samsuik.sakura.entity;
 
 import ca.spottedleaf.moonrise.common.util.CoordinateUtils;
+import ca.spottedleaf.moonrise.common.util.TickThread;
 import io.papermc.paper.threadedregions.RegionizedWorldData;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
@@ -22,14 +23,14 @@ import org.jspecify.annotations.Nullable;
 public final class SakuraEntityManager {
     private final SimpleHashTable<BlockPos, SakuraEntity> tickedEntityPositions = new SimpleHashTable<>(128);
     private @Nullable SakuraEntity lastEntityToTick;
-    private final ReferenceOpenHashSet<LinkedEntityControllers> activelyTicking = new ReferenceOpenHashSet<>();
+    private final ReferenceOpenHashSet<LinkedControllers> activelyTicking = new ReferenceOpenHashSet<>();
     private final Map<EntitySpawnPosition, PersistentEntityData> entityData = new Object2ObjectOpenHashMap<>();
 
     public EntityData getEntityData(final Entity entity) {
         final EntitySpawnPosition spawnPosition = EntitySpawnPosition.from(entity);
         final PersistentEntityData persistentEntityData = this.entityData.computeIfAbsent(
             spawnPosition,
-            sp -> new PersistentEntityData()
+            _ -> new PersistentEntityData()
         );
 
         MergeLevel mergeLevel = entity.level().localConfig().at(entity.blockPosition()).mergeLevel;
@@ -37,14 +38,38 @@ public final class SakuraEntityManager {
         return new EntityData(spawnPosition, mergeLevel, persistentEntityData);
     }
 
-    public void saveEntityData(final SakuraEntityController controller, final PersistentEntityData persistentEntityData) {
-        final EntitySpawnPosition entitySpawnPosition = controller.getEntityData().spawnPosition();
+    public void saveEntityData(final EntityData entityData, final PersistentEntityData persistentEntityData) {
+        final EntitySpawnPosition entitySpawnPosition = entityData.spawnPosition();
         final PersistentEntityData savedPersistentEntityData = this.entityData.get(entitySpawnPosition);
         if (savedPersistentEntityData != null) {
             savedPersistentEntityData.load(persistentEntityData);
         } else {
             this.entityData.put(entitySpawnPosition, persistentEntityData);
         }
+    }
+
+    public boolean tryLinkEntities(
+        final SakuraEntityController controller,
+        final Entity entity,
+        final SakuraEntity sakuraEntity,
+        final EntityState currentState,
+        final EntityData entityData
+    ) {
+        final MergeLevel mergeLevel = entityData.mergeLevel();
+        final SakuraEntity otherSakuraEntity = this.getEntityToLinkWith(
+            entity, sakuraEntity, controller, currentState, mergeLevel
+        );
+
+        if (otherSakuraEntity != null) {
+            final SakuraEntityController otherController = otherSakuraEntity.getSakuraEntityController();
+            if (controller.canLinkWith(sakuraEntity, otherSakuraEntity, otherController)) {
+                controller.linkWith(otherController);
+                return true;
+            }
+        }
+
+        this.lastEntityToTick = sakuraEntity;
+        return false;
     }
 
     public @Nullable SakuraEntity getEntityToLinkWith(
@@ -67,20 +92,21 @@ public final class SakuraEntityManager {
             return lastSakuraEntity;
         }
 
-        this.lastEntityToTick = sakuraEntity;
-
         SakuraEntity linkWithEntity = null;
         if (lastSakuraEntity != null
-            && mergeLevel == MergeLevel.STRICT
-            && sakuraEntity.sameProperties(lastSakuraEntity.asEntity(), 1)) {
+            && sakuraEntity.sameProperties(lastSakuraEntity.asEntity(), 1)
+            && lastSakuraEntity.isInSimilarState(currentState)) {
             linkWithEntity = lastSakuraEntity;
         }
 
         if (mergeLevel == MergeLevel.LENIENT || mergeLevel == MergeLevel.SPAWN) {
-            linkWithEntity = this.tickedEntityPositions.put(entity.blockPosition(), sakuraEntity);
+            final SakuraEntity entityWithSamePos = this.tickedEntityPositions.put(entity.blockPosition(), sakuraEntity);
+            if (linkWithEntity == null && entityWithSamePos != null && entityWithSamePos.isInSimilarState(currentState)) {
+                linkWithEntity = entityWithSamePos;
+            }
         }
 
-        return linkWithEntity != null && linkWithEntity.isInSimilarState(currentState) ? linkWithEntity : null;
+        return linkWithEntity;
     }
 
     public void tick(final long gameTime) {
@@ -93,13 +119,33 @@ public final class SakuraEntityManager {
         }
     }
 
-    public void decoupleAllTickingEntities() {
-        for (final LinkedEntityControllers controllers : List.copyOf(this.activelyTicking)) {
-            controllers.getHead().decoupleTicking();
+    public void decouple(final SakuraEntityController controller) {
+        controller.decouple(controller.entity.sakura$getTickOrder());
+        this.invalidate();
+    }
+
+    public void decoupleTickingEntities(final Entity entity) {
+        final int tickOrder = entity.sakura$getTickOrder();
+        for (final LinkedControllers linkedControllers : this.activelyTicking) {
+            final SakuraEntityController head = linkedControllers.getHead();
+            // Entities that left this region while ticking belong to another region now
+            if (TickThread.isTickThreadFor(head.entity)) {
+                head.decouple(tickOrder);
+            }
+        }
+
+        this.activelyTicking.clear();
+        this.invalidate();
+    }
+
+    private void invalidate() {
+        if (this.lastEntityToTick != null) {
+            this.lastEntityToTick = null;
+            this.tickedEntityPositions.clear();
         }
     }
 
-    public void updateTickingStatus(final LinkedEntityControllers controllers, final boolean ticking) {
+    public void updateTickingStatus(final LinkedControllers controllers, final boolean ticking) {
         if (ticking) {
             this.activelyTicking.add(controllers);
         } else {
@@ -116,29 +162,33 @@ public final class SakuraEntityManager {
     }
 
     public void splitInto(
-        final Iterable<Entity> entities,
         final int chunkToRegionShift,
         final Long2ReferenceOpenHashMap<RegionizedWorldData> regionToData
     ) {
-        this.unmergeGroupsThatWouldSplit(entities, chunkToRegionShift);
         this.clearScratch();
         this.activelyTicking.clear();
         this.movePersistentData(chunkToRegionShift, regionToData);
     }
 
-    private void unmergeGroupsThatWouldSplit(final Iterable<Entity> entities, final int chunkToRegionShift) {
-        final ReferenceOpenHashSet<LinkedEntityControllers> seen = new ReferenceOpenHashSet<>();
+    /**
+     * Wakes up the linked entities that would end up in different regions. This runs before the
+     * entities are handed to the new regions, as waking an entity up moves it to the head's position.
+     */
+    public void unmergeGroupsThatWouldSplit(final Iterable<Entity> entities, final int chunkToRegionShift) {
+        final ReferenceOpenHashSet<LinkedControllers> seen = new ReferenceOpenHashSet<>();
         for (final Entity entity : entities) {
             if (!(entity instanceof final SakuraEntity sakuraEntity)) {
                 continue;
             }
 
-            final LinkedEntityControllers links = sakuraEntity.getSakuraEntityController().getLinks();
+            final LinkedControllers links = sakuraEntity.getSakuraEntityController().getLinks();
             if (links.count() <= 1 || !seen.add(links)) {
                 continue;
             }
 
             if (links.membersWouldSeparate(controller -> regionKey(controller.entity, chunkToRegionShift))) {
+                // Regions split between ticks, the linked entities continue from where the head is now
+                links.getHead().storeEntityState();
                 sakuraEntity.getSakuraEntityController().unmergeAll();
             }
         }

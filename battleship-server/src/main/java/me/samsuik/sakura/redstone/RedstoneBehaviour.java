@@ -70,7 +70,8 @@ public final class RedstoneBehaviour {
             orientation,
             level.neighborUpdateDepth(),
             oldPower,
-            newPower
+            newPower,
+            level.autoFarmTracker().isTrackedAutoFarm(pos)
         ));
     }
 }
