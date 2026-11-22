@@ -31,7 +31,8 @@ public final class FallingBlockBehaviour {
         final BlockPos blockPos = fallingBlock.blockPosition();
         final BlockState state = level.getBlockState(blockPos);
 
-        if (state.is(block)) {
+        // Differs from upstream Sakura, which dropped this event: the entity can be moved or summoned onto a block the spawn event never covered.
+        if (state.is(block) && org.bukkit.craftbukkit.event.CraftEventFactory.callEntityChangeBlockEvent(fallingBlock, blockPos, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState())) {
             level.removeBlock(blockPos, false);
         } else {
             if (state.is(block)) {
