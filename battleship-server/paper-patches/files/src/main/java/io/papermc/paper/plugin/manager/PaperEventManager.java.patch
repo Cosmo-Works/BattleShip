@@ -8,19 +8,3 @@
          if (event.isAsynchronous() && this.server.isPrimaryThread()) {
              throw new IllegalStateException(event.getEventName() + " may only be triggered asynchronously.");
          } else if (!event.isAsynchronous() && !this.server.isPrimaryThread() && !this.server.isStopping()) {
-@@ -51,6 +_,7 @@
-                 continue;
-             }
- 
-+            final long battleship$gate = dev.cosmoworks.battleship.octopus.PluginGate.OBSERVE ? dev.cosmoworks.battleship.octopus.PluginGate.enter() : 0L; // Battleship - octopus plugin gate (observe)
-             try {
-                 registration.callEvent(event);
-             } catch (AuthorNagException ex) {
-@@ -73,6 +_,7 @@
-                     this.callEvent(new ServerExceptionEvent(new ServerEventException(msg, ex, registration.getPlugin(), registration.getListener(), event)));
-                 }
-             }
-+            if (battleship$gate != 0L) dev.cosmoworks.battleship.octopus.PluginGate.listener(event, registration.getPlugin(), battleship$gate); // Battleship - octopus plugin gate (observe)
-         }
-     }
- 

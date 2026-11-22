@@ -108,7 +108,6 @@ public final class RegionPhaseTiming {
         final long took = now - start;
         stats.ticks.increment();
         stats.total.add(took);
-        ALL_REGION_TICK_TIME.add(took);
         if (took > stats.windowMax) {
             stats.windowMax = took;
         }
@@ -127,44 +126,11 @@ public final class RegionPhaseTiming {
         return CURRENT.get() == null ? 0L : System.nanoTime();
     }
 
-    private static final ThreadLocal<Phase> PHASE = new ThreadLocal<>();
-
-    private static final LongAdder[] ALL_REGIONS = new LongAdder[PHASES.length];
-    private static final LongAdder ALL_REGION_TICK_TIME = new LongAdder();
-
-    public static long takeAllRegionTickTime() {
-        return ALL_REGION_TICK_TIME.sumThenReset();
-    }
-
-    static {
-        for (int i = 0; i < ALL_REGIONS.length; ++i) {
-            ALL_REGIONS[i] = new LongAdder();
-        }
-    }
-
     public static long start(final Phase phase) {
-        if (dev.cosmoworks.battleship.octopus.PluginGate.OBSERVE) {
-            PHASE.set(phase);
-        }
         return start();
     }
 
-    public static @Nullable Phase currentPhase() {
-        return PHASE.get();
-    }
-
-    public static long[] takeAllRegionTotals() {
-        final long[] ret = new long[ALL_REGIONS.length];
-        for (int i = 0; i < ret.length; ++i) {
-            ret[i] = ALL_REGIONS[i].sumThenReset();
-        }
-        return ret;
-    }
-
     public static void end(final Phase phase, final long start) {
-        if (dev.cosmoworks.battleship.octopus.PluginGate.OBSERVE && phase != Phase.HELPER_WAIT) {
-            PHASE.remove();
-        }
         if (start == 0L) {
             return;
         }
@@ -172,7 +138,6 @@ public final class RegionPhaseTiming {
         if (stats != null) {
             final long took = System.nanoTime() - start;
             stats.phases[phase.ordinal()].add(took);
-            ALL_REGIONS[phase.ordinal()].add(took);
         }
     }
 
@@ -190,9 +155,6 @@ public final class RegionPhaseTiming {
     }
 
     public static void packet(final Class<?> packetClass, final long start) {
-        if (dev.cosmoworks.battleship.octopus.PluginGate.OBSERVE) {
-            PHASE.remove();
-        }
         if (start == 0L) {
             return;
         }
@@ -202,7 +164,6 @@ public final class RegionPhaseTiming {
         }
         final long took = System.nanoTime() - start;
         stats.phases[Phase.PACKETS.ordinal()].add(took);
-        ALL_REGIONS[Phase.PACKETS.ordinal()].add(took);
         final LongAdder[] adders = stats.packets.computeIfAbsent(packetClass, k -> new LongAdder[] {new LongAdder(), new LongAdder()});
         adders[0].add(took);
         adders[1].increment();

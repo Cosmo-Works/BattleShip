@@ -38,8 +38,7 @@ public class BattleshipCommands {
             new TpsSubCommand(),
             new LocalConfigSubCommand(),
             new dev.cosmoworks.battleship.command.subcommands.CrowdSubCommand(),
-            new dev.cosmoworks.battleship.command.subcommands.RegionsSubCommand(),
-            new dev.cosmoworks.battleship.command.subcommands.GateSubCommand()
+            new dev.cosmoworks.battleship.command.subcommands.RegionsSubCommand()
         );
     }
 

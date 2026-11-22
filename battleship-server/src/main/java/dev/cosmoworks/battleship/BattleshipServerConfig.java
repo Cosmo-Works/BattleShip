@@ -58,7 +58,6 @@ public class BattleshipServerConfig extends Part {
                     Validator.validateObject(instance);
                     instance.linearFormat.resolveFormat();
                     INSTANCE = instance;
-                    dev.cosmoworks.battleship.octopus.PluginGate.configure(instance.octopus.gate.observe); // Battleship - octopus plugin gate
                     LOGGER.info("Loaded Battleship server configuration from {}", BASE_FILE);
                 }
             },
@@ -777,51 +776,6 @@ public class BattleshipServerConfig extends Part {
     }
 
     private static final Debug DEFAULT_DEBUG = new Debug();
-
-    {
-        option("octopus").docs("Octopus fork groundwork (M0): measurements only.");
-    }
-
-    public Octopus octopus = new Octopus();
-
-    public static class Octopus extends Part {
-
-        {
-            option("gate").docs("The plugin gate.");
-        }
-
-        public Gate gate = new Gate();
-
-        public static class Gate extends Part {
-
-            {
-                option("observe")
-                    .docs(
-                        "Measure plugin code as the octopus head would run it: every listener call (per phase kind, event, plugin,",
-                        "Folia support: calls/s, ms/s, p99), plugin scheduler tasks, plugin-class entities/goals/trackers, and the",
-                        "head cost per tick (with debug.region-phase-timing on). Logged by BattleshipGate, /sakura gate, JSON dump in",
-                        "logs/gate-<time>.json at shutdown. Nothing is changed."
-                    );
-                option("reportInterval")
-                    .docs("Seconds between reports (at least 5).")
-                    .greaterThanOrEqualTo(5);
-                option("reportRows")
-                    .docs("Rows per table in a report.")
-                    .greaterThanOrEqualTo(1);
-            }
-
-            public boolean observe = false;
-            public int reportInterval = 60;
-            public int reportRows = 25;
-        }
-    }
-
-    public static Octopus octopus() {
-        final BattleshipServerConfig config = INSTANCE;
-        return config == null ? DEFAULT_OCTOPUS : config.octopus;
-    }
-
-    private static final Octopus DEFAULT_OCTOPUS = new Octopus();
 
     {
         option("join").docs(
